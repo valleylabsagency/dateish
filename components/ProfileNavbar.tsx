@@ -1,13 +1,15 @@
 // ProfileNavbar.tsx
 import React from "react";
 import { View, TouchableOpacity, StyleSheet, Image } from "react-native";
-import { useRouter } from "expo-router";
 
-export default function ProfileNavbar() {
-  const router = useRouter();
+interface ProfileNavbarProps {
+  onBack: () => void;
+}
+
+export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
   return (
     <View style={profileNavbarStyles.navbar}>
-      <TouchableOpacity onPress={() => router.back()}>
+      <TouchableOpacity onPress={onBack}>
         <Image
           source={require("../assets/images/icons/back-arrow.png")}
           style={profileNavbarStyles.navIcon}

@@ -11,31 +11,48 @@ import {
   Dimensions,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { NavigationProp } from "../types"; // Import the navigation types
+import { NavigationProp } from "../types";
 import { useRouter } from "expo-router";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import typography from "@/assets/styles/typography";
 import { FirstTimeContext } from "../contexts/FirstTimeContext";
+import { signUp } from "../services/authservice"; // Updated signUp
 
 export default function WelcomeScreen() {
-  const navigation = useNavigation<NavigationProp>(); // Use typed navigation
-  const [showSignup, setShowSignup] = useState(false);
-  const [username, setUsername] = useState("");
+  const navigation = useNavigation<NavigationProp>();
+  const [showSignup, setShowSignup] = useState(true); // Always show signup form for new accounts
+  const [username, setUsername] = useState(""); // Now represents the username
   const [password, setPassword] = useState("");
   const [showError, setShowError] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const today = new Date().toLocaleDateString();
-
   const router = useRouter();
 
-  const handleNavigate = () => {
-    // If username is "unknown" (ignoring case) and the checkbox isn't checked, show error.
+  // Use the FirstTimeContext to access and update the global boolean.
+  const { firstTime, setFirstTime } = useContext(FirstTimeContext);
+
+  const handleSignUp = async () => {
+    // Example check: if username is "unknown" and firstTime is not set, show error
     if (username.trim().toLowerCase() === "unknown" && !firstTime) {
       setShowError(true);
-    } else {
-      setShowError(false);
-      router.push("/bar"); // Navigate if conditions are met
+      return;
+    }
+
+    setLoading(true);
+    setShowError(false);
+
+    try {
+      // Use the username to sign up. The authservice will append the domain.
+      const user = await signUp(username, password);
+      console.log("Account created for:", username);
+      router.push("/bar"); // Navigate after successful signup
+    } catch (error) {
+      console.error("Sign up error:", error);
+      setShowError(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -45,10 +62,8 @@ export default function WelcomeScreen() {
     [FontNames.MontserratExtraLight]: require("../assets/fonts/Montserrat-ExtraLight.ttf"),
     [FontNames.MontserratExtraLightItalic]: require("../assets/fonts/Montserrat-ExtraLightItalic.ttf"),
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
+    [FontNames.MVBoli]: require("../assets/fonts/mvboli.ttf")
   });
-
-  // Use the FirstTimeContext to access and update the global boolean.
-  const { firstTime, setFirstTime } = useContext(FirstTimeContext);
 
   if (!fontsLoaded) {
     return (
@@ -78,7 +93,6 @@ export default function WelcomeScreen() {
             resizeMode="contain"
           >
             <View style={styles.signupContainer}>
-              {/* Added marginTop to move title and date down */}
               <Text style={[styles.title, { marginTop: 20 }]}>Sign Up Sheet</Text>
               <Text style={[styles.date, { marginTop: 10 }]}>{today}</Text>
 
@@ -86,9 +100,9 @@ export default function WelcomeScreen() {
                 <Text style={styles.inputLabel}>Username:</Text>
                 <TextInput
                   style={styles.input}
-                  placeholderTextColor="#000"
                   value={username}
                   onChangeText={setUsername}
+                  autoCapitalize="none"
                 />
               </View>
 
@@ -96,23 +110,26 @@ export default function WelcomeScreen() {
                 <Text style={styles.inputLabel}>Password:</Text>
                 <TextInput
                   style={styles.input}
-                  placeholderTextColor="#000"
                   secureTextEntry
                   value={password}
                   onChangeText={setPassword}
                 />
               </View>
 
-              <TouchableOpacity style={styles.button} onPress={handleNavigate}>
-                <Text style={styles.buttonText}>GO IN!</Text>
+              <TouchableOpacity style={styles.button} onPress={handleSignUp}>
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>GO IN!</Text>
+                )}
               </TouchableOpacity>
 
-              {/* Error message: only show if conditions are met */}
               {showError && (
-                <Text style={styles.errorText}>Never heard of you...</Text>
+                <Text style={styles.errorText}>
+                  Never heard of you...
+                </Text>
               )}
 
-              {/* Checkbox and label container */}
               <View style={styles.checkboxContainer}>
                 <TouchableOpacity
                   onPress={() => setFirstTime(!firstTime)}
@@ -144,18 +161,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "transparent", // Ensures the background image shows through
+    backgroundColor: "transparent",
   },
   logo: {
     width: 400,
     height: 400,
     position: "absolute",
-    top: 30, // Adjusts the position of the logo
+    top: 30,
   },
   enterText: {
     fontSize: 48,
-    fontFamily: FontNames.MontserratRegular,
-    fontWeight: "700", // Bold
+    fontFamily: "Montserrat-Regular",
+    fontWeight: "700",
     letterSpacing: 3,
     color: "#8b003e",
     marginTop: 300,
@@ -173,20 +190,20 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontFamily: FontNames.MontserratBold,
+    fontFamily: "Montserrat-Bold",
     fontWeight: "700",
     color: "#000",
     position: "relative",
-    top: 10
+    top: 10,
   },
   date: {
     fontSize: 18,
-    fontFamily: FontNames.MontserratExtraLightItalic,
+    fontFamily: "Montserrat-ExtraLightItalic",
     fontWeight: "600",
     color: "#000",
     marginBottom: 20,
     position: "relative",
-    top: 3
+    top: 3,
   },
   inputContainer: {
     flexDirection: "row",
@@ -196,7 +213,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 15,
-    fontFamily: FontNames.MontserratBlack,
+    fontFamily: "Montserrat-Black",
     fontWeight: "600",
     color: "#000",
     width: 100,
@@ -206,6 +223,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#000",
     fontSize: 18,
+    fontFamily: FontNames.MVBoli,
     padding: 5,
     position: "relative",
     bottom: 10,
@@ -227,22 +245,22 @@ const styles = StyleSheet.create({
     borderColor: "#000",
     justifyContent: "center",
     alignItems: "center",
-    overflow: "visible", // Allow children to show outside
+    overflow: "visible",
     position: "relative",
   },
   checkmark: {
     position: "absolute",
-    top: -10,    // Shift upward; adjust as needed
-    right: -10,  // Shift to the right; adjust as needed
+    top: -10,
+    right: -10,
     fontSize: 28,
     width: 25,
     color: "black",
-    fontFamily: FontNames.MontserratBlack,
+    fontFamily: "Montserrat-Black",
     zIndex: 17,
   },
   checkboxLabel: {
     fontSize: 16,
-    fontFamily: FontNames.MontserratBold,
+    fontFamily: "Montserrat-Bold",
     fontWeight: "600",
     color: "#000",
     marginLeft: 8,
@@ -261,7 +279,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 32,
-    fontFamily: FontNames.MontserratExtraLight,
+    fontFamily: "Montserrat-ExtraLight",
     color: "white",
   },
   errorText: {
@@ -270,6 +288,6 @@ const styles = StyleSheet.create({
     top: 300,
     fontSize: 16,
     color: "red",
-    fontFamily: FontNames.MontserratRegular,
+    fontFamily: "Montserrat-Regular",
   },
 });

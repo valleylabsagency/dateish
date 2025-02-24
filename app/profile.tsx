@@ -1,4 +1,3 @@
-// profile.tsx
 import React, { useState, useContext, useEffect, useRef } from "react";
 import {
   View,
@@ -11,7 +10,6 @@ import {
   ActivityIndicator,
   Modal,
   Animated,
-  TouchableWithoutFeedback,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -22,12 +20,15 @@ import { FontNames } from "../constants/fonts";
 import { useRouter } from "expo-router";
 import { ProfileContext } from "../contexts/ProfileContext";
 import ProfileNavbar from "@/components/ProfileNavbar";
+import { logout } from "../services/authservice";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function ProfileScreen() {
-  const { profile, saveProfile, setProfileComplete } = useContext(ProfileContext);
+  // Consume the profile and its completeness status from context.
+  const { profile, saveProfile, setProfileComplete, profileComplete } = useContext(ProfileContext);
   const router = useRouter();
 
-  // Local state for form inputs, initialized to empty.
+  // Local state for form fields.
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [location, setLocation] = useState("");
@@ -42,7 +43,7 @@ export default function ProfileScreen() {
   // Animated value for Mr. Mingles image
   const rollAnim = useRef(new Animated.Value(500)).current;
 
-  // Pre-populate fields if a saved profile exists
+  // When the context’s profile changes, pre-populate the form.
   useEffect(() => {
     if (profile) {
       setName(profile.name || "");
@@ -62,7 +63,7 @@ export default function ProfileScreen() {
     [FontNames.MontSerratSemiBold]: require("../assets/fonts/Montserrat-SemiBold.ttf"),
   });
 
-  // Animate modal appearance
+  // Animate the modal appearance.
   useEffect(() => {
     Animated.timing(rollAnim, {
       toValue: modalVisible ? 0 : 500,
@@ -105,15 +106,23 @@ export default function ProfileScreen() {
     }
   };
 
-  // Save profile data using the context's saveProfile and navigate on success.
+  // The back button handler. If any field is missing, show the modal; otherwise, save and navigate.
   const handleSubmit = async () => {
+
     if (!name || !age || !location || !about || !photoUri) {
       setModalVisible(true);
       setModalTypedText("");
+      return; // Prevent navigation if the profile is incomplete.
     } else {
-      await saveProfile({ name, age, location, about, photoUri });
-      setProfileComplete(true);
-      router.push("/bar");
+      try {
+        // Save profile data (this updates Firestore and local cache)
+        await saveProfile({ name, age, location, about, photoUri });
+        setProfileComplete(true);
+        console.log("Profile saved successfully");
+        router.push("/bar");
+      } catch (error) {
+        console.error("Error saving profile:", error);
+      }
     }
   };
 
@@ -137,6 +146,17 @@ export default function ProfileScreen() {
     }
   };
 
+  // Logout handler: logs out, clears local storage, and routes back to welcome.
+  const handleLogout = async () => {
+    try {
+      await logout();
+      await AsyncStorage.clear();
+      router.push("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
   return (
     <ImageBackground
       source={require("../assets/images/bathroom-background.png")}
@@ -149,6 +169,7 @@ export default function ProfileScreen() {
         </View>
       ) : (
         <>
+          {/* ProfileNavbar should call our handleSubmit when the back button is pressed */}
           <ProfileNavbar onBack={handleSubmit} />
           <View style={styles.mirrorContainer}>
             <Text style={styles.header}>PROFILE</Text>
@@ -235,6 +256,14 @@ export default function ProfileScreen() {
               </View>
             </View>
           </Modal>
+          {/* Only show the logout button if the profile is complete */}
+          {profileComplete && (
+            <View style={styles.logoutContainer}>
+              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                <Text style={styles.logoutButtonText}>LOG OUT</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </>
       )}
     </ImageBackground>
@@ -335,6 +364,24 @@ const styles = StyleSheet.create({
   bottomEdit: {
     position: "relative",
     left: 140,
+  },
+  logoutContainer: {
+    position: "absolute",
+    bottom: 40,
+    width: "100%",
+    alignItems: "center",
+  },
+  logoutButton: {
+    backgroundColor: "#D9534F",
+    paddingVertical: 15,
+    paddingHorizontal: 50,
+    borderRadius: 30,
+    elevation: 5,
+  },
+  logoutButtonText: {
+    color: "#fff",
+    fontSize: 20,
+    fontFamily: FontNames.MontserratBold,
   },
 });
 
