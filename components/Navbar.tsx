@@ -1,48 +1,29 @@
 // Navbar.tsx
-import React from "react";
+import React, { useContext } from "react";
 import { View, Image, StyleSheet, TouchableOpacity } from "react-native";
-import { useRouter, usePathname } from "expo-router";
+import { useRouter } from "expo-router";
+import { NavbarContext } from "../app/_layout";
 
-export default function Navbar({ onSubmitForm }: { onSubmitForm?: () => Promise<void> | void }) {
-
+export default function Navbar() {
   const router = useRouter();
-  const pathName = usePathname();
-
-  const isProfile = pathName === '/profile'
-
-  const handleNavigate = () => {
-    router.push("/profile"); // Ensure your route matches the file name (e.g., "bar.tsx")
-  };
-
-  const handleBackPress = async () => {
-    // Optionally submit the form if provided (for the profile screen).
-    if (isProfile && onSubmitForm) {
-      await onSubmitForm();
-    }
-    // Navigate to the bar screen.
-    router.push('/bar');
-  };
+  const { showWcButton } = useContext(NavbarContext);
 
   return (
     <View style={styles.navbar}>
-      {isProfile ? (
-        <TouchableOpacity onPress={handleBackPress}>
+      {/* Conditionally render the WC button */}
+      {showWcButton ? (
+        <TouchableOpacity onPress={() => router.push("/profile")}>
           <Image
-            source={require('../assets/images/icons/back-arrow.png')}
+            source={require("../assets/images/icons/WC.png")}
             style={styles.navIcon}
             resizeMode="contain"
           />
-      </TouchableOpacity>
+        </TouchableOpacity>
       ) : (
-        <TouchableOpacity onPress={handleNavigate}>
-        <Image
-          source={require("../assets/images/icons/WC.png")}
-          style={styles.navIcon}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
+        // If not ready, you can render nothing (or a placeholder if desired)
+        <View style={styles.navPlaceholder} />
       )}
-      
+      {/* Other navbar items */}
       <View style={styles.navSpacer} />
       <Image
         source={require("../assets/images/icons/speaker-icon.png")}
@@ -71,5 +52,9 @@ const styles = StyleSheet.create({
   },
   navSpacer: {
     flex: 1,
+  },
+  navPlaceholder: {
+    width: 50,
+    height: 50,
   },
 });

@@ -1,4 +1,4 @@
-// components/BottomNavbar.tsx
+// BottomNavbar.tsx
 import React from 'react';
 import { View, TouchableOpacity, Image, StyleSheet, Text } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
@@ -15,25 +15,39 @@ export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
   const currentPath = usePathname();
 
   const handleTabPress = (route: string) => {
-    //router.push(route);
+    if (route !== currentPath) {
+      router.push(route);
+    }
   };
 
   return (
     <View style={styles.navbar}>
       {tabs.map((tab) => {
+        // Conditionally add additional styles for "Browse" and "Stage"
+        let labelAdditionalStyle = {};
+        let iconAdditionalStyle = {};
+        if (tab.label === "Browse") {
+          labelAdditionalStyle = styles.browseLabel;
+          iconAdditionalStyle = styles.browseIcon;
+        } else if (tab.label === "Stage") {
+          labelAdditionalStyle = styles.stageLabel;
+          iconAdditionalStyle = styles.stageIcon;
+        }
         const isSelected = tab.label === selectedTab;
         return (
           <TouchableOpacity
             key={tab.label}
-            style={styles.tab}
+            style={[styles.tab]}
             onPress={() => handleTabPress(tab.route)}
           >
             <Image
               source={tab.icon}
-              style={[styles.icon, isSelected && styles.selectedIcon]}
+              style={[styles.icon, isSelected && styles.selectedIcon, iconAdditionalStyle]}
               resizeMode="contain"
             />
-            <Text style={[styles.label, isSelected && styles.selectedLabel]}>{tab.label}</Text>
+            <Text style={[styles.label, isSelected && styles.selectedLabel, labelAdditionalStyle]}>
+              {tab.label}
+            </Text>
           </TouchableOpacity>
         );
       })}
@@ -44,7 +58,7 @@ export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
 const styles = StyleSheet.create({
   navbar: {
     width: '100%',
-    height: 70,
+    height: 90,
     backgroundColor: '#460b2a',
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -53,20 +67,46 @@ const styles = StyleSheet.create({
   tab: {
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 5,
+  },
+  
+  browseLabel: {
+   position: "relative",
+   bottom: 12
+   
+  },
+  browseIcon: {
+    width: 85,
+    height: 85,
+    position: "relative",
+    top: 8,
+  },
+  
+  stageLabel: {
+    position: "relative",
+    bottom: 6
+  },
+  stageIcon: {
+    width: 80,
+    height: 60,
+    position: "relative",
+    top: 2
   },
   icon: {
-    width: 30,
-    height: 30,
+    width: 45,
+    height: 45,
     tintColor: '#fff',
   },
   selectedIcon: {
-    tintColor: '#000', // Darker tint for the selected tab
+    // Optionally add styling for selected icon here.
   },
   label: {
-    fontSize: 12,
+    fontSize: 10,
+    marginTop: 8,
     color: '#fff',
+    textTransform: 'uppercase',
   },
   selectedLabel: {
-    color: '#000', // Darker text for the selected tab
+    // Optionally add styling for selected label here.
   },
 });

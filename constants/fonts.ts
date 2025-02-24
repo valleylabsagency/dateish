@@ -1,6 +1,11 @@
 // src/constants/fonts.ts
 export const FontNames = {
-    Montserrat: 'Montserrat-VariableFont_wght',
+    MontserratBold: 'Montserrat-Bold',
+    MontserratBlack: 'Montserrat-Black',
+    MontserratExtraLight: 'Montserrat-ExtraLight',
+    MontserratExtraLightItalic: 'Montserrat-ExtraLightItalic',
+    MontserratRegular: 'Montserrat-Regular',
+    MontSerratSemiBold: 'Montserrat-SemiBold',
     MVBoli: 'MVBoli',
   };
   

@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   Text,
   TextInput,
+  ActivityIndicator,
   TouchableOpacity,
   ImageBackground,
   Image,
@@ -12,20 +13,50 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { NavigationProp } from "../types"; // Import the navigation types
 import { useRouter } from "expo-router";
+import { useFonts } from "expo-font";
+import { FontNames } from "../constants/fonts";
+import typography from "@/assets/styles/typography";
+import { FirstTimeContext } from "../contexts/FirstTimeContext";
 
 export default function WelcomeScreen() {
   const navigation = useNavigation<NavigationProp>(); // Use typed navigation
   const [showSignup, setShowSignup] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showError, setShowError] = useState(false);
 
   const today = new Date().toLocaleDateString();
 
   const router = useRouter();
 
   const handleNavigate = () => {
-    router.push("/bar"); // Ensure your route matches the file name (e.g., "bar.tsx")
+    // If username is "unknown" (ignoring case) and the checkbox isn't checked, show error.
+    if (username.trim().toLowerCase() === "unknown" && !firstTime) {
+      setShowError(true);
+    } else {
+      setShowError(false);
+      router.push("/bar"); // Navigate if conditions are met
+    }
   };
+
+  const [fontsLoaded] = useFonts({
+    [FontNames.MontserratBold]: require("../assets/fonts/Montserrat-Bold.ttf"),
+    [FontNames.MontserratBlack]: require("../assets/fonts/Montserrat-Black.ttf"),
+    [FontNames.MontserratExtraLight]: require("../assets/fonts/Montserrat-ExtraLight.ttf"),
+    [FontNames.MontserratExtraLightItalic]: require("../assets/fonts/Montserrat-ExtraLightItalic.ttf"),
+    [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
+  });
+
+  // Use the FirstTimeContext to access and update the global boolean.
+  const { firstTime, setFirstTime } = useContext(FirstTimeContext);
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <ImageBackground
@@ -34,7 +65,11 @@ export default function WelcomeScreen() {
       resizeMode="cover"
     >
       <View style={styles.container}>
-        <Image source={require("../assets/images/Logo.png")} style={styles.logo} resizeMode="contain" />
+        <Image
+          source={require("../assets/images/Logo.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
 
         {showSignup ? (
           <ImageBackground
@@ -43,14 +78,14 @@ export default function WelcomeScreen() {
             resizeMode="contain"
           >
             <View style={styles.signupContainer}>
-              <Text style={styles.title}>Sign Up Sheet</Text>
-              <Text style={styles.date}>{today}</Text>
+              {/* Added marginTop to move title and date down */}
+              <Text style={[styles.title, { marginTop: 20 }]}>Sign Up Sheet</Text>
+              <Text style={[styles.date, { marginTop: 10 }]}>{today}</Text>
 
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Username:</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Type here..."
                   placeholderTextColor="#000"
                   value={username}
                   onChangeText={setUsername}
@@ -61,7 +96,6 @@ export default function WelcomeScreen() {
                 <Text style={styles.inputLabel}>Password:</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Type here..."
                   placeholderTextColor="#000"
                   secureTextEntry
                   value={password}
@@ -69,14 +103,25 @@ export default function WelcomeScreen() {
                 />
               </View>
 
-              <View style={styles.checkboxContainer}>
-                <Text style={styles.checkboxLabel}>It's my first time here</Text>
-              </View>
-
-              {/* Fixed navigation issue here */}
               <TouchableOpacity style={styles.button} onPress={handleNavigate}>
                 <Text style={styles.buttonText}>GO IN!</Text>
               </TouchableOpacity>
+
+              {/* Error message: only show if conditions are met */}
+              {showError && (
+                <Text style={styles.errorText}>Never heard of you...</Text>
+              )}
+
+              {/* Checkbox and label container */}
+              <View style={styles.checkboxContainer}>
+                <TouchableOpacity
+                  onPress={() => setFirstTime(!firstTime)}
+                  style={styles.checkbox}
+                >
+                  {firstTime && <Text style={styles.checkmark}>✓</Text>}
+                </TouchableOpacity>
+                <Text style={styles.checkboxLabel}>It's my first time here</Text>
+              </View>
             </View>
           </ImageBackground>
         ) : (
@@ -88,8 +133,6 @@ export default function WelcomeScreen() {
     </ImageBackground>
   );
 }
-
-// Styles remain the same...
 
 const styles = StyleSheet.create({
   background: {
@@ -111,10 +154,11 @@ const styles = StyleSheet.create({
   },
   enterText: {
     fontSize: 48,
-    fontWeight: 300,
-    letterSpacing: 5,
+    fontFamily: FontNames.MontserratRegular,
+    fontWeight: "700", // Bold
+    letterSpacing: 3,
     color: "#8b003e",
-    marginTop: 300
+    marginTop: 300,
   },
   clipboard: {
     marginTop: 90,
@@ -129,24 +173,32 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: "bold",
+    fontFamily: FontNames.MontserratBold,
+    fontWeight: "700",
     color: "#000",
+    position: "relative",
+    top: 10
   },
   date: {
     fontSize: 18,
+    fontFamily: FontNames.MontserratExtraLightItalic,
+    fontWeight: "600",
     color: "#000",
     marginBottom: 20,
+    position: "relative",
+    top: 3
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    width: "100%",
+    width: "80%",
     marginBottom: 15,
   },
   inputLabel: {
-    fontSize: 18,
+    fontSize: 15,
+    fontFamily: FontNames.MontserratBlack,
+    fontWeight: "600",
     color: "#000",
-    fontWeight: "bold",
     width: 100,
   },
   input: {
@@ -155,33 +207,69 @@ const styles = StyleSheet.create({
     borderColor: "#000",
     fontSize: 18,
     padding: 5,
+    position: "relative",
+    bottom: 10,
+    left: 2,
     color: "#000",
   },
   checkboxContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 0,
+    marginTop: 20,
+    position: "relative",
+    top: 30,
+  },
+  checkbox: {
+    width: 25,
+    height: 25,
+    borderWidth: 3,
+    borderColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "visible", // Allow children to show outside
+    position: "relative",
+  },
+  checkmark: {
+    position: "absolute",
+    top: -10,    // Shift upward; adjust as needed
+    right: -10,  // Shift to the right; adjust as needed
+    fontSize: 28,
+    width: 25,
+    color: "black",
+    fontFamily: FontNames.MontserratBlack,
+    zIndex: 17,
   },
   checkboxLabel: {
     fontSize: 16,
+    fontFamily: FontNames.MontserratBold,
+    fontWeight: "600",
     color: "#000",
     marginLeft: 8,
   },
   button: {
     backgroundColor: "#610e14",
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 50,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 25,
     shadowColor: "#4a0a0f",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 4,
-    elevation: 5, // For Android shadow
+    elevation: 5,
+    marginTop: 20,
   },
   buttonText: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#ff33d0",
+    fontSize: 32,
+    fontFamily: FontNames.MontserratExtraLight,
+    color: "white",
+  },
+  errorText: {
+    marginTop: 10,
+    position: "absolute",
+    top: 300,
+    fontSize: 16,
+    color: "red",
+    fontFamily: FontNames.MontserratRegular,
   },
 });
-
