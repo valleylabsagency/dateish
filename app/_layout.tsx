@@ -5,6 +5,9 @@ import { Stack, usePathname } from "expo-router";
 import Navbar from "../components/Navbar";
 import { ProfileProvider } from "../contexts/ProfileContext";
 import { FirstTimeProvider } from "../contexts/FirstTimeContext";
+import { NotificationContext, NotificationProvider } from "@/contexts/NotificationContext";
+import InAppNotification from '../components/InAppNotification';
+import OfflineNotice from '../components/OfflineNotice';
 
 export const NavbarContext = createContext({
   showWcButton: false,
@@ -19,18 +22,36 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const hideNavbar = pathname === "/profile" || pathname === "/welcome" || pathname === "/chat";
 
   return (
-    <FirstTimeProvider>
-      <ProfileProvider>
-        <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-          <View style={styles.container}>
-            {!hideNavbar && <Navbar />}
-            <Stack screenOptions={{ headerShown: false }} />
-          </View>
-        </NavbarContext.Provider>
-      </ProfileProvider>
-    </FirstTimeProvider>
+    <NotificationProvider>
+      <FirstTimeProvider>
+        <ProfileProvider>
+          <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
+            <View style={styles.container}>
+              <OfflineNotice />
+              {!hideNavbar && <Navbar />}
+              <Stack screenOptions={{ headerShown: false }} />
+            </View>
+          </NavbarContext.Provider>
+        </ProfileProvider>
+      </FirstTimeProvider>
+    </NotificationProvider>
+    
   );
 }
+
+function GlobalLayout({ children }: { children: React.ReactNode }) {
+  const { visible, message, chatId, hideNotification } = useContext(NotificationContext);
+
+  return (
+    <View style={styles.container}>
+      {/* Render the notification over all screens */}
+      <InAppNotification visible={visible} message={message} chatId={chatId} onDismiss={hideNotification} />
+      {children}
+    </View>
+  );
+}
+
+
 
 const styles = StyleSheet.create({
   container: {

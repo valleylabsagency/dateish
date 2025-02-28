@@ -21,7 +21,7 @@ import { signUp } from "../services/authservice"; // Updated signUp
 
 export default function WelcomeScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const [showSignup, setShowSignup] = useState(true); // Always show signup form for new accounts
+  const [showSignup, setShowSignup] = useState(false); // Always show signup form for new accounts
   const [username, setUsername] = useState(""); // Now represents the username
   const [password, setPassword] = useState("");
   const [showError, setShowError] = useState(false);

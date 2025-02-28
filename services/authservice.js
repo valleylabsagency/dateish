@@ -3,7 +3,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } f
 
 export const signUp = (username, password) => {
   // Construct a pseudo-email using the username.
-  const pseudoEmail = `${username}@yourapp.com`;
+  const pseudoEmail = `${username}@dateish.com`;
   return createUserWithEmailAndPassword(auth, pseudoEmail, password)
     .then((userCredential) => {
       const user = userCredential.user;
@@ -18,7 +18,7 @@ export const signUp = (username, password) => {
 };
 
 export const login = (username, password) => {
-  const pseudoEmail = `${username}@yourapp.com`;
+  const pseudoEmail = `${username}@dateish.com`;
   return signInWithEmailAndPassword(auth, pseudoEmail, password)
     .then((userCredential) => {
       const user = userCredential.user;

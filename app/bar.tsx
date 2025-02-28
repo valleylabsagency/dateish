@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Image,
   Modal,
+  Animated,
 } from "react-native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { NavbarContext } from "./_layout";
@@ -16,14 +17,13 @@ import { ProfileContext } from "../contexts/ProfileContext";
 import BottomNavbar from "../components/BottomNavbar";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
-import typography from "@/assets/styles/typography";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import * as Updates from "expo-updates";
+import { MaterialIcons } from "@expo/vector-icons";
 
 function BarMessages() {
   const messages = [
-    "Tap me. If you dare…",
+    "Beep Boop Beep Mothafuckas!",
     "Hello! I’m Mr. Mingles, how you doin?",
     "Welcome to Dateish!",
     "Yes. It’s another dating app.",
@@ -37,13 +37,19 @@ function BarMessages() {
     "Who will you see? Whoever is in the bar right now!",
     "All genders and ages. Like REAL life.",
     "I mean it’s still an app, but that’s the concept.",
-    "So first thing - go to the bathroom and make yourself a profile!"
+    "So first thing - go to the bathroom and make yourself a profile!",
   ];
 
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [displayedText, setDisplayedText] = useState("");
   const [isTyping, setIsTyping] = useState(true);
   const { setShowWcButton } = useContext(NavbarContext);
+  const router = useRouter();
+
+  // Animated value for WC pointer.
+  const pointerAnim = useRef(new Animated.Value(0)).current;
+  // Separate animated value for speech bubble pointer.
+  const speechPointerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const currentMessage = messages[currentMessageIndex];
@@ -62,12 +68,46 @@ function BarMessages() {
     return () => clearInterval(interval);
   }, [currentMessageIndex]);
 
-  // Show the WC button when the last message finishes typing.
+  // When the last message finishes, show the WC button and start WC pointer animation.
   useEffect(() => {
     if (currentMessageIndex === messages.length - 1 && !isTyping) {
       setShowWcButton(true);
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pointerAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pointerAnim, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
     }
-  }, [currentMessageIndex, isTyping, setShowWcButton]);
+  }, [currentMessageIndex, isTyping, setShowWcButton, pointerAnim]);
+
+  // When the first message finishes, start the speech bubble pointer animation.
+  useEffect(() => {
+    if (currentMessageIndex === 0 && !isTyping) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(speechPointerAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(speechPointerAnim, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [currentMessageIndex, isTyping, speechPointerAnim]);
 
   return (
     <TouchableWithoutFeedback
@@ -97,6 +137,48 @@ function BarMessages() {
             <Text style={styles.text}>{displayedText}</Text>
           </View>
         </MaskedView>
+        {/* WC Pointer – appears when introduction is complete */}
+        {currentMessageIndex === messages.length - 1 && !isTyping && (
+          <Animated.View
+            style={[
+              styles.wcPointer,
+              {
+                opacity: pointerAnim,
+                transform: [
+                  {
+                    translateY: pointerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -10],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <MaterialIcons name="pan-tool-alt" size={60} color="#fff" />
+          </Animated.View>
+        )}
+        {/* Speech Pointer – appears when the first message is complete */}
+        {currentMessageIndex === 0 && !isTyping && (
+          <Animated.View
+            style={[
+              styles.speechPointer,
+              {
+                opacity: speechPointerAnim,
+                transform: [
+                  {
+                    translateY: speechPointerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -10],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <MaterialIcons name="pan-tool-alt" size={60} color="#fff" />
+          </Animated.View>
+        )}
       </View>
     </TouchableWithoutFeedback>
   );
@@ -109,28 +191,23 @@ function BarProfileComplete() {
   const { setShowWcButton } = useContext(NavbarContext);
   const router = useRouter();
 
-  // Ensure the WC button is visible when profile is complete.
   useEffect(() => {
     setShowWcButton(true);
   }, [setShowWcButton]);
+
+  // If the user never selects a drink, default to "water" when the drink menu is closed.
+  useEffect(() => {
+    if (!showDrinkMenu && !profile.drink) {
+      saveProfile({ drink: "water" });
+    }
+  }, [showDrinkMenu, profile, saveProfile]);
 
   const handleTapPress = () => {
     setShowDrinkMenu(true);
   };
 
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.clear();
-      console.log("Local storage cleared.");
-      await Updates.reloadAsync();
-    } catch (error) {
-      console.error("Error clearing local storage", error);
-    }
-  };
-
   const handleDrinkSelect = async (drinkName: string) => {
     try {
-      // Use the shared saveProfile function to update the drink property.
       await saveProfile({ drink: drinkName });
       console.log("Drink updated in profile:", drinkName);
     } catch (error) {
@@ -230,7 +307,6 @@ function BarProfileComplete() {
 
 export default function BarScreen() {
   const { profileComplete } = useContext(ProfileContext);
-
   return (
     <ImageBackground
       source={require("../assets/images/bar-background.png")}
@@ -309,6 +385,20 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 0,
     width: "100%",
+  },
+  // Global pointer style for WC button – positioned near where WC button appears.
+  wcPointer: {
+    position: "absolute",
+    top: 2,
+    right: 370,
+    zIndex: 9999,
+  },
+  // Pointer for speech bubble – positioned relative to the speech bubble.
+  speechPointer: {
+    position: "absolute",
+    bottom: 470,
+    left: 240,
+    zIndex: 9999,
   },
 });
 

@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Modal,
   Animated,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -24,26 +26,26 @@ import { logout } from "../services/authservice";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function ProfileScreen() {
-  // Consume the profile and its completeness status from context.
   const { profile, saveProfile, setProfileComplete, profileComplete } = useContext(ProfileContext);
   const router = useRouter();
 
-  // Local state for form fields.
+  // Form state.
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [location, setLocation] = useState("");
   const [about, setAbout] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+
+  // State to control modal for editing the "about" field.
   const [editingAbout, setEditingAbout] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
   const [modalTypedText, setModalTypedText] = useState("");
   const fullModalText =
     "Finish your profile you lazy shit!\n\nThen you will be able to see others and use the app...";
 
-  // Animated value for Mr. Mingles image
+  // Animated value for Mr. Mingles image.
   const rollAnim = useRef(new Animated.Value(500)).current;
 
-  // When the context’s profile changes, pre-populate the form.
+  // Pre-populate fields from context.
   useEffect(() => {
     if (profile) {
       setName(profile.name || "");
@@ -63,7 +65,7 @@ export default function ProfileScreen() {
     [FontNames.MontSerratSemiBold]: require("../assets/fonts/Montserrat-SemiBold.ttf"),
   });
 
-  // Animate the modal appearance.
+  // Animate modal appearance for the Mr. Mingles message.
   useEffect(() => {
     Animated.timing(rollAnim, {
       toValue: modalVisible ? 0 : 500,
@@ -72,7 +74,8 @@ export default function ProfileScreen() {
     }).start();
   }, [modalVisible]);
 
-  // Typewriter effect for modal text.
+  // (Existing modal for Mr. Mingles introduction)
+  const [modalVisible, setModalVisible] = useState(false);
   useEffect(() => {
     let intervalId: number | null = null;
     if (modalVisible) {
@@ -106,16 +109,14 @@ export default function ProfileScreen() {
     }
   };
 
-  // The back button handler. If any field is missing, show the modal; otherwise, save and navigate.
+  // Back button handler: if any field is missing, show the modal.
   const handleSubmit = async () => {
-
     if (!name || !age || !location || !about || !photoUri) {
       setModalVisible(true);
       setModalTypedText("");
       return; // Prevent navigation if the profile is incomplete.
     } else {
       try {
-        // Save profile data (this updates Firestore and local cache)
         await saveProfile({ name, age, location, about, photoUri });
         setProfileComplete(true);
         console.log("Profile saved successfully");
@@ -146,16 +147,49 @@ export default function ProfileScreen() {
     }
   };
 
-  // Logout handler: logs out, clears local storage, and routes back to welcome.
   const handleLogout = async () => {
     try {
       await logout();
-      await AsyncStorage.clear();
+      await AsyncStorage.removeItem("userProfile");
       router.push("/");
     } catch (error) {
       console.error("Logout error:", error);
     }
   };
+
+  // New modal overlay for editing "about"
+  const renderAboutEditor = () => (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={editingAbout}
+      onRequestClose={() => setEditingAbout(false)}
+    >
+      <KeyboardAvoidingView
+        style={editorStyles.modalContainer}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <View style={editorStyles.editorBox}>
+          <Text style={editorStyles.editorTitle}>Write something about yourself</Text>
+          <TextInput
+            style={editorStyles.editorInput}
+            value={about}
+            onChangeText={setAbout}
+            placeholder="Write something about yourself..."
+            placeholderTextColor="#999"
+            multiline
+            autoFocus
+          />
+          <TouchableOpacity
+            style={editorStyles.doneButton}
+            onPress={() => setEditingAbout(false)}
+          >
+            <Text style={editorStyles.doneButtonText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
 
   return (
     <ImageBackground
@@ -169,7 +203,6 @@ export default function ProfileScreen() {
         </View>
       ) : (
         <>
-          {/* ProfileNavbar should call our handleSubmit when the back button is pressed */}
           <ProfileNavbar onBack={handleSubmit} />
           <View style={styles.mirrorContainer}>
             <Text style={styles.header}>PROFILE</Text>
@@ -197,7 +230,7 @@ export default function ProfileScreen() {
                 onChangeText={setLocation}
               />
               <TouchableOpacity style={styles.editButton} onPress={handleRequestLocation}>
-                <Text style={styles.editButtonText}>EDIT</Text>
+                <Text style={styles.editButtonText}>Get Location</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.column}>
@@ -210,28 +243,17 @@ export default function ProfileScreen() {
                 style={[styles.editButton, styles.editButtonPhoto]}
                 onPress={handleTakePhoto}
               >
-                <Text style={styles.editButtonText}>EDIT</Text>
+                <Text style={styles.editButtonText}>Take a pic</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.column}>
-              {editingAbout ? (
-                <TextInput
-                  style={[styles.input, styles.inputAbout, { flex: 1 }]}
-                  placeholder="Write something about yourself..."
-                  placeholderTextColor="#999"
-                  value={about}
-                  onChangeText={setAbout}
-                  maxLength={30}
-                  autoFocus
-                />
-              ) : (
-                <Text style={[styles.aboutText, { flex: 1 }]}>
-                  {about ? about : "Write something about yourself..."}
-                </Text>
-              )}
+              {/* Instead of inline editing, show the about text and a button to edit */}
+              <Text style={[styles.aboutText, { flex: 1 }]}>
+                {about ? about : "Write something about yourself..."}
+              </Text>
               <TouchableOpacity
                 style={[styles.editButton, styles.bottomEdit]}
-                onPress={() => setEditingAbout(!editingAbout)}
+                onPress={() => setEditingAbout(true)}
               >
                 <Text style={styles.editButtonText}>EDIT</Text>
               </TouchableOpacity>
@@ -256,7 +278,7 @@ export default function ProfileScreen() {
               </View>
             </View>
           </Modal>
-          {/* Only show the logout button if the profile is complete */}
+          {renderAboutEditor()}
           {profileComplete && (
             <View style={styles.logoutContainer}>
               <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -266,6 +288,7 @@ export default function ProfileScreen() {
           )}
         </>
       )}
+      {/* End of main content */}
     </ImageBackground>
   );
 }
@@ -381,6 +404,55 @@ const styles = StyleSheet.create({
   logoutButtonText: {
     color: "#fff",
     fontSize: 20,
+    fontFamily: FontNames.MontserratBold,
+  },
+});
+
+const editorStyles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  editorBox: {
+    backgroundColor: "#fff",
+    width: "90%",
+    borderRadius: 10,
+    padding: 20,
+    alignItems: "center",
+  },
+  editorTitle: {
+    fontSize: 24,
+    fontFamily: FontNames.MontserratBold,
+    marginBottom: 20,
+    color: "#333",
+    textAlign: "center"
+  },
+  editorInput: {
+    width: "100%",
+    height: 100,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 18,
+    fontFamily: FontNames.MontserratRegular,
+    color: "#333",
+    backgroundColor: "#f9f9f9",
+    textAlignVertical: "top",
+  },
+  doneButton: {
+    marginTop: 20,
+    backgroundColor: "#4a0a0f",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  doneButtonText: {
+    color: "#fff",
+    fontSize: 18,
     fontFamily: FontNames.MontserratBold,
   },
 });

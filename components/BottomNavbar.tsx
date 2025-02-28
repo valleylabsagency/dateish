@@ -1,4 +1,3 @@
-// BottomNavbar.tsx
 import React from 'react';
 import { View, TouchableOpacity, Image, StyleSheet, Text } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
@@ -9,6 +8,14 @@ const tabs = [
   { label: 'Chats', icon: require('../assets/images/icons/chats-icon.png'), route: '/chats' },
   { label: 'Stage', icon: require('../assets/images/icons/stage-tab-icon.png'), route: '/stage' },
 ];
+
+// Mapping for the selected (pink) icons.
+const pinkIcons = {
+  Bar: require('../assets/images/icons/bar-pink.png'),
+  Browse: require('../assets/images/icons/browse-pink.png'),
+  Chats: require('../assets/images/icons/chat-pink.png'),
+  Stage: require('../assets/images/icons/stage-pink.png'),
+};
 
 export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
   const router = useRouter();
@@ -23,29 +30,35 @@ export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
   return (
     <View style={styles.navbar}>
       {tabs.map((tab) => {
-        // Conditionally add additional styles for "Browse" and "Stage"
         let labelAdditionalStyle = {};
         let iconAdditionalStyle = {};
+        let tabAdditionalStyle = {};
         if (tab.label === "Browse") {
           labelAdditionalStyle = styles.browseLabel;
           iconAdditionalStyle = styles.browseIcon;
+          // Override top padding for Browse by specifying it last
+          tabAdditionalStyle = { height: 90, position: "relative", top: 0};
         } else if (tab.label === "Stage") {
           labelAdditionalStyle = styles.stageLabel;
           iconAdditionalStyle = styles.stageIcon;
+          // Override top padding for Stage
+          tabAdditionalStyle = { paddingTop: 9 };
         }
         const isSelected = tab.label === selectedTab;
         return (
           <TouchableOpacity
             key={tab.label}
-            style={[styles.tab]}
+            style={[styles.tab, tabAdditionalStyle, isSelected && styles.selectedTab]}
             onPress={() => handleTabPress(tab.route)}
           >
             <Image
-              source={tab.icon}
-              style={[styles.icon, isSelected && styles.selectedIcon, iconAdditionalStyle]}
+              source={isSelected ? pinkIcons[tab.label] : tab.icon}
+              style={[styles.icon, iconAdditionalStyle, isSelected && styles.selectedIcon]}
               resizeMode="contain"
             />
-            <Text style={[styles.label, isSelected && styles.selectedLabel, labelAdditionalStyle]}>
+            <Text
+              style={[styles.label, labelAdditionalStyle, isSelected && styles.selectedLabel]}
+            >
               {tab.label}
             </Text>
           </TouchableOpacity>
@@ -59,38 +72,41 @@ const styles = StyleSheet.create({
   navbar: {
     width: '100%',
     height: 90,
-    backgroundColor: '#460b2a',
+    backgroundColor: '#592540',
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-evenly',
     alignItems: 'center',
   },
   tab: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 5,
+    padding: 11,
   },
-  
+  selectedTab: {
+    backgroundColor: '#460b2a', 
+  },
   browseLabel: {
-   position: "relative",
-   bottom: 12
-   
+    position: "relative",
+    bottom: 12,
   },
+  // Adjusted Browse icon
   browseIcon: {
     width: 85,
-    height: 85,
+    height: 75,
     position: "relative",
-    top: 8,
+    top: 4,
   },
-  
   stageLabel: {
     position: "relative",
-    bottom: 6
+    bottom: 2,
   },
+  // Adjusted Stage icon
   stageIcon: {
     width: 80,
     height: 60,
     position: "relative",
-    top: 2
+    top: 5,
   },
   icon: {
     width: 45,
@@ -98,7 +114,7 @@ const styles = StyleSheet.create({
     tintColor: '#fff',
   },
   selectedIcon: {
-    // Optionally add styling for selected icon here.
+    tintColor: undefined, // Allow the pink icon to show in its original colors
   },
   label: {
     fontSize: 10,
@@ -107,6 +123,9 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   selectedLabel: {
-    // Optionally add styling for selected label here.
+    fontWeight: 'bold',
+    color: '#e98dbd', // Pink color for the selected label
   },
 });
+
+export { BottomNavbar };

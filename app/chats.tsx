@@ -1,4 +1,3 @@
-// chats.tsx
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -14,42 +13,56 @@ import {
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { auth, firestore } from "../firebase";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+} from "firebase/firestore";
 import BottomNavbar from "../components/BottomNavbar";
 
 const { width } = Dimensions.get("window");
 
 export default function ChatsScreen() {
   const router = useRouter();
+  const currentUserId = auth.currentUser?.uid;
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
   });
 
-  const loadConversations = async () => {
-    try {
-      // Assuming dummy conversation keys for partner indices 0, 1, and 2
-      const keys = ["chat_0", "chat_1", "chat_2"];
-      const stores = await AsyncStorage.multiGet(keys);
-      const convs = stores
-        .map(([key, value]) => (value ? JSON.parse(value) : null))
-        .filter(Boolean);
-      setConversations(convs);
-    } catch (error) {
-      console.error("Error loading conversations", error);
-    }
-    setLoading(false);
-  };
-
+  // Query Firestore for chat conversations where the current user is a participant.
   useEffect(() => {
-    loadConversations();
-  }, []);
+    if (!currentUserId) return;
+    const chatsRef = collection(firestore, "chats");
+    // Query chat documents that contain the current user in the "users" array.
+    const q = query(chatsRef, where("users", "array-contains", currentUserId), orderBy("updatedAt", "desc"));
+    const unsubscribe = onSnapshot(
+      q,
+      (querySnapshot) => {
+        const convs = [];
+        querySnapshot.forEach((doc) => {
+          convs.push({ id: doc.id, ...doc.data() });
+        });
+        setConversations(convs);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching conversations:", error);
+        setLoading(false);
+      }
+    );
+    return () => unsubscribe();
+  }, [currentUserId]);
 
   if (!fontsLoaded || loading) {
     return (
       <View style={chatsStyles.loadingContainer}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#fff" />
       </View>
     );
   }
@@ -58,43 +71,47 @@ export default function ChatsScreen() {
     <ImageBackground
       source={require("../assets/images/chat-background.png")}
       style={chatsStyles.background}
-      blurRadius={5} // Slight blur effect
+      blurRadius={5}
     >
       <ScrollView contentContainerStyle={chatsStyles.scrollContent}>
-        {conversations.map((conv) => (
-          <TouchableOpacity
-            key={conv.partnerIndex}
-            style={chatsStyles.chatPreview}
-            onPress={() => router.push(`/chat?partner=${conv.partnerIndex}`)}
-          >
-            <Image
-              source={
-                conv.partnerIndex === 0
-                  ? require("../assets/images/person1.jpg")
-                  : conv.partnerIndex === 1
-                  ? require("../assets/images/person2.jpg")
-                  : require("../assets/images/person3.jpg")
-              }
-              style={chatsStyles.previewImage}
-            />
-            <View style={chatsStyles.previewTextContainer}>
-              <Text style={chatsStyles.previewName}>
-                {conv.partnerIndex === 0
-                  ? "Alice"
-                  : conv.partnerIndex === 1
-                  ? "Bob"
-                  : "Carmen"}
-              </Text>
-              <Text style={chatsStyles.previewLastMessage}>
-                {conv.fromUser ? "You: " : ""}
-                {conv.lastMessage}
-              </Text>
-            </View>
-            <Text style={chatsStyles.previewTimestamp}>
-              {new Date(conv.timestamp).toLocaleTimeString()}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {conversations.map((conv) => {
+          // Determine the partner's UID by filtering out the current user's UID.
+          const partnerUid = conv.users.filter((uid) => uid !== currentUserId)[0];
+          // Use conversation fields if available; otherwise, fall back to the partner's UID.
+          const partnerName = conv.partnerName || partnerUid;
+          const lastMsg = conv.lastMessage || "";
+          // Format updatedAt timestamp if available.
+          const timestamp =
+            conv.updatedAt && conv.updatedAt.seconds
+              ? new Date(conv.updatedAt.seconds * 1000).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "";
+          return (
+            <TouchableOpacity
+              key={conv.id}
+              style={chatsStyles.chatPreview}
+              onPress={() => router.push(`/chat?partner=${partnerUid}`)}
+            >
+              <Image
+                source={
+                  conv.partnerPhotoUri && conv.partnerPhotoUri.trim().length > 0
+                    ? { uri: conv.partnerPhotoUri }
+                    : require("../assets/images/person1.jpg")
+                }
+                style={chatsStyles.previewImage}
+              />
+              <View style={chatsStyles.previewTextContainer}>
+                <Text style={chatsStyles.previewName}>{partnerName}</Text>
+                <Text style={chatsStyles.previewLastMessage}>
+                  {lastMsg.length > 30 ? lastMsg.slice(0, 30) + "..." : lastMsg}
+                </Text>
+              </View>
+              <Text style={chatsStyles.previewTimestamp}>{timestamp}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       {/* Bottom Navbar */}
@@ -106,12 +123,25 @@ export default function ChatsScreen() {
 }
 
 const chatsStyles = StyleSheet.create({
-  background: { flex: 1, resizeMode: "cover", justifyContent: "center", alignItems: "center" },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  scrollContent: { paddingVertical: 20, alignItems: "center", width: "100%" },
+  background: {
+    flex: 1,
+    resizeMode: "cover",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scrollContent: {
+    paddingVertical: 20,
+    alignItems: "center",
+    width: "100%",
+  },
   chatPreview: {
-    backgroundColor: "rgb(89 37 66)",
-    opacity: .85,
+    backgroundColor: "rgb(89,37,66)",
+    opacity: 0.85,
     borderColor: "#fff",
     borderWidth: 2,
     width: "95%",
@@ -142,3 +172,5 @@ const chatsStyles = StyleSheet.create({
   },
   bottomNavbarContainer: { position: "absolute", bottom: 0, width: "100%" },
 });
+
+export { ChatsScreen };

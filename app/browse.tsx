@@ -1,5 +1,4 @@
-// Browse.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import { useRouter } from "expo-router";
@@ -11,49 +10,70 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import BottomNavbar from "../components/BottomNavbar";
+import { firestore, auth } from "../firebase";
+import { collection, getDocs } from "firebase/firestore";
 
 const { width } = Dimensions.get("window");
 
-// Dummy profile data
-const profiles = [
-  {
-    id: 1,
-    name: "Alice",
-    age: "28",
-    location: "New York, USA",
-    description: "Loves art, coffee, and long walks in Central Park.",
-    image: require("../assets/images/person1.jpg"),
-    drink: require("../assets/images/icons/Beer.png"),
-  },
-  {
-    id: 2,
-    name: "Bob",
-    age: "32",
-    location: "San Francisco, USA",
-    description:
-      "Tech enthusiast, surfer, and foodie who enjoys exploring new places.",
-    image: require("../assets/images/person2.jpg"),
-    drink: require("../assets/images/icons/Beer.png"),
-  },
-  {
-    id: 3,
-    name: "Carmen",
-    age: "25",
-    location: "Austin, USA",
-    description:
-      "Musician and creative spirit, always looking for a new adventure.",
-    image: require("../assets/images/person3.jpg"),
-    drink: require("../assets/images/icons/Beer.png"),
-  },
-];
+// Mapping drink names to icons.
+const drinkMapping = {
+  wine: require("../assets/images/icons/wine.png"),
+  beer: require("../assets/images/icons/beer.png"),
+  whiskey: require("../assets/images/icons/whiskey.png"),
+  martini: require("../assets/images/icons/martini.png"),
+  vodka: require("../assets/images/icons/vodka.png"),
+  tequila: require("../assets/images/icons/tequila.png"),
+  absinthe: require("../assets/images/icons/absinthe.png"),
+  water: require("../assets/images/icons/water.png"),
+};
 
 export default function BrowseScreen() {
+  const [profiles, setProfiles] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const currentProfile = profiles[currentIndex];
+  const [loading, setLoading] = useState(true);
+  const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
   const router = useRouter();
 
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      try {
+        const profilesCollection = collection(firestore, "users");
+        const querySnapshot = await getDocs(profilesCollection);
+        const loadedProfiles = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (auth.currentUser && doc.id !== auth.currentUser.uid) {
+            loadedProfiles.push({ id: doc.id, ...data });
+          }
+        });
+        setProfiles(loadedProfiles);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching profiles:", error);
+        setLoading(false);
+      }
+    };
+    fetchProfiles();
+  }, []);
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev === 0 ? profiles.length - 1 : prev - 1));
+    setShowDrinkSpeech(false);
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) =>
+      prev === profiles.length - 1 ? 0 : prev + 1
+    );
+    setShowDrinkSpeech(false);
+  };
+
+  const handleChat = () => {
+    router.push(`/chat?partner=${profiles[currentIndex].id}`);
+  };
 
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
@@ -64,53 +84,70 @@ export default function BrowseScreen() {
     [FontNames.MontSerratSemiBold]: require("../assets/fonts/Montserrat-SemiBold.ttf"),
   });
 
-  // Cycle to previous profile; wrap around if needed.
-  const handlePrev = () => {
-    setCurrentIndex((prev) => (prev === 0 ? profiles.length - 1 : prev - 1));
-  };
-
-  // Cycle to next profile; wrap around if needed.
-  const handleNext = () => {
-    setCurrentIndex((prev) => (prev === profiles.length - 1 ? 0 : prev + 1));
-  };
-
-  // Placeholder handler for the CHAT button.
-  const handleChat = () => {
-    router.push(`/chat?partner=${currentIndex}`);
-  };
-
-  if (!fontsLoaded) {
-    return null;
+  if (!fontsLoaded || loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
   }
+
+  const currentProfile = profiles[currentIndex];
+  const drinkIcon =
+    drinkMapping[currentProfile.drink] || drinkMapping["water"];
+
+  // Map each drink to its corresponding speech bubble text.
+  const drinkTextMapping = {
+    wine: "Where's the romance at?",
+    beer: "Chill night... Sup?",
+    whiskey: "I'm an adult.",
+    martini: "I'm smart and beautiful!",
+    vodka: "Get the party started!",
+    tequila: "Gonna get fucked tonight",
+    absinthe: "Who are you?",
+    water: "I don't need alcohol to have fun",
+  };
+  const drinkText =
+    drinkTextMapping[currentProfile.drink.toLowerCase()] ||
+    drinkTextMapping["water"];
 
   return (
     <ImageBackground
       source={require("../assets/images/chat-background.png")}
       style={styles.background}
     >
-      {/* Profile Card Container: positioned near the top and taller */}
       <View style={styles.profileCardContainer}>
         <View style={styles.profileCard}>
           <View style={styles.imageContainer}>
-            <Image source={currentProfile.image} style={styles.profileImage} />
-            {/* Drink icon overlay */}
-            <View style={styles.drinkIconContainer}>
-              <Image source={currentProfile.drink} style={styles.drink} />
-            </View>
+            <Image
+              source={{ uri: currentProfile.photoUri }}
+              style={styles.profileImage}
+            />
+            <TouchableOpacity onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}>
+              <View style={styles.drinkIconContainer}>
+                <Image source={drinkIcon} style={styles.drinkIcon} />
+                {showDrinkSpeech && (
+                  <View style={styles.drinkSpeechBubble}>
+                    <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
           <View style={styles.infoContainer}>
             <Text style={styles.nameText}>
               {currentProfile.name}, {currentProfile.age}
             </Text>
-            <Text style={styles.locationText}>{currentProfile.location}</Text>
+            <Text style={styles.locationText}>
+              {currentProfile.location}
+            </Text>
             <Text style={styles.descriptionText}>
-              {currentProfile.description}
+              {currentProfile.about}
             </Text>
           </View>
         </View>
       </View>
 
-      {/* Bottom navigation controls for cycling through profiles and CHAT */}
       <View style={styles.navigationContainer}>
         <TouchableOpacity onPress={handlePrev}>
           <View style={styles.triangleLeftContainer}>
@@ -131,7 +168,6 @@ export default function BrowseScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Bottom Navbar */}
       <View style={styles.bottomNavbarContainer}>
         <BottomNavbar selectedTab="Browse" />
       </View>
@@ -146,11 +182,16 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     alignItems: "center",
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   profileCardContainer: {
     width: width * 0.9,
     alignSelf: "center",
-    marginTop: 30, // starts toward the top of the page
-    height: "60%", // profile card is now taller
+    marginTop: 30,
+    height: "60%",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -171,17 +212,30 @@ const styles = StyleSheet.create({
   profileImage: {
     width: 220,
     height: 220,
-    borderRadius: "50%",
+    borderRadius: 110,
   },
   drinkIconContainer: {
     position: "absolute",
-    bottom: -15,
-    right: 0,
-    padding: 5,
+    bottom: -40,
+    right: -30,
+    padding: 2,
   },
-  drink: {
-    width: 40,
-    height: 40,
+  drinkIcon: {
+    width: 67,
+    height: 80,
+  },
+  drinkSpeechBubble: {
+    position: "absolute",
+    bottom: 70,
+    right: 0,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    padding: 5,
+    borderRadius: 10,
+  },
+  drinkSpeechBubbleText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: FontNames.MontserratRegular,
   },
   infoContainer: {
     alignItems: "flex-start",
@@ -191,24 +245,24 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "bold",
     marginBottom: 5,
-    fontFamily: FontNames.MontserratRegular
+    fontFamily: FontNames.MontserratRegular,
   },
   locationText: {
     color: "orange",
     fontSize: 22,
     marginBottom: 10,
-    fontFamily: FontNames.MontserratRegular
+    fontFamily: FontNames.MontserratRegular,
   },
   descriptionText: {
     color: "beige",
     fontSize: 23,
     textAlign: "left",
     width: 300,
-    fontFamily: FontNames.MontserratRegular
+    fontFamily: FontNames.MontserratRegular,
   },
   navigationContainer: {
     position: "absolute",
-    bottom: 90, // above the bottom navbar
+    bottom: 90,
     backgroundColor: "#4a0a0f",
     flexDirection: "row",
     alignItems: "center",
@@ -217,13 +271,12 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 5,
   },
-  // Updated Left arrow triangle (scaled up)
   triangleLeftContainer: {
     width: 0,
     height: 0,
     position: "absolute",
     left: -30,
-    top: -45
+    top: -45,
   },
   triangleLeftOuter: {
     width: 0,
@@ -248,7 +301,6 @@ const styles = StyleSheet.create({
     borderBottomColor: "transparent",
     borderRightColor: "#ffe3d0",
   },
-  // Updated Right arrow triangle (scaled up)
   triangleRightContainer: {
     width: 0,
     height: 0,
@@ -256,7 +308,7 @@ const styles = StyleSheet.create({
     marginRight: 20,
     position: "absolute",
     top: -45,
-    right: 20
+    right: 20,
   },
   triangleRightOuter: {
     width: 0,
@@ -301,3 +353,5 @@ const styles = StyleSheet.create({
     width: "100%",
   },
 });
+
+export { BrowseScreen };
