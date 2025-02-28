@@ -18,9 +18,12 @@ import BottomNavbar from "../components/BottomNavbar";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import { useRouter } from "expo-router";
-import * as Updates from "expo-updates";
+import { auth } from "../firebase";
 import { MaterialIcons } from "@expo/vector-icons";
 
+/* -------------------------------------------------------------------------- */
+/*                         Intro / "No Profile" Screen                         */
+/* -------------------------------------------------------------------------- */
 function BarMessages() {
   const messages = [
     "Beep Boop Beep Mothafuckas!",
@@ -43,18 +46,22 @@ function BarMessages() {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [displayedText, setDisplayedText] = useState("");
   const [isTyping, setIsTyping] = useState(true);
-  const { setShowWcButton } = useContext(NavbarContext);
-  const router = useRouter();
 
-  // Animated value for WC pointer.
-  const pointerAnim = useRef(new Animated.Value(0)).current;
-  // Separate animated value for speech bubble pointer.
+  // Animations for pointers:
+  // - speechPointerAnim for the first message bubble pointer
+  // - wcPointerAnim for the final message pointer
   const speechPointerAnim = useRef(new Animated.Value(0)).current;
+  const wcPointerAnim = useRef(new Animated.Value(0)).current;
 
+  // We’ll need setShowWcButton to toggle the WC button in the top navbar
+  const { setShowWcButton } = useContext(NavbarContext);
+
+  // Type out the current message gradually
   useEffect(() => {
     const currentMessage = messages[currentMessageIndex];
     setDisplayedText("");
     setIsTyping(true);
+
     let index = 0;
     const interval = setInterval(() => {
       index++;
@@ -65,31 +72,11 @@ function BarMessages() {
         setDisplayedText(currentMessage.substring(0, index));
       }
     }, 30);
+
     return () => clearInterval(interval);
   }, [currentMessageIndex]);
 
-  // When the last message finishes, show the WC button and start WC pointer animation.
-  useEffect(() => {
-    if (currentMessageIndex === messages.length - 1 && !isTyping) {
-      setShowWcButton(true);
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pointerAnim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pointerAnim, {
-            toValue: 0,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    }
-  }, [currentMessageIndex, isTyping, setShowWcButton, pointerAnim]);
-
-  // When the first message finishes, start the speech bubble pointer animation.
+  // Animate the speech bubble pointer after the first message completes
   useEffect(() => {
     if (currentMessageIndex === 0 && !isTyping) {
       Animated.loop(
@@ -109,20 +96,44 @@ function BarMessages() {
     }
   }, [currentMessageIndex, isTyping, speechPointerAnim]);
 
+  // When we finish the last message, show the WC button & animate the pointer
+  useEffect(() => {
+    if (currentMessageIndex === messages.length - 1 && !isTyping) {
+      setShowWcButton(true);
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(wcPointerAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(wcPointerAnim, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [currentMessageIndex, isTyping, setShowWcButton, wcPointerAnim]);
+
+  // Move to the next message on tap, if typing is done
+  const handleMessagePress = () => {
+    if (!isTyping && currentMessageIndex < messages.length - 1) {
+      setCurrentMessageIndex(currentMessageIndex + 1);
+    }
+  };
+
   return (
-    <TouchableWithoutFeedback
-      onPress={() => {
-        if (!isTyping && currentMessageIndex < messages.length - 1) {
-          setCurrentMessageIndex(currentMessageIndex + 1);
-        }
-      }}
-    >
+    <TouchableWithoutFeedback onPress={handleMessagePress}>
       <View style={styles.container}>
         <Image
           source={require("../assets/images/speech-bubble.png")}
           style={styles.speech}
           resizeMode="contain"
         />
+
         <MaskedView
           style={styles.maskedContainer}
           maskElement={
@@ -137,28 +148,8 @@ function BarMessages() {
             <Text style={styles.text}>{displayedText}</Text>
           </View>
         </MaskedView>
-        {/* WC Pointer – appears when introduction is complete */}
-        {currentMessageIndex === messages.length - 1 && !isTyping && (
-          <Animated.View
-            style={[
-              styles.wcPointer,
-              {
-                opacity: pointerAnim,
-                transform: [
-                  {
-                    translateY: pointerAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -10],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <MaterialIcons name="pan-tool-alt" size={60} color="#fff" />
-          </Animated.View>
-        )}
-        {/* Speech Pointer – appears when the first message is complete */}
+
+        {/* Speech pointer - only for the first message */}
         {currentMessageIndex === 0 && !isTyping && (
           <Animated.View
             style={[
@@ -179,32 +170,55 @@ function BarMessages() {
             <MaterialIcons name="pan-tool-alt" size={60} color="#fff" />
           </Animated.View>
         )}
+
+        {/* WC pointer - only for the last message */}
+        {currentMessageIndex === messages.length - 1 && !isTyping && (
+          <Animated.View
+            style={[
+              styles.wcPointer,
+              {
+                opacity: wcPointerAnim,
+                transform: [
+                  {
+                    translateY: wcPointerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -10],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <MaterialIcons name="pan-tool-alt" size={60} color="#fff" />
+          </Animated.View>
+        )}
       </View>
     </TouchableWithoutFeedback>
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*                       Main Screen for Completed Profile                     */
+/* -------------------------------------------------------------------------- */
 function BarProfileComplete() {
   const [bubbleText, setBubbleText] = useState("What would you like to drink?");
   const [showDrinkMenu, setShowDrinkMenu] = useState(false);
   const { profile, saveProfile } = useContext(ProfileContext);
   const { setShowWcButton } = useContext(NavbarContext);
-  const router = useRouter();
 
+  // Turn on the WC button in the nav only if user’s profile is complete
   useEffect(() => {
     setShowWcButton(true);
   }, [setShowWcButton]);
 
-  // If the user never selects a drink, default to "water" when the drink menu is closed.
+  // Default to water if user never selects a drink
   useEffect(() => {
     if (!showDrinkMenu && !profile.drink) {
       saveProfile({ drink: "water" });
     }
   }, [showDrinkMenu, profile, saveProfile]);
 
-  const handleTapPress = () => {
-    setShowDrinkMenu(true);
-  };
+  const handleTapPress = () => setShowDrinkMenu(true);
 
   const handleDrinkSelect = async (drinkName: string) => {
     try {
@@ -228,8 +242,8 @@ function BarProfileComplete() {
 
   if (!fontsLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#fff" />
       </View>
     );
   }
@@ -267,6 +281,7 @@ function BarProfileComplete() {
         </View>
       </TouchableWithoutFeedback>
 
+      {/* Drink menu modal */}
       <Modal animationType="slide" transparent={true} visible={showDrinkMenu}>
         <View style={drinkModalStyles.modalOverlay}>
           <View style={drinkModalStyles.modalContainer}>
@@ -275,6 +290,10 @@ function BarProfileComplete() {
               style={drinkModalStyles.menuBackground}
               resizeMode="contain"
             >
+                <TouchableOpacity
+              style={drinkModalStyles.closeHotspot}
+              onPress={() => setShowDrinkMenu(false)}
+            />
               {[
                 { name: "wine", style: drinkModalStyles.wine },
                 { name: "beer", style: drinkModalStyles.beer },
@@ -305,8 +324,32 @@ function BarProfileComplete() {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*                             Bar Screen Export                               */
+/* -------------------------------------------------------------------------- */
 export default function BarScreen() {
-  const { profileComplete } = useContext(ProfileContext);
+  const router = useRouter();
+  const user = auth.currentUser;
+  const { profile, profileComplete } = useContext(ProfileContext);
+
+  // If no user is logged in, route to the welcome page
+  useEffect(() => {
+    console.log("Is user logged in?", !!user);
+    if (!user) {
+      router.push("/welcome");
+    }
+  }, [user, router]);
+
+  // Show a spinner while checking user or loading the Firestore doc
+  if (!user || profile === null) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
+
+  // If profileComplete, show BarProfileComplete; else show BarMessages
   return (
     <ImageBackground
       source={require("../assets/images/bar-background.png")}
@@ -314,6 +357,7 @@ export default function BarScreen() {
       resizeMode="cover"
     >
       {profileComplete ? <BarProfileComplete /> : <BarMessages />}
+
       {profileComplete && (
         <View style={styles.bottomNavbarContainer}>
           <BottomNavbar selectedTab="Bar" />
@@ -323,17 +367,30 @@ export default function BarScreen() {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*                               Stylesheets                                  */
+/* -------------------------------------------------------------------------- */
 const styles = StyleSheet.create({
   background: {
     flex: 1,
     width: "100%",
     height: "100%",
   },
-  container: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loaderContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "transparent",
+  },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   speech: {
     width: 400,
@@ -370,11 +427,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: FontNames.MontserratExtraLight,
   },
-  logoutText: {
-    color: "#fff",
-    fontSize: 20,
-    fontFamily: FontNames.MontserratBold,
-  },
   buttonRow: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -386,18 +438,18 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: "100%",
   },
-  // Global pointer style for WC button – positioned near where WC button appears.
-  wcPointer: {
-    position: "absolute",
-    top: 2,
-    right: 370,
-    zIndex: 9999,
-  },
-  // Pointer for speech bubble – positioned relative to the speech bubble.
+  // Pointer for the first message's speech bubble
   speechPointer: {
     position: "absolute",
     bottom: 470,
     left: 240,
+    zIndex: 9999,
+  },
+  // Pointer for the last message's WC indicator
+  wcPointer: {
+    position: "absolute",
+    top: 2,
+    right: 370,
     zIndex: 9999,
   },
 });
@@ -412,9 +464,18 @@ const drinkModalStyles = StyleSheet.create({
   modalContainer: {
     width: "90%",
     height: "80%",
-    backgroundColor: "transparent", // Transparent because we use an ImageBackground
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
+  },
+  closeHotspot: {
+    position: "absolute",
+    top: 50,    // Adjust these to match the background image's X location
+    right: 0,
+    width: 80, // approximate bounding box size around the X
+    height: 80,
+    // No background or "transparent" if you don't want to cover up the image
+     //backgroundColor: "rgba(255,0,0,0.2)", // debug: semitransparent red
   },
   menuBackground: {
     width: "100%",
@@ -434,97 +495,5 @@ const drinkModalStyles = StyleSheet.create({
   labelImage: {
     width: 65,
     height: 65,
-  },
-  labelText: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: 50,
-    textAlign: "center",
-    fontSize: 10,
-    color: "#000",
-    fontFamily: FontNames.MontserratBold,
-  },
-});
-
-const modalStyles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-  },
-  modalContainer: {
-    width: "90%",
-    height: 400,
-    backgroundColor: "#020621",
-    borderWidth: 4,
-    borderColor: "#fff",
-    borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 8,
-    alignItems: "center",
-    position: "relative",
-    bottom: 140,
-  },
-  modalText: {
-    color: "#eceded",
-    fontSize: 32,
-    textAlign: "center",
-    marginBottom: 20,
-    fontWeight: "400",
-    fontFamily: FontNames.MontserratExtraLight,
-  },
-  triangleContainer: {
-    position: "absolute",
-    bottom: -24,
-    right: 24,
-    width: 0,
-    height: 0,
-  },
-  outerTriangle: {
-    width: 5,
-    height: 5,
-    borderLeftWidth: 26,
-    borderRightWidth: 26,
-    borderTopWidth: 24,
-    position: "absolute",
-    left: -44,
-    top: -24,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#fff",
-  },
-  innerTriangle: {
-    position: "absolute",
-    top: -25,
-    left: -40,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 22,
-    borderRightWidth: 22,
-    borderTopWidth: 22,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#020621",
-  },
-  closeButton: {
-    position: "absolute",
-    top: 40,
-    right: 20,
-    zIndex: 100,
-  },
-  closeButtonText: {
-    color: "#fff",
-    fontSize: 48,
-    fontFamily: FontNames.MontserratExtraLight,
-  },
-  mrMingles: {
-    width: 350,
-    height: 420,
-    position: "absolute",
-    bottom: -440,
-    right: -100,
   },
 });

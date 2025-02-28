@@ -26,26 +26,27 @@ import { logout } from "../services/authservice";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function ProfileScreen() {
-  const { profile, saveProfile, setProfileComplete, profileComplete } = useContext(ProfileContext);
+  const { profile, saveProfile, setProfileComplete, profileComplete, setProfile } = useContext(ProfileContext);
   const router = useRouter();
 
-  // Form state.
+  // Form state
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [location, setLocation] = useState("");
   const [about, setAbout] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
-  // State to control modal for editing the "about" field.
+  // State for editing "about"
   const [editingAbout, setEditingAbout] = useState(false);
   const [modalTypedText, setModalTypedText] = useState("");
   const fullModalText =
     "Finish your profile you lazy shit!\n\nThen you will be able to see others and use the app...";
 
-  // Animated value for Mr. Mingles image.
+  // Animated value for Mr. Mingles
   const rollAnim = useRef(new Animated.Value(500)).current;
+  const [modalVisible, setModalVisible] = useState(false);
 
-  // Pre-populate fields from context.
+  // Pre-populate fields from the context
   useEffect(() => {
     if (profile) {
       setName(profile.name || "");
@@ -53,9 +54,17 @@ export default function ProfileScreen() {
       setLocation(profile.location || "");
       setAbout(profile.about || "");
       setPhotoUri(profile.photoUri || null);
+    } else {
+      // If no profile is loaded, reset fields
+      setName("");
+      setAge("");
+      setLocation("");
+      setAbout("");
+      setPhotoUri(null);
     }
   }, [profile]);
 
+  // Font loading
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
     [FontNames.MontserratBold]: require("../assets/fonts/Montserrat-Bold.ttf"),
@@ -65,7 +74,7 @@ export default function ProfileScreen() {
     [FontNames.MontSerratSemiBold]: require("../assets/fonts/Montserrat-SemiBold.ttf"),
   });
 
-  // Animate modal appearance for the Mr. Mingles message.
+  // Mr. Mingles "finish your profile" animation
   useEffect(() => {
     Animated.timing(rollAnim, {
       toValue: modalVisible ? 0 : 500,
@@ -74,8 +83,7 @@ export default function ProfileScreen() {
     }).start();
   }, [modalVisible]);
 
-  // (Existing modal for Mr. Mingles introduction)
-  const [modalVisible, setModalVisible] = useState(false);
+  // Type out the "Finish your profile" text
   useEffect(() => {
     let intervalId: number | null = null;
     if (modalVisible) {
@@ -93,6 +101,7 @@ export default function ProfileScreen() {
     };
   }, [modalVisible]);
 
+  // Launch camera
   const handleTakePhoto = async () => {
     const { status } = await Camera.requestCameraPermissionsAsync();
     if (status !== "granted") {
@@ -109,12 +118,12 @@ export default function ProfileScreen() {
     }
   };
 
-  // Back button handler: if any field is missing, show the modal.
+  // If profile is incomplete, show Mr. Mingles modal
   const handleSubmit = async () => {
     if (!name || !age || !location || !about || !photoUri) {
       setModalVisible(true);
       setModalTypedText("");
-      return; // Prevent navigation if the profile is incomplete.
+      return; // Prevent navigation if the profile is incomplete
     } else {
       try {
         await saveProfile({ name, age, location, about, photoUri });
@@ -127,6 +136,7 @@ export default function ProfileScreen() {
     }
   };
 
+  // Pull location from device
   const handleRequestLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") {
@@ -147,17 +157,23 @@ export default function ProfileScreen() {
     }
   };
 
+  // Logout
   const handleLogout = async () => {
     try {
       await logout();
+      // Clear local storage
       await AsyncStorage.removeItem("userProfile");
+      // Clear context state
+      setProfile(null);
+      setProfileComplete(false);
+
       router.push("/");
     } catch (error) {
       console.error("Logout error:", error);
     }
   };
 
-  // New modal overlay for editing "about"
+  // Editor for "about"
   const renderAboutEditor = () => (
     <Modal
       animationType="fade"
@@ -191,107 +207,118 @@ export default function ProfileScreen() {
     </Modal>
   );
 
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
   return (
     <ImageBackground
       source={require("../assets/images/bathroom-background.png")}
       style={styles.background}
       resizeMode="cover"
     >
-      {!fontsLoaded ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <ActivityIndicator size="large" />
+      <>
+        <ProfileNavbar onBack={handleSubmit} />
+        <View style={styles.mirrorContainer}>
+          <Text style={styles.header}>PROFILE</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Name"
+            placeholderTextColor="#999"
+            value={name}
+            onChangeText={setName}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Age"
+            placeholderTextColor="#999"
+            value={age}
+            onChangeText={setAge}
+            keyboardType="numeric"
+          />
+          <View style={styles.locationContainer}>
+            <TextInput
+              style={[styles.input]}
+              placeholder="Location"
+              placeholderTextColor="#999"
+              value={location}
+              onChangeText={setLocation}
+            />
+            <TouchableOpacity style={styles.editButton} onPress={handleRequestLocation}>
+              <Text style={styles.editButtonText}>Get Location</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.column}>
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={styles.photo} />
+            ) : (
+              <MaterialIcons name="person" style={styles.personIcon} size={180} color="grey" />
+            )}
+            <TouchableOpacity
+              style={[styles.editButton, styles.editButtonPhoto]}
+              onPress={handleTakePhoto}
+            >
+              <Text style={styles.editButtonText}>Take a pic</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.column}>
+            <Text style={[styles.aboutText, { flex: 1 }]}>
+              {about ? about : "Write something about yourself..."}
+            </Text>
+            <TouchableOpacity
+              style={[styles.editButton, styles.bottomEdit]}
+              onPress={() => setEditingAbout(true)}
+            >
+              <Text style={styles.editButtonText}>EDIT</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      ) : (
-        <>
-          <ProfileNavbar onBack={handleSubmit} />
-          <View style={styles.mirrorContainer}>
-            <Text style={styles.header}>PROFILE</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Name"
-              placeholderTextColor="#999"
-              value={name}
-              onChangeText={setName}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Age"
-              placeholderTextColor="#999"
-              value={age}
-              onChangeText={setAge}
-              keyboardType="numeric"
-            />
-            <View style={styles.locationContainer}>
-              <TextInput
-                style={[styles.input]}
-                placeholder="Location"
-                placeholderTextColor="#999"
-                value={location}
-                onChangeText={setLocation}
+
+        {/* Mr. Mingles Modal */}
+        <Modal animationType="slide" transparent={true} visible={modalVisible}>
+          <View style={modalStyles.modalOverlay}>
+            <TouchableOpacity style={modalStyles.closeButton} onPress={() => setModalVisible(false)}>
+              <Text style={modalStyles.closeButtonText}>X</Text>
+            </TouchableOpacity>
+            <View style={modalStyles.modalContainer}>
+              <Text style={modalStyles.modalText}>{modalTypedText}</Text>
+              <View style={modalStyles.triangleContainer}>
+                <View style={modalStyles.outerTriangle} />
+                <View style={modalStyles.innerTriangle} />
+              </View>
+              <Animated.Image
+                source={require("../assets/images/mr-mingles.png")}
+                style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
+                resizeMode="contain"
               />
-              <TouchableOpacity style={styles.editButton} onPress={handleRequestLocation}>
-                <Text style={styles.editButtonText}>Get Location</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.column}>
-              {photoUri ? (
-                <Image source={{ uri: photoUri }} style={styles.photo} />
-              ) : (
-                <MaterialIcons name="person" style={styles.personIcon} size={180} color="grey" />
-              )}
-              <TouchableOpacity
-                style={[styles.editButton, styles.editButtonPhoto]}
-                onPress={handleTakePhoto}
-              >
-                <Text style={styles.editButtonText}>Take a pic</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.column}>
-              {/* Instead of inline editing, show the about text and a button to edit */}
-              <Text style={[styles.aboutText, { flex: 1 }]}>
-                {about ? about : "Write something about yourself..."}
-              </Text>
-              <TouchableOpacity
-                style={[styles.editButton, styles.bottomEdit]}
-                onPress={() => setEditingAbout(true)}
-              >
-                <Text style={styles.editButtonText}>EDIT</Text>
-              </TouchableOpacity>
             </View>
           </View>
-          <Modal animationType="slide" transparent={true} visible={modalVisible}>
-            <View style={modalStyles.modalOverlay}>
-              <TouchableOpacity style={modalStyles.closeButton} onPress={() => setModalVisible(false)}>
-                <Text style={modalStyles.closeButtonText}>X</Text>
-              </TouchableOpacity>
-              <View style={modalStyles.modalContainer}>
-                <Text style={modalStyles.modalText}>{modalTypedText}</Text>
-                <View style={modalStyles.triangleContainer}>
-                  <View style={modalStyles.outerTriangle} />
-                  <View style={modalStyles.innerTriangle} />
-                </View>
-                <Animated.Image
-                  source={require("../assets/images/mr-mingles.png")}
-                  style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
-                  resizeMode="contain"
-                />
-              </View>
-            </View>
-          </Modal>
-          {renderAboutEditor()}
-          {profileComplete && (
-            <View style={styles.logoutContainer}>
-              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <Text style={styles.logoutButtonText}>LOG OUT</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </>
-      )}
-      {/* End of main content */}
+        </Modal>
+
+        {renderAboutEditor()}
+
+        {/* If profile is complete, we allow user to log out */}
+        {profileComplete && (
+          <View style={styles.logoutContainer}>
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Text style={styles.logoutButtonText}>LOG OUT</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </>
     </ImageBackground>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*                                   Styles                                   */
+/* -------------------------------------------------------------------------- */
 
 const styles = StyleSheet.create({
   background: {
@@ -325,12 +352,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#908db3",
     fontFamily: FontNames.MontserratBold,
-  },
-  inputAbout: {
-    fontSize: 14,
-    color: "gray",
-    fontFamily: FontNames.MontSerratSemiBold,
-    marginTop: 20,
   },
   locationContainer: {
     flexDirection: "column",
@@ -428,7 +449,7 @@ const editorStyles = StyleSheet.create({
     fontFamily: FontNames.MontserratBold,
     marginBottom: 20,
     color: "#333",
-    textAlign: "center"
+    textAlign: "center",
   },
   editorInput: {
     width: "100%",

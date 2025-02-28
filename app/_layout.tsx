@@ -5,7 +5,10 @@ import { Stack, usePathname } from "expo-router";
 import Navbar from "../components/Navbar";
 import { ProfileProvider } from "../contexts/ProfileContext";
 import { FirstTimeProvider } from "../contexts/FirstTimeContext";
+import { MusicProvider } from "@/contexts/MusicContext";
 import { NotificationContext, NotificationProvider } from "@/contexts/NotificationContext";
+import AuthWrapper  from "@/contexts/AuthContext";
+
 import InAppNotification from '../components/InAppNotification';
 import OfflineNotice from '../components/OfflineNotice';
 
@@ -22,19 +25,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const hideNavbar = pathname === "/profile" || pathname === "/welcome" || pathname === "/chat";
 
   return (
-    <NotificationProvider>
-      <FirstTimeProvider>
-        <ProfileProvider>
-          <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-            <View style={styles.container}>
-              <OfflineNotice />
-              {!hideNavbar && <Navbar />}
-              <Stack screenOptions={{ headerShown: false }} />
-            </View>
-          </NavbarContext.Provider>
-        </ProfileProvider>
-      </FirstTimeProvider>
-    </NotificationProvider>
+    <AuthWrapper>
+      <MusicProvider>
+        <NotificationProvider>
+        <FirstTimeProvider>
+          <ProfileProvider>
+            <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
+              <View style={styles.container}>
+                <OfflineNotice />
+                {!hideNavbar && <Navbar />}
+                <Stack screenOptions={{ headerShown: false }} />
+              </View>
+            </NavbarContext.Provider>
+          </ProfileProvider>
+        </FirstTimeProvider>
+      </NotificationProvider>
+      </MusicProvider>
+      
+    </AuthWrapper>
+    
     
   );
 }

@@ -42,6 +42,7 @@ export default function BrowseScreen() {
       try {
         const profilesCollection = collection(firestore, "users");
         const querySnapshot = await getDocs(profilesCollection);
+
         const loadedProfiles = [];
         querySnapshot.forEach((doc) => {
           const data = doc.data();
@@ -49,6 +50,7 @@ export default function BrowseScreen() {
             loadedProfiles.push({ id: doc.id, ...data });
           }
         });
+
         setProfiles(loadedProfiles);
         setLoading(false);
       } catch (error) {
@@ -60,18 +62,24 @@ export default function BrowseScreen() {
   }, []);
 
   const handlePrev = () => {
-    setCurrentIndex((prev) => (prev === 0 ? profiles.length - 1 : prev - 1));
+    setCurrentIndex((prev) => {
+      if (profiles.length === 0) return 0; // Just a safety check
+      return prev === 0 ? profiles.length - 1 : prev - 1;
+    });
     setShowDrinkSpeech(false);
   };
 
   const handleNext = () => {
-    setCurrentIndex((prev) =>
-      prev === profiles.length - 1 ? 0 : prev + 1
-    );
+    setCurrentIndex((prev) => {
+      if (profiles.length === 0) return 0;
+      return prev === profiles.length - 1 ? 0 : prev + 1;
+    });
     setShowDrinkSpeech(false);
   };
 
   const handleChat = () => {
+    // If somehow profiles is empty or currentIndex is invalid, just return
+    if (!profiles[currentIndex]) return;
     router.push(`/chat?partner=${profiles[currentIndex].id}`);
   };
 
@@ -92,9 +100,31 @@ export default function BrowseScreen() {
     );
   }
 
-  const currentProfile = profiles[currentIndex];
-  const drinkIcon =
-    drinkMapping[currentProfile.drink] || drinkMapping["water"];
+  // If there are no profiles to show, just display a fallback message and hide nav controls
+  if (profiles.length === 0) {
+    return (
+      <ImageBackground
+        source={require("../assets/images/chat-background.png")}
+        style={styles.background}
+        resizeMode="cover"
+      >
+        <View style={styles.noProfilesContainer}>
+          <Text style={styles.noProfilesText}>No one is here, check back later</Text>
+        </View>
+        <View style={styles.bottomNavbarContainer}>
+          <BottomNavbar selectedTab="Browse" />
+        </View>
+      </ImageBackground>
+    );
+  }
+
+  // Safely get the current profile (should not be undefined if profiles.length > 0)
+  const currentProfile = profiles[currentIndex] || {};
+  // Safely handle the drink, defaulting to "water"
+  const profileDrink = typeof currentProfile.drink === "string"
+    ? currentProfile.drink.toLowerCase()
+    : "water";
+  const drinkIcon = drinkMapping[profileDrink] || drinkMapping["water"];
 
   // Map each drink to its corresponding speech bubble text.
   const drinkTextMapping = {
@@ -107,14 +137,13 @@ export default function BrowseScreen() {
     absinthe: "Who are you?",
     water: "I don't need alcohol to have fun",
   };
-  const drinkText =
-    drinkTextMapping[currentProfile.drink.toLowerCase()] ||
-    drinkTextMapping["water"];
+  const drinkText = drinkTextMapping[profileDrink] || drinkTextMapping["water"];
 
   return (
     <ImageBackground
       source={require("../assets/images/chat-background.png")}
       style={styles.background}
+      resizeMode="cover"
     >
       <View style={styles.profileCardContainer}>
         <View style={styles.profileCard}>
@@ -136,13 +165,13 @@ export default function BrowseScreen() {
           </View>
           <View style={styles.infoContainer}>
             <Text style={styles.nameText}>
-              {currentProfile.name}, {currentProfile.age}
+              {currentProfile.name || "?"}, {currentProfile.age || "??"}
             </Text>
             <Text style={styles.locationText}>
-              {currentProfile.location}
+              {currentProfile.location || "No location set"}
             </Text>
             <Text style={styles.descriptionText}>
-              {currentProfile.about}
+              {currentProfile.about || "No description provided."}
             </Text>
           </View>
         </View>
@@ -186,6 +215,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  noProfilesContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noProfilesText: {
+    color: "#fff",
+    fontFamily: FontNames.MontserratRegular,
+    fontSize: 28,
+    textAlign: "center",
+    marginHorizontal: 40,
   },
   profileCardContainer: {
     width: width * 0.9,
@@ -353,5 +394,3 @@ const styles = StyleSheet.create({
     width: "100%",
   },
 });
-
-export { BrowseScreen };

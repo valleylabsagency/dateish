@@ -17,39 +17,63 @@ import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import typography from "@/assets/styles/typography";
 import { FirstTimeContext } from "../contexts/FirstTimeContext";
-import { signUp } from "../services/authservice"; // Updated signUp
+import { signUp, login } from "../services/authservice"; 
+
 
 export default function WelcomeScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const [showSignup, setShowSignup] = useState(false); // Always show signup form for new accounts
-  const [username, setUsername] = useState(""); // Now represents the username
+  const [showSignup, setShowSignup] = useState(false);
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [errorText, setErrorText] = useState("");
   const [showError, setShowError] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const today = new Date().toLocaleDateString();
   const router = useRouter();
 
-  // Use the FirstTimeContext to access and update the global boolean.
+  // Use the FirstTimeContext to access and update the global boolean
   const { firstTime, setFirstTime } = useContext(FirstTimeContext);
 
-  const handleSignUp = async () => {
-    // Example check: if username is "unknown" and firstTime is not set, show error
-    if (username.trim().toLowerCase() === "unknown" && !firstTime) {
-      setShowError(true);
-      return;
-    }
-
+  const handleSignUpOrIn = async () => {
     setLoading(true);
     setShowError(false);
+    setErrorText("");
 
     try {
-      // Use the username to sign up. The authservice will append the domain.
-      const user = await signUp(username, password);
-      console.log("Account created for:", username);
-      router.push("/bar"); // Navigate after successful signup
-    } catch (error) {
-      console.error("Sign up error:", error);
+      if (!firstTime) {
+        // ==============================
+        //  CASE: sign in to existing account
+        // ==============================
+        const user = await login(username, password);
+        console.log("Signed in successfully:", username);
+        router.push("/bar");
+      } else {
+        // ==============================
+        //  CASE: create new account
+        // ==============================
+        const newUser = await signUp(username, password);
+        console.log("Account created for:", username);
+        router.push("/bar");
+      }
+    } catch (error: any) {
+      // We'll interpret the error message or code to decide which errorText to set
+      console.error("Auth error:", error);
+
+      if (!firstTime) {
+        // Tried to sign in, but failed => "Never heard of you..."
+        setErrorText("Never heard of you...");
+      } else {
+        // Tried to create a new account
+        if (error.message?.includes("already in use") || error.code === "auth/email-already-in-use") {
+          // Or however your service indicates user is already taken
+          setErrorText("This account already exists");
+        } else {
+          // Fallback
+          setErrorText("Never heard of you...");
+        }
+      }
+
       setShowError(true);
     } finally {
       setLoading(false);
@@ -116,7 +140,7 @@ export default function WelcomeScreen() {
                 />
               </View>
 
-              <TouchableOpacity style={styles.button} onPress={handleSignUp}>
+              <TouchableOpacity style={styles.button} onPress={handleSignUpOrIn}>
                 {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
@@ -126,7 +150,7 @@ export default function WelcomeScreen() {
 
               {showError && (
                 <Text style={styles.errorText}>
-                  Never heard of you...
+                  {errorText}
                 </Text>
               )}
 
@@ -150,6 +174,10 @@ export default function WelcomeScreen() {
     </ImageBackground>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*                                  Styles                                    */
+/* -------------------------------------------------------------------------- */
 
 const styles = StyleSheet.create({
   background: {

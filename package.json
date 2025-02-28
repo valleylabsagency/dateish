@@ -24,6 +24,7 @@
     "expo": "~52.0.31",
     "expo-av": "^15.0.2",
     "expo-camera": "^16.0.16",
+    "expo-dev-client": "^5.0.12",
     "expo-font": "~13.0.3",
     "expo-image-picker": "^16.0.6",
     "expo-linking": "~7.0.5",

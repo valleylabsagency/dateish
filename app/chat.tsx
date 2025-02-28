@@ -35,15 +35,15 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-import { drinkMapping } from "./utils/drinkMapping"; // Assuming you have a separate file for drink mappings.
+import { drinkMapping } from "./utils/drinkMapping"; // local file for drinkMapping
 
 const { width, height } = Dimensions.get("window");
 
 export default function ChatScreen() {
   const router = useRouter();
-  // Get the partner's uid from the route (e.g., /chat?partner=partnerUID)
+  // Get the partner's uid from the route (e.g. /chat?partner=partnerUID)
   const { partner } = useLocalSearchParams();
-  const partnerId = partner; // Should be the uid string.
+  const partnerId = partner; // Should be the UID string.
   const currentUserId = auth.currentUser?.uid;
 
   // Compute chatId by sorting the two UIDs and joining them with an underscore.
@@ -52,7 +52,7 @@ export default function ChatScreen() {
       ? [currentUserId, partnerId].sort().join("_")
       : null;
 
-  // State to store the partner's profile fetched from Firestore.
+  // State to store the partner's profile from Firestore.
   const [partnerProfile, setPartnerProfile] = useState(null);
 
   // Fetch partner's profile from the "users" collection.
@@ -81,24 +81,28 @@ export default function ChatScreen() {
     ? { uri: profile.photoUri }
     : require("../assets/images/tyler.jpeg");
 
+  // Font loading
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
   });
 
+  // Chat state
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(true);
+
+  // UI states
   const [showPartnerModal, setShowPartnerModal] = useState(false);
-  // Removed the main screen speech bubble state for the partner's drink.
-  // Added modal drink bubble state for the partner's drink in the modal.
   const [showModalDrinkSpeech, setShowModalDrinkSpeech] = useState(false);
-  // State to trigger Mr. Mingles warning when user texts twice with no response.
-  const [mingModalVisible, setMingModalVisible] = useState(false);
-  // Animated value for Mr. Mingles image.
+  const [mingModalVisible, setMingModalVisible] = useState(false); // For "Don't be a creep" warning
+
+  // Animated value for Mr. Mingles image
   const rollAnim = useRef(new Animated.Value(500)).current;
 
+  // Notification context
   const { showNotification } = useContext(NotificationContext);
 
+  // Show a local notification if the last incoming message wasn't ours
   useEffect(() => {
     if (messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
@@ -108,7 +112,7 @@ export default function ChatScreen() {
     }
   }, [messages]);
 
-  // Subscribe to real-time updates from the chat's "messages" subcollection.
+  // Subscribe to real-time updates from the chat's "messages" subcollection
   useEffect(() => {
     if (!chatId) return;
     const messagesRef = collection(firestore, "chats", chatId, "messages");
@@ -131,7 +135,7 @@ export default function ChatScreen() {
     return () => unsubscribe();
   }, [chatId]);
 
-  // Animate Mr. Mingles image when the warning modal is shown.
+  // Animate Mr. Mingles image when the warning modal is shown
   useEffect(() => {
     Animated.timing(rollAnim, {
       toValue: mingModalVisible ? 0 : 500,
@@ -140,10 +144,10 @@ export default function ChatScreen() {
     }).start();
   }, [mingModalVisible]);
 
-  // Function to send a message.
+  // Send a message
   const sendMessage = async () => {
     if (inputMessage.trim() === "" || !chatId) return;
-    
+
     // Count consecutive messages from currentUser (no partner response)
     let consecutiveCount = 0;
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -153,25 +157,29 @@ export default function ChatScreen() {
         break;
       }
     }
-    // If two or more consecutive messages have already been sent, show Mr. Mingles warning.
+
+    // If two or more consecutive messages have been sent, show "Don't be a creep" modal
     if (consecutiveCount >= 2) {
       setMingModalVisible(true);
       return;
     }
 
     try {
-      // Update or create the chat document with metadata.
+      // Update or create the chat document with metadata
       const chatDocRef = doc(firestore, "chats", chatId);
       const chatDocSnap = await getDoc(chatDocRef);
+
       if (!chatDocSnap.exists()) {
         await setDoc(chatDocRef, {
           users: [currentUserId, partnerId],
           updatedAt: serverTimestamp(),
           lastMessage: inputMessage,
           partnerName: partnerProfile ? partnerProfile.name : "",
-          partnerPhotoUri: partnerProfile && partnerProfile.drink
-            ? drinkMapping[partnerProfile.drink.toLowerCase()]
-            : drinkMapping["water"],
+          // We store a local image ref if partner has a drink set; otherwise water
+          partnerPhotoUri:
+            partnerProfile && partnerProfile.drink
+              ? drinkMapping[partnerProfile.drink.toLowerCase()]
+              : drinkMapping["water"],
         });
       } else {
         await updateDoc(chatDocRef, {
@@ -180,7 +188,7 @@ export default function ChatScreen() {
         });
       }
 
-      // Add the new message.
+      // Add the new message
       const messagesRef = collection(firestore, "chats", chatId, "messages");
       await addDoc(messagesRef, {
         text: inputMessage,
@@ -193,45 +201,13 @@ export default function ChatScreen() {
     }
   };
 
-  // Optional auto-reply simulation (for testing purposes).
-  useEffect(() => {
-    if (messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg.sender === currentUserId) {
-        const timer = setTimeout(async () => {
-          try {
-            const messagesRef = collection(firestore, "chats", chatId, "messages");
-            await addDoc(messagesRef, {
-              text: "Auto-reply: I'm busy right now!",
-              sender: partnerId,
-              createdAt: serverTimestamp(),
-            });
-          } catch (error) {
-            console.error("Error sending auto-reply:", error);
-          }
-        }, 5000);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [messages]);
-
-  if (!fontsLoaded) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
-    );
-  }
-
-  // Determine current user's drink icon.
+  // Drink icons
   const currentUserDrink = profile && profile.drink ? profile.drink : "water";
   const currentUserDrinkIcon = drinkMapping[currentUserDrink.toLowerCase()];
-
-  // Determine partner's drink icon.
   const partnerDrink = partnerProfile && partnerProfile.drink ? partnerProfile.drink : "water";
   const partnerDrinkIcon = drinkMapping[partnerDrink.toLowerCase()];
 
-  // Map each drink to its corresponding text.
+  // Map each partner drink to text
   const partnerDrinkTextMapping = {
     wine: "Where's the romance at?",
     beer: "Chill night... Sup?",
@@ -243,6 +219,14 @@ export default function ChatScreen() {
     water: "I don't need alcohol to have fun",
   };
   const partnerDrinkText = partnerDrinkTextMapping[partnerDrink.toLowerCase()];
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
 
   return (
     <ImageBackground
@@ -288,6 +272,7 @@ export default function ChatScreen() {
             ))
           )}
         </ScrollView>
+
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
@@ -314,6 +299,7 @@ export default function ChatScreen() {
             <Image source={currentUserDrinkIcon} style={[styles.drinkIcon, styles.myDrink]} />
           </View>
         </View>
+
         <View style={styles.profileWithDrink}>
           <TouchableOpacity onPress={() => setShowPartnerModal(true)}>
             {partnerProfile && partnerProfile.photoUri ? (
@@ -363,6 +349,7 @@ export default function ChatScreen() {
                   </View>
                 )}
               </View>
+
               <View style={styles.modalInfoContainer}>
                 <Text style={styles.nameText}>
                   {partnerProfile ? partnerProfile.name : "Partner"},{" "}
@@ -416,6 +403,10 @@ export default function ChatScreen() {
     </ImageBackground>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*                             Styles & Layout                                */
+/* -------------------------------------------------------------------------- */
 
 const styles = StyleSheet.create({
   background: { flex: 1, resizeMode: "cover" },
@@ -527,7 +518,34 @@ const styles = StyleSheet.create({
   },
   modalImageContainer: { marginBottom: 10 },
   modalProfileImage: { width: 220, height: 220, borderRadius: 110 },
-  modalInfoContainer: { alignItems: "flex-start", marginTop: 10 },
+  modalDrinkContainer: {
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  modalDrinkIcon: {
+    height: 65,
+    width: 50,
+    position: "absolute",
+    left: 50,
+    bottom: -20,
+  },
+  modalDrinkSpeechBubble: {
+    position: "absolute",
+    bottom: 50,
+    left: -10,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    padding: 5,
+    borderRadius: 10,
+  },
+  modalDrinkSpeechBubbleText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: FontNames.MontserratRegular,
+  },
+  modalInfoContainer: {
+    alignItems: "flex-start",
+    marginTop: 10,
+  },
   nameText: {
     color: "red",
     fontSize: 32,
@@ -548,37 +566,7 @@ const styles = StyleSheet.create({
     width: 300,
     fontFamily: FontNames.MontserratRegular,
   },
-  // New styles for the modal drink section
-  modalDrinkContainer: {
-    alignItems: "center",
-    marginVertical: 10,
-  },
-  modalDrinkText: {
-    color: "#fff",
-    fontSize: 18,
-    fontFamily: FontNames.MontserratRegular,
-  },
-  modalDrinkSpeechBubble: {
-    position: "absolute",
-    bottom: 50,
-    left: -10,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    padding: 5,
-    borderRadius: 10,
-  },
-  modalDrinkIcon: {
-    height: 65,
-    width: 50,
-    position: "absolute",
-    left: 50,
-    bottom: -20,
-  },
-  modalDrinkSpeechBubbleText: {
-    color: "#fff",
-    fontSize: 14,
-    fontFamily: FontNames.MontserratRegular,
-  },
-  // Styles for Mr. Mingles Warning Modal
+  // "Don't be a creep" modal
   mingModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.8)",
@@ -659,5 +647,3 @@ const styles = StyleSheet.create({
     right: -100,
   },
 });
-
-export { ChatScreen };
