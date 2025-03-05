@@ -1,4 +1,3 @@
-// InAppNotification.tsx
 import React, { useRef, useEffect } from 'react';
 import { 
   View, 
@@ -7,7 +6,8 @@ import {
   PanResponder, 
   TouchableOpacity, 
   StyleSheet, 
-  Dimensions 
+  Dimensions,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -17,6 +17,7 @@ interface InAppNotificationProps {
   visible: boolean;
   message: string;
   chatId: string;
+  senderName: string;
   onDismiss: () => void;
 }
 
@@ -24,12 +25,26 @@ export default function InAppNotification({
   visible,
   message,
   chatId,
+  senderName,
   onDismiss,
 }: InAppNotificationProps) {
-  const translateY = useRef(new Animated.Value(-100)).current;
+  const translateY = useRef(new Animated.Value(-150)).current;
   const router = useRouter();
 
-  // When 'visible' changes, animate the notification.
+  // Auto dismiss notification after 3 seconds
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (visible) {
+      timer = setTimeout(() => {
+        onDismiss();
+      }, 3000);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [visible]);
+
+  // Animate notification in/out when 'visible' changes.
   useEffect(() => {
     if (visible) {
       Animated.spring(translateY, {
@@ -38,7 +53,7 @@ export default function InAppNotification({
       }).start();
     } else {
       Animated.timing(translateY, {
-        toValue: -100,
+        toValue: -150,
         duration: 200,
         useNativeDriver: true,
       }).start();
@@ -52,14 +67,12 @@ export default function InAppNotification({
         gestureState.dy < -10, // trigger if swiping up
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy < -50) {
-          // Dismiss if swiped up enough.
           Animated.timing(translateY, {
-            toValue: -100,
+            toValue: -150,
             duration: 200,
             useNativeDriver: true,
           }).start(() => onDismiss());
         } else {
-          // Otherwise, snap back.
           Animated.spring(translateY, {
             toValue: 0,
             useNativeDriver: true,
@@ -73,11 +86,21 @@ export default function InAppNotification({
 
   return (
     <Animated.View
-      style={[styles.notificationContainer, { transform: [{ translateY }] }]}
+      style={[
+        styles.notificationContainer, 
+        { transform: [{ translateY }], height: Platform.OS === 'ios' ? 100 : 70 }
+      ]}
       {...panResponder.panHandlers}
     >
-      <TouchableOpacity onPress={() => router.push(`/chat?chatId=${chatId}`)}>
-        <Text style={styles.notificationText}>{message}</Text>
+      <TouchableOpacity
+        onPress={() => {
+          router.push(`/chat?chatId=${chatId}`);
+          onDismiss();
+        }}
+      >
+        <Text style={styles.notificationText}>
+          {senderName}: {message}
+        </Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -88,8 +111,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     width: width,
-    backgroundColor: '#333',
-    padding: 15,
+    backgroundColor: '#460b2a',
+    padding: 20,
+    // Increase top padding for iOS to push the text lower so it's not hidden behind the camera view
+    paddingTop: Platform.OS === 'ios' ? 40 : 20,
     zIndex: 1000,
     elevation: 10,
     alignItems: 'center',

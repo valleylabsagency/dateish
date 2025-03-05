@@ -19,34 +19,39 @@ import { Camera } from "expo-camera";
 import * as Location from "expo-location";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { ProfileContext } from "../contexts/ProfileContext";
 import ProfileNavbar from "@/components/ProfileNavbar";
 import { logout } from "../services/authservice";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+// NEW IMPORTS FOR FIREBASE STORAGE
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { auth, storage } from "../firebase";
 
 export default function ProfileScreen() {
-  const { profile, saveProfile, setProfileComplete, profileComplete, setProfile } = useContext(ProfileContext);
+  const { profile, saveProfile, setProfileComplete, profileComplete } = useContext(ProfileContext);
   const router = useRouter();
+  const searchParams = useLocalSearchParams();
 
-  // Form state
+  const from = searchParams.from;
+
+  // Form state.
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [location, setLocation] = useState("");
   const [about, setAbout] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
-  // State for editing "about"
+  // State to control modal for editing the "about" field.
   const [editingAbout, setEditingAbout] = useState(false);
   const [modalTypedText, setModalTypedText] = useState("");
   const fullModalText =
     "Finish your profile you lazy shit!\n\nThen you will be able to see others and use the app...";
 
-  // Animated value for Mr. Mingles
+  // Animated value for Mr. Mingles image.
   const rollAnim = useRef(new Animated.Value(500)).current;
-  const [modalVisible, setModalVisible] = useState(false);
 
-  // Pre-populate fields from the context
+  // Pre-populate fields from context.
   useEffect(() => {
     if (profile) {
       setName(profile.name || "");
@@ -54,17 +59,9 @@ export default function ProfileScreen() {
       setLocation(profile.location || "");
       setAbout(profile.about || "");
       setPhotoUri(profile.photoUri || null);
-    } else {
-      // If no profile is loaded, reset fields
-      setName("");
-      setAge("");
-      setLocation("");
-      setAbout("");
-      setPhotoUri(null);
     }
   }, [profile]);
 
-  // Font loading
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
     [FontNames.MontserratBold]: require("../assets/fonts/Montserrat-Bold.ttf"),
@@ -74,7 +71,7 @@ export default function ProfileScreen() {
     [FontNames.MontSerratSemiBold]: require("../assets/fonts/Montserrat-SemiBold.ttf"),
   });
 
-  // Mr. Mingles "finish your profile" animation
+  // Animate modal appearance for the Mr. Mingles message.
   useEffect(() => {
     Animated.timing(rollAnim, {
       toValue: modalVisible ? 0 : 500,
@@ -83,7 +80,7 @@ export default function ProfileScreen() {
     }).start();
   }, [modalVisible]);
 
-  // Type out the "Finish your profile" text
+  // Type out the modal text.
   useEffect(() => {
     let intervalId: number | null = null;
     if (modalVisible) {
@@ -101,7 +98,38 @@ export default function ProfileScreen() {
     };
   }, [modalVisible]);
 
-  // Launch camera
+  // NEW: Function to upload the image to Firebase Storage and get the download URL
+  const uploadImage = async (uri: string): Promise<string> => {
+    try {
+      // Use XMLHttpRequest to fetch the blob from the local URI.
+      const blob: Blob = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.onload = () => {
+          resolve(xhr.response);
+        };
+        xhr.onerror = (e) => {
+          console.error("XHR error:", e);
+          reject(new Error("Network request failed"));
+        };
+        xhr.responseType = "blob";
+        xhr.open("GET", uri, true);
+        xhr.send(null);
+      });
+  
+      // Extract filename from URI and build a storage path using current user's UID.
+      const filename = uri.substring(uri.lastIndexOf("/") + 1);
+      const storageRef = ref(storage, `profileImages/${auth.currentUser?.uid}/${filename}`);
+      
+      await uploadBytes(storageRef, blob);
+      const downloadUrl = await getDownloadURL(storageRef);
+      return downloadUrl;
+    } catch (error) {
+      console.error("Error uploading image:", JSON.stringify(error));
+      throw error;
+    }
+  };
+  
+  // Launch camera and then upload the image to get a shared URL
   const handleTakePhoto = async () => {
     const { status } = await Camera.requestCameraPermissionsAsync();
     if (status !== "granted") {
@@ -112,31 +140,33 @@ export default function ProfileScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,
+      base64: true, // enable base64 conversion
     });
-    if (!result.canceled) {
-      setPhotoUri(result.assets[0].uri);
+    if (!result.canceled && result.assets[0].base64) {
+      // Create a base64 data URL. Adjust the mime type if needed.
+      const dataUrl = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      setPhotoUri(dataUrl);
     }
   };
 
-  // If profile is incomplete, show Mr. Mingles modal
+  // Back button handler: if any field is missing, show the modal.
   const handleSubmit = async () => {
     if (!name || !age || !location || !about || !photoUri) {
       setModalVisible(true);
       setModalTypedText("");
-      return; // Prevent navigation if the profile is incomplete
+      return; // Prevent navigation if the profile is incomplete.
     } else {
       try {
         await saveProfile({ name, age, location, about, photoUri });
         setProfileComplete(true);
         console.log("Profile saved successfully");
-        router.push("/bar");
+        router.back();
       } catch (error) {
         console.error("Error saving profile:", error);
       }
     }
   };
 
-  // Pull location from device
   const handleRequestLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") {
@@ -157,23 +187,17 @@ export default function ProfileScreen() {
     }
   };
 
-  // Logout
   const handleLogout = async () => {
     try {
       await logout();
-      // Clear local storage
       await AsyncStorage.removeItem("userProfile");
-      // Clear context state
-      setProfile(null);
-      setProfileComplete(false);
-
       router.push("/");
     } catch (error) {
       console.error("Logout error:", error);
     }
   };
 
-  // Editor for "about"
+  // New modal overlay for editing "about"
   const renderAboutEditor = () => (
     <Modal
       animationType="fade"
@@ -206,6 +230,8 @@ export default function ProfileScreen() {
       </KeyboardAvoidingView>
     </Modal>
   );
+
+  const [modalVisible, setModalVisible] = useState(false);
 
   if (!fontsLoaded) {
     return (
@@ -252,7 +278,6 @@ export default function ProfileScreen() {
               <Text style={styles.editButtonText}>Get Location</Text>
             </TouchableOpacity>
           </View>
-
           <View style={styles.column}>
             {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.photo} />
@@ -266,7 +291,6 @@ export default function ProfileScreen() {
               <Text style={styles.editButtonText}>Take a pic</Text>
             </TouchableOpacity>
           </View>
-
           <View style={styles.column}>
             <Text style={[styles.aboutText, { flex: 1 }]}>
               {about ? about : "Write something about yourself..."}
@@ -280,7 +304,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Mr. Mingles Modal */}
         <Modal animationType="slide" transparent={true} visible={modalVisible}>
           <View style={modalStyles.modalOverlay}>
             <TouchableOpacity style={modalStyles.closeButton} onPress={() => setModalVisible(false)}>
@@ -303,7 +326,6 @@ export default function ProfileScreen() {
 
         {renderAboutEditor()}
 
-        {/* If profile is complete, we allow user to log out */}
         {profileComplete && (
           <View style={styles.logoutContainer}>
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -316,10 +338,6 @@ export default function ProfileScreen() {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                   Styles                                   */
-/* -------------------------------------------------------------------------- */
-
 const styles = StyleSheet.create({
   background: {
     flex: 1,
@@ -329,7 +347,7 @@ const styles = StyleSheet.create({
   mirrorContainer: {
     position: "absolute",
     top: 140,
-    padding: 20,
+    padding: Platform.select({ android: 15, ios: 20 }),
     borderRadius: 10,
     alignItems: "center",
     alignSelf: "center",
@@ -341,7 +359,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     letterSpacing: 1,
     color: "#908db3",
-    marginBottom: 20,
+    marginBottom: Platform.select({ android: 10, ios: 20 }),
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 1,
     fontFamily: FontNames.MontSerratSemiBold,
@@ -352,12 +370,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#908db3",
     fontFamily: FontNames.MontserratBold,
+    marginVertical: Platform.select({ android: -13, ios: 0 }),
   },
   locationContainer: {
     flexDirection: "column",
     alignItems: "center",
     width: "80%",
-    marginBottom: 15,
+    marginBottom: Platform.select({ android: 10, ios: 15 }),
   },
   editButton: {
     paddingHorizontal: 5,
@@ -377,7 +396,7 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     alignItems: "center",
     width: "100%",
-    marginBottom: 15,
+    marginBottom: Platform.select({ android: 10, ios: 15 }),
   },
   photo: {
     width: 200,
@@ -426,6 +445,17 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 20,
     fontFamily: FontNames.MontserratBold,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent",
   },
 });
 
@@ -559,3 +589,4 @@ const modalStyles = StyleSheet.create({
     right: -100,
   },
 });
+

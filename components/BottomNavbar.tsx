@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     width: 85,
     height: 75,
     position: "relative",
-    top: 4,
+    top: 0,
   },
   stageLabel: {
     position: "relative",

@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
+  Platform
 } from "react-native";
 import { useRouter } from "expo-router";
 import { NavbarContext } from "../app/_layout";
@@ -125,14 +126,13 @@ export default function Navbar() {
 const styles = StyleSheet.create({
   navbar: {
     width: "100%",
-    height: 120,
+    height: Platform.OS === "ios" ? 85 : 65,
     backgroundColor: "#460b2a",
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingTop: 30,
-    zIndex: 2,
+    paddingHorizontal: 15,
+    paddingBottom: 0,
+    paddingTop: Platform.OS === "ios" ? 0 : 0,
   },
   navIcon: {
     width: 50,

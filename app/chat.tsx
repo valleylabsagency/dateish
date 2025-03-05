@@ -35,7 +35,7 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-import { drinkMapping } from "./utils/drinkMapping"; // local file for drinkMapping
+import { drinkMapping } from "./utils/drinkMapping";
 
 const { width, height } = Dimensions.get("window");
 
@@ -95,6 +95,7 @@ export default function ChatScreen() {
   const [showPartnerModal, setShowPartnerModal] = useState(false);
   const [showModalDrinkSpeech, setShowModalDrinkSpeech] = useState(false);
   const [mingModalVisible, setMingModalVisible] = useState(false); // For "Don't be a creep" warning
+  const [typingModalVisible, setTypingModalVisible] = useState(false);
 
   // Animated value for Mr. Mingles image
   const rollAnim = useRef(new Animated.Value(500)).current;
@@ -102,15 +103,20 @@ export default function ChatScreen() {
   // Notification context
   const { showNotification } = useContext(NotificationContext);
 
+  // Create a ref for the ScrollView
+  const scrollViewRef = useRef<ScrollView>(null);
+
   // Show a local notification if the last incoming message wasn't ours
   useEffect(() => {
     if (messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg.sender !== currentUserId) {
-        showNotification(lastMsg.text, chatId);
+        const senderName = partnerProfile.name || "Partner";
+        showNotification(lastMsg.text, senderName);
       }
     }
   }, [messages]);
+  
 
   // Subscribe to real-time updates from the chat's "messages" subcollection
   useEffect(() => {
@@ -135,6 +141,11 @@ export default function ChatScreen() {
     return () => unsubscribe();
   }, [chatId]);
 
+  // Always auto-scroll to bottom so newest messages are visible
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [messages]);
+
   // Animate Mr. Mingles image when the warning modal is shown
   useEffect(() => {
     Animated.timing(rollAnim, {
@@ -148,34 +159,26 @@ export default function ChatScreen() {
   const sendMessage = async () => {
     if (inputMessage.trim() === "" || !chatId) return;
 
-    // Count consecutive messages from currentUser (no partner response)
-    let consecutiveCount = 0;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].sender === currentUserId) {
-        consecutiveCount++;
-      } else {
-        break;
-      }
-    }
+    // Determine if the partner has responded at least once.
+    const partnerHasResponded = messages.some((msg) => msg.sender !== currentUserId);
 
-    // If two or more consecutive messages have been sent, show "Don't be a creep" modal
-    if (consecutiveCount >= 2) {
+    // If no partner message exists (i.e. conversation is still one-sided)
+    // and there's already one message sent, show the "wait for them to answer" modal.
+    if (!partnerHasResponded && messages.length >= 1) {
       setMingModalVisible(true);
       return;
     }
 
     try {
-      // Update or create the chat document with metadata
+      // Update or create the chat document with metadata.
       const chatDocRef = doc(firestore, "chats", chatId);
       const chatDocSnap = await getDoc(chatDocRef);
-
       if (!chatDocSnap.exists()) {
         await setDoc(chatDocRef, {
           users: [currentUserId, partnerId],
           updatedAt: serverTimestamp(),
           lastMessage: inputMessage,
           partnerName: partnerProfile ? partnerProfile.name : "",
-          // We store a local image ref if partner has a drink set; otherwise water
           partnerPhotoUri:
             partnerProfile && partnerProfile.drink
               ? drinkMapping[partnerProfile.drink.toLowerCase()]
@@ -188,7 +191,7 @@ export default function ChatScreen() {
         });
       }
 
-      // Add the new message
+      // Add the new message.
       const messagesRef = collection(firestore, "chats", chatId, "messages");
       await addDoc(messagesRef, {
         text: inputMessage,
@@ -196,6 +199,7 @@ export default function ChatScreen() {
         createdAt: serverTimestamp(),
       });
       setInputMessage("");
+      setTypingModalVisible(false);
     } catch (error) {
       console.error("Error sending message:", error);
     }
@@ -241,38 +245,39 @@ export default function ChatScreen() {
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <ScrollView
-          style={styles.chatContainer}
-          contentContainerStyle={styles.chatContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {loadingMessages ? (
-            <ActivityIndicator size="large" color="#fff" />
-          ) : (
-            messages.map((msg, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.chatBubble,
-                  msg.sender === currentUserId
-                    ? styles.userBubble
-                    : styles.partnerBubble,
-                ]}
-              >
-                <Text style={styles.chatText}>{msg.text}</Text>
-                {msg.createdAt && msg.createdAt.seconds && (
-                  <Text style={styles.timestamp}>
-                    {new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </Text>
-                )}
-              </View>
-            ))
-          )}
-        </ScrollView>
-
+        {/* ChatWrapper clips any content that goes below its bounds */}
+        <View style={styles.chatWrapper}>
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.chatContainer}
+            contentContainerStyle={styles.chatContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {loadingMessages ? (
+              <ActivityIndicator size="large" color="#fff" />
+            ) : (
+              messages.map((msg, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.chatBubble,
+                    msg.sender === currentUserId ? styles.userBubble : styles.partnerBubble,
+                  ]}
+                >
+                  <Text style={styles.chatText}>{msg.text}</Text>
+                  {msg.createdAt && msg.createdAt.seconds && (
+                    <Text style={styles.timestamp}>
+                      {new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                  )}
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </View>
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
@@ -280,6 +285,7 @@ export default function ChatScreen() {
             onChangeText={setInputMessage}
             placeholder="Type your message..."
             placeholderTextColor="#999"
+            onFocus={() => setTypingModalVisible(true)}
             onSubmitEditing={sendMessage}
             returnKeyType="send"
           />
@@ -289,17 +295,47 @@ export default function ChatScreen() {
         </View>
       </KeyboardAvoidingView>
 
+      {/* Typing Modal */}
+      <Modal
+        visible={typingModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setTypingModalVisible(false)}
+      >
+        <View style={typingModalStyles.container}>
+          <View style={typingModalStyles.inputBox}>
+            <TextInput
+              style={typingModalStyles.textInput}
+              value={inputMessage}
+              onChangeText={setInputMessage}
+              placeholder="Type your message..."
+              placeholderTextColor="#999"
+              multiline
+              autoFocus
+            />
+            <TouchableOpacity
+              style={typingModalStyles.doneButton}
+              onPress={() => {
+                sendMessage();
+                setTypingModalVisible(false);
+              }}
+            >
+              <Text style={typingModalStyles.doneButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Bottom Profile Pictures with Drink Overlays */}
       <View style={styles.bottomProfiles}>
         <View style={styles.profileWithDrink}>
-          <TouchableOpacity onPress={() => router.push("/profile?self=true")}>
+          <TouchableOpacity onPress={() => router.push("/profile?self=true&from=chat")}>
             <Image source={currentUserImage} style={styles.currentUserImage} />
           </TouchableOpacity>
           <View style={styles.drinkOverlay}>
             <Image source={currentUserDrinkIcon} style={[styles.drinkIcon, styles.myDrink]} />
           </View>
         </View>
-
         <View style={styles.profileWithDrink}>
           <TouchableOpacity onPress={() => setShowPartnerModal(true)}>
             {partnerProfile && partnerProfile.photoUri ? (
@@ -308,7 +344,6 @@ export default function ChatScreen() {
               <Image source={require("../assets/images/person1.jpg")} style={styles.partnerImage} />
             )}
           </TouchableOpacity>
-          {/* Partner drink overlay is now static (non-clickable) */}
           <View style={styles.drinkOverlay}>
             <Image source={partnerDrinkIcon} style={[styles.drinkIcon, styles.otherDrink]} />
           </View>
@@ -338,7 +373,6 @@ export default function ChatScreen() {
                   <Image source={require("../assets/images/person1.jpg")} style={styles.modalProfileImage} />
                 )}
               </View>
-              {/* New Drink Section in Modal */}
               <View style={styles.modalDrinkContainer}>
                 <TouchableOpacity onPress={() => setShowModalDrinkSpeech(!showModalDrinkSpeech)}>
                   <Image source={partnerDrinkIcon} style={styles.modalDrinkIcon} />
@@ -349,7 +383,6 @@ export default function ChatScreen() {
                   </View>
                 )}
               </View>
-
               <View style={styles.modalInfoContainer}>
                 <Text style={styles.nameText}>
                   {partnerProfile ? partnerProfile.name : "Partner"},{" "}
@@ -404,16 +437,160 @@ export default function ChatScreen() {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                             Styles & Layout                                */
-/* -------------------------------------------------------------------------- */
+const typingModalStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  inputBox: {
+    backgroundColor: "#fff",
+    width: "90%",
+    borderRadius: 10,
+    padding: 20,
+    alignItems: "center",
+  },
+  textInput: {
+    width: "100%",
+    height: 100,
+    fontSize: 18,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    textAlignVertical: "top",
+  },
+  doneButton: {
+    marginTop: 20,
+    backgroundColor: "#4a0a0f",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  doneButtonText: {
+    color: "#fff",
+    fontSize: 18,
+  },
+});
 
 const styles = StyleSheet.create({
-  background: { flex: 1, resizeMode: "cover" },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  container: { flex: 1, paddingTop: 50, paddingHorizontal: 20, paddingBottom: 100 },
+  background: { flex: 1, resizeMode: "cover", width: "100%", height: "100%" },
+  mirrorContainer: {
+    position: "absolute",
+    top: 140,
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    alignSelf: "center",
+    width: "80%",
+    textAlign: "center",
+  },
+  header: {
+    fontSize: 32,
+    fontWeight: "500",
+    letterSpacing: 1,
+    color: "#908db3",
+    marginBottom: 20,
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 1,
+    fontFamily: FontNames.MontSerratSemiBold,
+  },
+  input: {
+    width: "100%",
+    fontSize: 21,
+    textAlign: "center",
+    color: "#908db3",
+    fontFamily: FontNames.MontserratBold,
+  },
+  locationContainer: {
+    flexDirection: "column",
+    alignItems: "center",
+    width: "80%",
+    marginBottom: 15,
+  },
+  editButton: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 20,
+    marginTop: 5,
+    borderWidth: 1,
+    borderColor: "black",
+  },
+  editButtonText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: "black",
+    fontFamily: FontNames.MontserratBold,
+  },
+  column: {
+    flexDirection: "column",
+    alignItems: "center",
+    width: "100%",
+    marginBottom: 15,
+  },
+  photo: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+  },
+  personIcon: {
+    borderWidth: 2,
+    borderColor: "grey",
+    borderRadius: 100,
+    width: 200,
+    height: 200,
+    paddingTop: 25,
+    textAlign: "center",
+  },
+  aboutText: {
+    fontSize: 14,
+    color: "gray",
+    fontWeight: "400",
+    marginTop: 20,
+    fontFamily: FontNames.MontSerratSemiBold,
+  },
+  editButtonPhoto: {
+    position: "absolute",
+    left: 200,
+    top: 196,
+  },
+  bottomEdit: {
+    position: "relative",
+    left: 140,
+  },
+  logoutContainer: {
+    position: "absolute",
+    bottom: 40,
+    width: "100%",
+    alignItems: "center",
+  },
+  logoutButton: {
+    backgroundColor: "#D9534F",
+    paddingVertical: 15,
+    paddingHorizontal: 50,
+    borderRadius: 30,
+    elevation: 5,
+  },
+  logoutButtonText: {
+    color: "#fff",
+    fontSize: 20,
+    fontFamily: FontNames.MontserratBold,
+  },
+  // Chat area wrapper limits visible messages and clips overflow.
+  chatWrapper: {
+    height: height * 0.50,
+    overflow: "hidden",
+  },
   chatContainer: { flex: 1 },
-  chatContent: { paddingBottom: 20 },
+  // The chatContent now uses flexGrow with justifyContent "flex-end" so that newer messages are anchored at the bottom.
+  chatContent: {
+    flexGrow: 1,
+    justifyContent: "flex-end",
+    paddingHorizontal: 10,
+    paddingBottom: height * 0.03,
+  },
   chatBubble: {
     maxWidth: "70%",
     padding: 10,
@@ -432,10 +609,11 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: "row",
-    marginVertical: 10,
     alignItems: "center",
-    position: "relative",
-    bottom: 100,
+    position: "absolute",
+    bottom: -250,
+    width: "100%",
+    paddingHorizontal: 20,
   },
   textInput: {
     flex: 1,
@@ -466,27 +644,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     alignItems: "center",
   },
-  profileWithDrink: {
-    position: "relative",
-  },
+  profileWithDrink: { position: "relative" },
   currentUserImage: { width: 110, height: 110, borderRadius: 55 },
   partnerImage: { width: 110, height: 110, borderRadius: 55 },
-  drinkOverlay: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-  },
+  drinkOverlay: { position: "absolute", bottom: 0, right: 0 },
   drinkIcon: { width: 52, height: 59 },
-  myDrink: {
-    position: "absolute",
-    left: 18,
-    bottom: 67,
-  },
-  otherDrink: {
-    position: "absolute",
-    right: 123,
-    bottom: 67,
-  },
+  myDrink: { position: "absolute", left: 18, bottom: 67 },
+  otherDrink: { position: "absolute", right: 123, bottom: 67 },
   bottomNavbarContainer: { position: "absolute", bottom: 0, width: "100%" },
   modalOverlay: {
     flex: 1,
@@ -497,38 +661,29 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     width: "90%",
-    borderRadius: 20,
-    padding: 20,
+    height: 500,
+    paddingVertical: 20,
+    paddingHorizontal: 8,
     alignItems: "center",
+    position: "relative",
+    bottom: 80,
   },
-  modalCloseButton: {
-    position: "absolute",
-    top: 30,
-    right: 40,
-    zIndex: 10,
-  },
+  modalCloseButton: { position: "absolute", top: 30, right: 40, zIndex: 10 },
   modalCloseButtonText: { fontSize: 24, color: "#fff" },
   profileCard: {
     backgroundColor: "rgba(69,26,31,0.8)",
     borderColor: "#371015",
     borderWidth: 8,
     borderRadius: 20,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 30,
+    height: 470,
     alignItems: "center",
   },
   modalImageContainer: { marginBottom: 10 },
-  modalProfileImage: { width: 220, height: 220, borderRadius: 110 },
-  modalDrinkContainer: {
-    alignItems: "center",
-    marginVertical: 10,
-  },
-  modalDrinkIcon: {
-    height: 65,
-    width: 50,
-    position: "absolute",
-    left: 50,
-    bottom: -20,
-  },
+  modalProfileImage: { width: 250, height: 250, borderRadius: 130 },
+  modalDrinkContainer: { alignItems: "center", marginVertical: 10 },
+  modalDrinkIcon: { height: 65, width: 50, position: "absolute", left: 50, bottom: -20 },
   modalDrinkSpeechBubble: {
     position: "absolute",
     bottom: 50,
@@ -542,10 +697,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: FontNames.MontserratRegular,
   },
-  modalInfoContainer: {
-    alignItems: "flex-start",
-    marginTop: 10,
-  },
+  modalInfoContainer: { alignItems: "flex-start", marginTop: 10 },
   nameText: {
     color: "red",
     fontSize: 32,
@@ -587,12 +739,7 @@ const styles = StyleSheet.create({
     position: "relative",
     bottom: 140,
   },
-  mingModalCloseButton: {
-    position: "absolute",
-    top: 40,
-    right: 20,
-    zIndex: 100,
-  },
+  mingModalCloseButton: { position: "absolute", top: 40, right: 20, zIndex: 100 },
   mingModalCloseButtonText: {
     color: "#fff",
     fontSize: 48,
@@ -606,13 +753,7 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     fontFamily: FontNames.MontserratExtraLight,
   },
-  mingTriangleContainer: {
-    position: "absolute",
-    bottom: -24,
-    right: 24,
-    width: 0,
-    height: 0,
-  },
+  mingTriangleContainer: { position: "absolute", bottom: -24, right: 24, width: 0, height: 0 },
   mingOuterTriangle: {
     width: 5,
     height: 5,
@@ -647,3 +788,5 @@ const styles = StyleSheet.create({
     right: -100,
   },
 });
+
+export { ChatScreen };

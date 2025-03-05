@@ -1,6 +1,6 @@
 // contexts/ProfileContext.tsx
 
-import React, { createContext, useState, useEffect } from "react";
+import React, { createContext, useState, useEffect, useRef } from "react";
 import { firestore, auth } from "../firebase";
 import {
   doc,
@@ -40,6 +40,9 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
   const [profileComplete, setProfileComplete] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(auth.currentUser);
 
+  // Use a ref to track the previously logged-in user.
+  const previousUser = useRef<User | null>(auth.currentUser);
+
   // Utility: determine if a profile is complete
   const isProfileComplete = (prof: Profile): boolean => {
     return Boolean(
@@ -51,18 +54,37 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
     );
   };
 
-  // 1) Track user changes via onAuthStateChanged
-  //    When user changes (including logout), reset the profile unless the user is new
+  // 1) Track user changes via onAuthStateChanged.
+  //    When a user logs in, update their document to online:true.
+  //    When a user logs out, update the previous user's doc to online:false.
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       console.log("Auth state changed. user.uid =", user?.uid ?? null);
 
-      setCurrentUser(user);
-
-      if (!user) {
-        // If no user is logged in, clear the profile so it doesn't bleed over
+      if (!user && previousUser.current) {
+        // User logged out; update the previous user to online:false.
+        try {
+          const profileDocRef = doc(firestore, "users", previousUser.current.uid);
+          await setDoc(profileDocRef, { online: false }, { merge: true });
+          console.log(`Set user ${previousUser.current.uid} offline.`);
+        } catch (error) {
+          console.error("Error updating online status to false:", error);
+        }
+        previousUser.current = null;
+        setCurrentUser(null);
         setProfile(null);
         setProfileComplete(false);
+      } else if (user) {
+        // User logged in; update their online status to true.
+        previousUser.current = user;
+        setCurrentUser(user);
+        try {
+          const profileDocRef = doc(firestore, "users", user.uid);
+          await setDoc(profileDocRef, { online: true }, { merge: true });
+          console.log(`Set user ${user.uid} online.`);
+        } catch (error) {
+          console.error("Error updating online status to true:", error);
+        }
       }
     });
 
@@ -92,14 +114,12 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
           setProfile(data);
           setProfileComplete(isProfileComplete(data));
         } else {
-          // doc doesn't exist => set an empty object
           console.log("No profile doc found for this user; setting empty profile object.");
           setProfile({});
           setProfileComplete(false);
         }
       });
     } else {
-      // No current user => clear profile
       setProfile(null);
       setProfileComplete(false);
     }
@@ -112,7 +132,7 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
     };
   }, [currentUser]);
 
-  // 3) Save the updated profile data to Firestore
+  // 3) Save the updated profile data to Firestore.
   const saveProfile = async (profileData: Partial<Profile>) => {
     try {
       if (!currentUser) {
@@ -126,7 +146,7 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
 
       const userUid = currentUser.uid;
       const profileDocRef = doc(firestore, "users", userUid);
-      await setDoc(profileDocRef, newProfile, { merge: true });
+      await setDoc(profileDocRef, { ...newProfile, online: true }, { merge: true });
 
       console.log("Profile saved:", newProfile);
     } catch (error) {
@@ -148,3 +168,5 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
     </ProfileContext.Provider>
   );
 };
+
+export default ProfileProvider;

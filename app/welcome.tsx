@@ -17,63 +17,40 @@ import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import typography from "@/assets/styles/typography";
 import { FirstTimeContext } from "../contexts/FirstTimeContext";
-import { signUp, login } from "../services/authservice"; 
-
+import { signUp, login } from "../services/authservice";
 
 export default function WelcomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [showSignup, setShowSignup] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [errorText, setErrorText] = useState("");
   const [showError, setShowError] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const today = new Date().toLocaleDateString();
   const router = useRouter();
 
-  // Use the FirstTimeContext to access and update the global boolean
+  // Use the FirstTimeContext to access and update the global boolean.
   const { firstTime, setFirstTime } = useContext(FirstTimeContext);
 
   const handleSignUpOrIn = async () => {
     setLoading(true);
     setShowError(false);
-    setErrorText("");
 
     try {
       if (!firstTime) {
-        // ==============================
-        //  CASE: sign in to existing account
-        // ==============================
+        // Sign in to existing account.
         const user = await login(username, password);
         console.log("Signed in successfully:", username);
         router.push("/bar");
       } else {
-        // ==============================
-        //  CASE: create new account
-        // ==============================
+        // Create new account.
         const newUser = await signUp(username, password);
         console.log("Account created for:", username);
         router.push("/bar");
       }
     } catch (error: any) {
-      // We'll interpret the error message or code to decide which errorText to set
       console.error("Auth error:", error);
-
-      if (!firstTime) {
-        // Tried to sign in, but failed => "Never heard of you..."
-        setErrorText("Never heard of you...");
-      } else {
-        // Tried to create a new account
-        if (error.message?.includes("already in use") || error.code === "auth/email-already-in-use") {
-          // Or however your service indicates user is already taken
-          setErrorText("This account already exists");
-        } else {
-          // Fallback
-          setErrorText("Never heard of you...");
-        }
-      }
-
       setShowError(true);
     } finally {
       setLoading(false);
@@ -127,6 +104,7 @@ export default function WelcomeScreen() {
                   value={username}
                   onChangeText={setUsername}
                   autoCapitalize="none"
+                  multiline={false} // Disable multiline to prevent auto-expansion
                 />
               </View>
 
@@ -137,6 +115,7 @@ export default function WelcomeScreen() {
                   secureTextEntry
                   value={password}
                   onChangeText={setPassword}
+                  multiline={false}
                 />
               </View>
 
@@ -150,7 +129,7 @@ export default function WelcomeScreen() {
 
               {showError && (
                 <Text style={styles.errorText}>
-                  {errorText}
+                  Never heard of you...
                 </Text>
               )}
 
@@ -247,16 +226,18 @@ const styles = StyleSheet.create({
     width: 100,
   },
   input: {
-    flex: 1,
+    width: "60%",       // Fixed width relative to container
+    height: 40,          // Fixed height
     borderBottomWidth: 1,
     borderColor: "#000",
     fontSize: 18,
     fontFamily: FontNames.MVBoli,
     padding: 5,
+    marginVertical: 5,
+    color: "#000",
     position: "relative",
     bottom: 10,
-    left: 2,
-    color: "#000",
+    overflow: "hidden",  // Hide any overflowing text
   },
   checkboxContainer: {
     flexDirection: "row",
@@ -264,7 +245,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
     marginTop: 20,
     position: "relative",
-    top: 30,
+    top: 10,
   },
   checkbox: {
     width: 25,
@@ -319,3 +300,5 @@ const styles = StyleSheet.create({
     fontFamily: "Montserrat-Regular",
   },
 });
+
+

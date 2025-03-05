@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from "react";
 import { Audio } from "expo-av";
+import { usePathname } from "expo-router";
 
 interface MusicContextValue {
   isPlaying: boolean;
@@ -14,11 +15,24 @@ export const MusicContext = createContext<MusicContextValue>({
 });
 
 export function MusicProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  // Consider both "/" and "/welcome" as routes where we should NOT play music.
+  const shouldPlayMusic = !(pathname === "/welcome" || pathname === "/");
+
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [soundLoading, setSoundLoading] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(shouldPlayMusic);
+  const [soundLoading, setSoundLoading] = useState(false);
+
+  // Whenever the route changes, if we are on a welcome route, pause/unload music.
+  useEffect(() => {
+    if (!shouldPlayMusic && sound) {
+      sound.pauseAsync();
+      setIsPlaying(false);
+    }
+  }, [shouldPlayMusic, sound]);
 
   useEffect(() => {
+    if (!shouldPlayMusic) return;
     Audio.setAudioModeAsync({
       playsInSilentModeIOS: true,
       staysActiveInBackground: true,
@@ -27,9 +41,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
       playThroughEarpieceAndroid: false,
     });
-  }, []);
+  }, [shouldPlayMusic]);
 
   useEffect(() => {
+    if (!shouldPlayMusic) return;
     (async () => {
       if (!sound && isPlaying) {
         setSoundLoading(true);
@@ -52,14 +67,15 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         sound.unloadAsync();
       }
     };
-  }, [sound, isPlaying]);
+  }, [sound, isPlaying, shouldPlayMusic]);
 
   const toggleMusic = async () => {
+    if (!shouldPlayMusic) return;
     if (soundLoading) return;
 
     try {
       if (!sound) {
-        // If there's no sound yet, create & play
+        // If there's no sound yet, create & play.
         setSoundLoading(true);
         const { sound: newSound } = await Audio.Sound.createAsync(
           require("../assets/videos/music.mp3"),
@@ -73,7 +89,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
 
       const status = await sound.getStatusAsync();
       if (!status.isLoaded) {
-        // forcibly reload
+        // Forcibly reload.
         setSoundLoading(true);
         await sound.unloadAsync();
         const { sound: newSound } = await Audio.Sound.createAsync(

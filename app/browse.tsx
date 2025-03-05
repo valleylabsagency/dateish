@@ -46,7 +46,8 @@ export default function BrowseScreen() {
         const loadedProfiles = [];
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          if (auth.currentUser && doc.id !== auth.currentUser.uid) {
+          // Only add profiles that are not the current user and that are online
+          if (auth.currentUser && doc.id !== auth.currentUser.uid && data.online) {
             loadedProfiles.push({ id: doc.id, ...data });
           }
         });
@@ -100,7 +101,7 @@ export default function BrowseScreen() {
     );
   }
 
-  // If there are no profiles to show, just display a fallback message and hide nav controls
+  // If there are no profiles to show, display a fallback message and hide nav controls
   if (profiles.length === 0) {
     return (
       <ImageBackground
@@ -121,9 +122,10 @@ export default function BrowseScreen() {
   // Safely get the current profile (should not be undefined if profiles.length > 0)
   const currentProfile = profiles[currentIndex] || {};
   // Safely handle the drink, defaulting to "water"
-  const profileDrink = typeof currentProfile.drink === "string"
-    ? currentProfile.drink.toLowerCase()
-    : "water";
+  const profileDrink =
+    typeof currentProfile.drink === "string"
+      ? currentProfile.drink.toLowerCase()
+      : "water";
   const drinkIcon = drinkMapping[profileDrink] || drinkMapping["water"];
 
   // Map each drink to its corresponding speech bubble text.
@@ -137,7 +139,8 @@ export default function BrowseScreen() {
     absinthe: "Who are you?",
     water: "I don't need alcohol to have fun",
   };
-  const drinkText = drinkTextMapping[profileDrink] || drinkTextMapping["water"];
+  const drinkText =
+    drinkTextMapping[profileDrink] || drinkTextMapping["water"];
 
   return (
     <ImageBackground
@@ -148,16 +151,17 @@ export default function BrowseScreen() {
       <View style={styles.profileCardContainer}>
         <View style={styles.profileCard}>
           <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: currentProfile.photoUri }}
-              style={styles.profileImage}
-            />
-            <TouchableOpacity onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}>
+          <Image source={{ uri: currentProfile.photoUri }} style={styles.profileImage} />
+            <TouchableOpacity
+              onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}
+            >
               <View style={styles.drinkIconContainer}>
                 <Image source={drinkIcon} style={styles.drinkIcon} />
                 {showDrinkSpeech && (
                   <View style={styles.drinkSpeechBubble}>
-                    <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
+                    <Text style={styles.drinkSpeechBubbleText}>
+                      {drinkText}
+                    </Text>
                   </View>
                 )}
               </View>

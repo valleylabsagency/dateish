@@ -6,12 +6,21 @@ import {
   ActivityIndicator,
   StyleSheet,
   Dimensions,
+  TouchableOpacity,
 } from "react-native";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import { useRouter } from "expo-router";
 import { auth, firestore } from "../firebase";
-import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  doc,
+  getDocs,
+} from "firebase/firestore";
 import BottomNavbar from "../components/BottomNavbar";
 import ConversationPreview from "../components/ConversationPreview";
 
@@ -20,8 +29,10 @@ const { width } = Dimensions.get("window");
 export default function ChatsScreen() {
   const router = useRouter();
   const currentUserId = auth.currentUser?.uid;
-  const [conversations, setConversations] = useState([]);
+  const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // partnerStatus maps partnerUid => online (boolean)
+  const [partnerStatus, setPartnerStatus] = useState<{ [uid: string]: boolean }>({});
 
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
@@ -55,6 +66,27 @@ export default function ChatsScreen() {
     return () => unsubscribe();
   }, [currentUserId]);
 
+  // For each conversation, subscribe to the partner's online status.
+  useEffect(() => {
+    const unsubscribes: (() => void)[] = [];
+    if (currentUserId && conversations.length > 0) {
+      conversations.forEach((conv) => {
+        const partnerUid = conv.users.filter((uid: string) => uid !== currentUserId)[0];
+        const partnerDocRef = doc(firestore, "users", partnerUid);
+        const unsub = onSnapshot(partnerDocRef, (docSnap) => {
+          setPartnerStatus((prev) => ({
+            ...prev,
+            [partnerUid]: docSnap.data()?.online,
+          }));
+        });
+        unsubscribes.push(unsub);
+      });
+    }
+    return () => {
+      unsubscribes.forEach((unsub) => unsub());
+    };
+  }, [conversations, currentUserId]);
+
   if (!fontsLoaded || loading) {
     return (
       <View style={chatsStyles.loadingContainer}>
@@ -70,13 +102,31 @@ export default function ChatsScreen() {
       blurRadius={5}
     >
       <ScrollView contentContainerStyle={chatsStyles.scrollContent}>
-        {conversations.map((conv) => (
-          <ConversationPreview
-            key={conv.id}
-            conversation={conv}
-            currentUserId={currentUserId}
-          />
-        ))}
+        {conversations.map((conv) => {
+          const partnerUid = conv.users.filter((uid: string) => uid !== currentUserId)[0];
+          const isOnline = partnerStatus[partnerUid];
+          // If the partner is offline (explicitly false), grey out the chat and disable click.
+          if (isOnline === false) {
+            return (
+              <View
+                key={conv.id}
+                style={[chatsStyles.conversationContainer, chatsStyles.disabledConversation]}
+              >
+                <ConversationPreview conversation={conv} currentUserId={currentUserId} />
+              </View>
+            );
+          } else {
+            return (
+              <TouchableOpacity
+                key={conv.id}
+                style={chatsStyles.conversationContainer}
+                onPress={() => router.push(`/chat?partner=${partnerUid}`)}
+              >
+                <ConversationPreview conversation={conv} currentUserId={currentUserId} />
+              </TouchableOpacity>
+            );
+          }
+        })}
       </ScrollView>
 
       <View style={chatsStyles.bottomNavbarContainer}>
@@ -104,6 +154,12 @@ const chatsStyles = StyleSheet.create({
     width: "100%",
   },
   bottomNavbarContainer: { position: "absolute", bottom: 0, width: "100%" },
+  conversationContainer: {
+    width: "100%",
+  },
+  disabledConversation: {
+    opacity: 0.5, // greyed out look
+  },
 });
 
 export { ChatsScreen };
