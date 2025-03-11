@@ -12,6 +12,7 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  // Dimensions (removed in favor of size-matters)
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -25,33 +26,44 @@ import ProfileNavbar from "@/components/ProfileNavbar";
 import { logout } from "../services/authservice";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 // NEW IMPORTS FOR FIREBASE STORAGE
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, storage } from "../firebase";
+
+// 1) Import react-native-size-matters
+import { scale, verticalScale, moderateScale } from "react-native-size-matters";
+
+// 2) Define some base font sizes that roughly mirror your old ones.
+//    For example, if you want them to feel about the same as your
+//    prior "width * 0.045", etc., pick some typical baseline values:
+const baseFont = scale(16);    // ~ an old 4-5% of screen width for a typical device
+const mediumFont = scale(22);  // ~ an old 6% 
+const largeFont = scale(35);   // ~ an old 10% 
 
 export default function ProfileScreen() {
   const { profile, saveProfile, setProfileComplete, profileComplete } = useContext(ProfileContext);
   const router = useRouter();
   const searchParams = useLocalSearchParams();
-
   const from = searchParams.from;
 
-  // Form state.
+  // Form state
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [location, setLocation] = useState("");
   const [about, setAbout] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
-  // State to control modal for editing the "about" field.
+  // State to control modal for editing the "about" field
   const [editingAbout, setEditingAbout] = useState(false);
   const [modalTypedText, setModalTypedText] = useState("");
   const fullModalText =
     "Finish your profile you lazy shit!\n\nThen you will be able to see others and use the app...";
 
-  // Animated value for Mr. Mingles image.
+  const [modalVisible, setModalVisible] = useState(false);
+
+  // Animated value for Mr. Mingles image
   const rollAnim = useRef(new Animated.Value(500)).current;
 
-  // Pre-populate fields from context.
+  // Pre-populate fields from context
   useEffect(() => {
     if (profile) {
       setName(profile.name || "");
@@ -71,7 +83,7 @@ export default function ProfileScreen() {
     [FontNames.MontSerratSemiBold]: require("../assets/fonts/Montserrat-SemiBold.ttf"),
   });
 
-  // Animate modal appearance for the Mr. Mingles message.
+  // Animate modal appearance for the Mr. Mingles message
   useEffect(() => {
     Animated.timing(rollAnim, {
       toValue: modalVisible ? 0 : 500,
@@ -80,7 +92,7 @@ export default function ProfileScreen() {
     }).start();
   }, [modalVisible]);
 
-  // Type out the modal text.
+  // Type out the modal text
   useEffect(() => {
     let intervalId: number | null = null;
     if (modalVisible) {
@@ -91,45 +103,14 @@ export default function ProfileScreen() {
         if (index === fullModalText.length) {
           clearInterval(intervalId!);
         }
-      }, 50);
+      }, 30);
     }
     return () => {
       if (intervalId !== null) clearInterval(intervalId);
     };
   }, [modalVisible]);
 
-  // NEW: Function to upload the image to Firebase Storage and get the download URL
-  const uploadImage = async (uri: string): Promise<string> => {
-    try {
-      // Use XMLHttpRequest to fetch the blob from the local URI.
-      const blob: Blob = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.onload = () => {
-          resolve(xhr.response);
-        };
-        xhr.onerror = (e) => {
-          console.error("XHR error:", e);
-          reject(new Error("Network request failed"));
-        };
-        xhr.responseType = "blob";
-        xhr.open("GET", uri, true);
-        xhr.send(null);
-      });
-  
-      // Extract filename from URI and build a storage path using current user's UID.
-      const filename = uri.substring(uri.lastIndexOf("/") + 1);
-      const storageRef = ref(storage, `profileImages/${auth.currentUser?.uid}/${filename}`);
-      
-      await uploadBytes(storageRef, blob);
-      const downloadUrl = await getDownloadURL(storageRef);
-      return downloadUrl;
-    } catch (error) {
-      console.error("Error uploading image:", JSON.stringify(error));
-      throw error;
-    }
-  };
-  
-  // Launch camera and then upload the image to get a shared URL
+  // Launch camera
   const handleTakePhoto = async () => {
     const { status } = await Camera.requestCameraPermissionsAsync();
     if (status !== "granted") {
@@ -143,18 +124,18 @@ export default function ProfileScreen() {
       base64: true, // enable base64 conversion
     });
     if (!result.canceled && result.assets[0].base64) {
-      // Create a base64 data URL. Adjust the mime type if needed.
+      // Create a base64 data URL
       const dataUrl = `data:image/jpeg;base64,${result.assets[0].base64}`;
       setPhotoUri(dataUrl);
     }
   };
 
-  // Back button handler: if any field is missing, show the modal.
+  // Back button handler: if any field is missing, show the modal
   const handleSubmit = async () => {
     if (!name || !age || !location || !about || !photoUri) {
       setModalVisible(true);
       setModalTypedText("");
-      return; // Prevent navigation if the profile is incomplete.
+      return; // Prevent navigation if the profile is incomplete
     } else {
       try {
         await saveProfile({ name, age, location, about, photoUri });
@@ -167,6 +148,7 @@ export default function ProfileScreen() {
     }
   };
 
+  // Get location
   const handleRequestLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") {
@@ -187,6 +169,7 @@ export default function ProfileScreen() {
     }
   };
 
+  // Logout
   const handleLogout = async () => {
     try {
       await logout();
@@ -197,7 +180,7 @@ export default function ProfileScreen() {
     }
   };
 
-  // New modal overlay for editing "about"
+  // Modal overlay for editing "about"
   const renderAboutEditor = () => (
     <Modal
       animationType="fade"
@@ -231,11 +214,9 @@ export default function ProfileScreen() {
     </Modal>
   );
 
-  const [modalVisible, setModalVisible] = useState(false);
-
   if (!fontsLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
       </View>
     );
@@ -268,7 +249,7 @@ export default function ProfileScreen() {
           />
           <View style={styles.locationContainer}>
             <TextInput
-              style={[styles.input]}
+              style={styles.input}
               placeholder="Location"
               placeholderTextColor="#999"
               value={location}
@@ -278,11 +259,12 @@ export default function ProfileScreen() {
               <Text style={styles.editButtonText}>Get Location</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.column}>
+
+          <View style={[styles.column, styles.placeholderContainer]}>
             {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.photo} />
             ) : (
-              <MaterialIcons name="person" style={styles.personIcon} size={180} color="grey" />
+              <MaterialIcons name="person" style={styles.personIcon} size={scale(125)} color="grey" />
             )}
             <TouchableOpacity
               style={[styles.editButton, styles.editButtonPhoto]}
@@ -291,8 +273,9 @@ export default function ProfileScreen() {
               <Text style={styles.editButtonText}>Take a pic</Text>
             </TouchableOpacity>
           </View>
+
           <View style={styles.column}>
-            <Text style={[styles.aboutText, { flex: 1 }]}>
+            <Text style={styles.aboutText}>
               {about ? about : "Write something about yourself..."}
             </Text>
             <TouchableOpacity
@@ -304,9 +287,13 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Mr. Mingles Modal */}
         <Modal animationType="slide" transparent={true} visible={modalVisible}>
           <View style={modalStyles.modalOverlay}>
-            <TouchableOpacity style={modalStyles.closeButton} onPress={() => setModalVisible(false)}>
+            <TouchableOpacity
+              style={modalStyles.closeButton}
+              onPress={() => setModalVisible(false)}
+            >
               <Text style={modalStyles.closeButtonText}>X</Text>
             </TouchableOpacity>
             <View style={modalStyles.modalContainer}>
@@ -338,6 +325,7 @@ export default function ProfileScreen() {
   );
 }
 
+// ----- STYLES -----
 const styles = StyleSheet.create({
   background: {
     flex: 1,
@@ -345,105 +333,136 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   mirrorContainer: {
+    // Replacing "top: height * 0.16" with an approximate verticalScale
     position: "absolute",
-    top: 140,
-    padding: Platform.select({ android: 15, ios: 20 }),
+    top: verticalScale(120), // ~16% of a typical ~750 px tall screen
+    // Replacing "height: height * 0.4" with ~300 px
+    height: verticalScale(300),
     borderRadius: 10,
     alignItems: "center",
     alignSelf: "center",
-    width: "80%",
+    width: "100%",
     textAlign: "center",
   },
   header: {
-    fontSize: 32,
+    fontSize: largeFont,
     fontWeight: "500",
     letterSpacing: 1,
     color: "#908db3",
-    marginBottom: Platform.select({ android: 10, ios: 20 }),
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 1,
-    fontFamily: FontNames.MontSerratSemiBold,
+    fontFamily: FontNames.MontserratRegular,
+    paddingBottom: 0,
+    marginBottom: 0,
   },
   input: {
     width: "100%",
-    fontSize: 21,
+    // Base text size
+    fontSize: scale(18),
     textAlign: "center",
     color: "#908db3",
     fontFamily: FontNames.MontserratBold,
-    marginVertical: Platform.select({ android: -13, ios: 0 }),
+    // Replacing "height * 0.03" with ~ verticalScale(20)
+    height: verticalScale(20),
+    zIndex: 100000,
+    position: "relative",
+    lineHeight: scale(18),
+    paddingVertical: 0,
+    marginVertical: 0,
+    includeFontPadding: false,
   },
   locationContainer: {
     flexDirection: "column",
     alignItems: "center",
     width: "80%",
-    marginBottom: Platform.select({ android: 10, ios: 15 }),
+    // was marginBottom: height * 0.02. Now let's do ~ verticalScale(20)
+    marginBottom: verticalScale(20),
+    includeFontPadding: false,
   },
   editButton: {
-    paddingHorizontal: 5,
-    paddingVertical: 2,
+    paddingHorizontal: scale(8),
+    paddingVertical: verticalScale(4),
     borderRadius: 20,
-    marginTop: 5,
+    marginTop: verticalScale(5),
     borderWidth: 1,
     borderColor: "black",
+    includeFontPadding: false,
   },
   editButtonText: {
-    fontSize: 11,
+    fontSize: scale(9),
     fontWeight: "500",
     color: "black",
     fontFamily: FontNames.MontserratBold,
+    includeFontPadding: false,
   },
   column: {
     flexDirection: "column",
     alignItems: "center",
     width: "100%",
-    marginBottom: Platform.select({ android: 10, ios: 15 }),
   },
-  photo: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+  placeholderContainer: {
+    width: scale(130),
+    height: scale(130),
+    borderWidth: scale(2),
+    borderColor: "grey",
+    borderRadius: scale(80),
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: verticalScale(10),
+    // marginBottom: height * 0.02 => verticalScale(20)
+    marginBottom: verticalScale(20),
   },
   personIcon: {
-    borderWidth: 2,
-    borderColor: "grey",
-    borderRadius: 100,
-    width: 200,
-    height: 200,
-    paddingTop: 25,
-    textAlign: "center",
+    // Size is handled in the <MaterialIcons> usage: size={scale(160)}
+  },
+  photo: {
+    position: "relative",
+    top: verticalScale(10),
+    // Replacing width * 0.45 => just pick scale(200)
+    width: scale(140),
+    height: scale(140),
+    borderRadius: scale(100),
   },
   aboutText: {
-    fontSize: 14,
+    // was baseFont * 0.65 => pick ~ scale(12 or 13)
+    fontSize: scale(12),
     color: "gray",
     fontWeight: "400",
-    marginTop: 20,
+    marginTop: verticalScale(25), // ~15% of typical screen
     fontFamily: FontNames.MontSerratSemiBold,
+    includeFontPadding: false,
   },
   editButtonPhoto: {
-    position: "absolute",
-    left: 200,
-    top: 196,
+    textAlign: "center",
+    position: "relative",
+    // was top: 20, or top: 196 in the original code
+    top: verticalScale(20),
+    padding: 0
   },
   bottomEdit: {
     position: "relative",
-    left: 140,
+    // was left: width * 0.30 => ~ scale(120)
+    left: scale(108),
+    bottom: scale(0),
+    padding: 0
   },
   logoutContainer: {
     position: "absolute",
-    bottom: 40,
+    // was bottom: 40 => verticalScale(40)
+    bottom: verticalScale(40),
     width: "100%",
     alignItems: "center",
   },
   logoutButton: {
     backgroundColor: "#D9534F",
-    paddingVertical: 15,
-    paddingHorizontal: 50,
+    paddingVertical: verticalScale(15),
+    paddingHorizontal: scale(50),
     borderRadius: 30,
     elevation: 5,
   },
   logoutButtonText: {
     color: "#fff",
-    fontSize: 20,
+    fontSize: scale(16), 
     fontFamily: FontNames.MontserratBold,
   },
   loadingContainer: {
@@ -451,63 +470,59 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
 });
 
+// ----- EDITOR STYLES -----
 const editorStyles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.85)",
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: scale(20),
   },
   editorBox: {
     backgroundColor: "#fff",
     width: "90%",
     borderRadius: 10,
-    padding: 20,
+    padding: scale(20),
     alignItems: "center",
   },
   editorTitle: {
-    fontSize: 24,
+    fontSize: mediumFont,
     fontFamily: FontNames.MontserratBold,
-    marginBottom: 20,
+    marginBottom: verticalScale(20),
     color: "#333",
     textAlign: "center",
   },
   editorInput: {
     width: "100%",
-    height: 100,
+    height: verticalScale(100),
     borderColor: "#ccc",
     borderWidth: 1,
     borderRadius: 8,
-    padding: 10,
-    fontSize: 18,
+    padding: scale(10),
+    fontSize: baseFont,
     fontFamily: FontNames.MontserratRegular,
     color: "#333",
     backgroundColor: "#f9f9f9",
     textAlignVertical: "top",
   },
   doneButton: {
-    marginTop: 20,
+    marginTop: verticalScale(20),
     backgroundColor: "#4a0a0f",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(20),
     borderRadius: 8,
   },
   doneButtonText: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: baseFont,
     fontFamily: FontNames.MontserratBold,
   },
 });
 
+// ----- MODAL STYLES -----
 const modalStyles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
@@ -518,75 +533,76 @@ const modalStyles = StyleSheet.create({
   },
   modalContainer: {
     width: "90%",
-    height: 400,
+    height: verticalScale(400),
     backgroundColor: "#020621",
     borderWidth: 4,
     borderColor: "#fff",
     borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 8,
+    paddingVertical: verticalScale(20),
+    paddingHorizontal: scale(8),
     alignItems: "center",
     position: "relative",
-    bottom: 140,
+    bottom: verticalScale(140),
   },
   modalText: {
     color: "#eceded",
-    fontSize: 32,
+    fontSize: mediumFont,
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: verticalScale(20),
     fontWeight: "400",
     fontFamily: FontNames.MontserratExtraLight,
   },
   triangleContainer: {
     position: "absolute",
-    bottom: -24,
-    right: 24,
+    bottom: verticalScale(-24),
+    right: scale(24),
     width: 0,
     height: 0,
   },
   outerTriangle: {
-    width: 5,
-    height: 5,
-    borderLeftWidth: 26,
-    borderRightWidth: 26,
-    borderTopWidth: 24,
+    width: scale(5),
+    height: scale(5),
+    borderLeftWidth: scale(26),
+    borderRightWidth: scale(26),
+    borderTopWidth: scale(24),
     position: "absolute",
-    left: -44,
-    top: -24,
+    left: scale(-44),
+    top: scale(-24),
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
     borderTopColor: "#fff",
   },
   innerTriangle: {
     position: "absolute",
-    top: -25,
-    left: -40,
+    top: scale(-25),
+    left: scale(-40),
     width: 0,
     height: 0,
-    borderLeftWidth: 22,
-    borderRightWidth: 22,
-    borderTopWidth: 22,
+    borderLeftWidth: scale(22),
+    borderRightWidth: scale(22),
+    borderTopWidth: scale(22),
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
     borderTopColor: "#020621",
   },
   closeButton: {
     position: "absolute",
-    top: 40,
-    right: 20,
+    top: verticalScale(40),
+    right: scale(20),
     zIndex: 100,
+    width: "8%",
+    height: "5%",
   },
   closeButtonText: {
     color: "#fff",
-    fontSize: 48,
+    fontSize: largeFont,
     fontFamily: FontNames.MontserratExtraLight,
   },
   mrMingles: {
-    width: 350,
-    height: 420,
+    width: scale(350),
+    height: scale(420),
     position: "absolute",
-    bottom: -440,
-    right: -100,
+    bottom: scale(-340),
+    right: scale(-100),
   },
 });
-

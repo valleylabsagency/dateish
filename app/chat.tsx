@@ -5,8 +5,6 @@ import {
   Image,
   ImageBackground,
   TouchableOpacity,
-  StyleSheet,
-  Dimensions,
   ScrollView,
   TextInput,
   KeyboardAvoidingView,
@@ -36,8 +34,13 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { drinkMapping } from "./utils/drinkMapping";
-
-const { width, height } = Dimensions.get("window");
+// 1) Import size-matters
+import {
+  ScaledSheet,
+  moderateScale,
+  scale,
+  verticalScale,
+} from "react-native-size-matters";
 
 export default function ChatScreen() {
   const router = useRouter();
@@ -111,12 +114,11 @@ export default function ChatScreen() {
     if (messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg.sender !== currentUserId) {
-        const senderName = partnerProfile.name || "Partner";
+        const senderName = partnerProfile?.name || "Partner";
         showNotification(lastMsg.text, senderName);
       }
     }
   }, [messages]);
-  
 
   // Subscribe to real-time updates from the chat's "messages" subcollection
   useEffect(() => {
@@ -127,8 +129,8 @@ export default function ChatScreen() {
       q,
       (querySnapshot) => {
         const msgs = [];
-        querySnapshot.forEach((doc) => {
-          msgs.push({ id: doc.id, ...doc.data() });
+        querySnapshot.forEach((docSnap) => {
+          msgs.push({ id: docSnap.id, ...docSnap.data() });
         });
         setMessages(msgs);
         setLoadingMessages(false);
@@ -162,8 +164,7 @@ export default function ChatScreen() {
     // Determine if the partner has responded at least once.
     const partnerHasResponded = messages.some((msg) => msg.sender !== currentUserId);
 
-    // If no partner message exists (i.e. conversation is still one-sided)
-    // and there's already one message sent, show the "wait for them to answer" modal.
+    // If no partner message exists and there's already one user-sent message => warn
     if (!partnerHasResponded && messages.length >= 1) {
       setMingModalVisible(true);
       return;
@@ -198,6 +199,7 @@ export default function ChatScreen() {
         sender: currentUserId,
         createdAt: serverTimestamp(),
       });
+
       setInputMessage("");
       setTypingModalVisible(false);
     } catch (error) {
@@ -206,9 +208,9 @@ export default function ChatScreen() {
   };
 
   // Drink icons
-  const currentUserDrink = profile && profile.drink ? profile.drink : "water";
+  const currentUserDrink = profile?.drink ? profile.drink : "water";
   const currentUserDrinkIcon = drinkMapping[currentUserDrink.toLowerCase()];
-  const partnerDrink = partnerProfile && partnerProfile.drink ? partnerProfile.drink : "water";
+  const partnerDrink = partnerProfile?.drink ? partnerProfile.drink : "water";
   const partnerDrinkIcon = drinkMapping[partnerDrink.toLowerCase()];
 
   // Map each partner drink to text
@@ -236,6 +238,7 @@ export default function ChatScreen() {
     <ImageBackground
       source={require("../assets/images/chat-background.png")}
       style={styles.background}
+      resizeMode="cover"
     >
       {/* Top Navbar */}
       <ProfileNavbar onBack={() => router.back()} />
@@ -245,7 +248,7 @@ export default function ChatScreen() {
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* ChatWrapper clips any content that goes below its bounds */}
+        {/* ChatWrapper: limit visible area and clip overflow */}
         <View style={styles.chatWrapper}>
           <ScrollView
             ref={scrollViewRef}
@@ -261,11 +264,13 @@ export default function ChatScreen() {
                   key={index}
                   style={[
                     styles.chatBubble,
-                    msg.sender === currentUserId ? styles.userBubble : styles.partnerBubble,
+                    msg.sender === currentUserId
+                      ? styles.userBubble
+                      : styles.partnerBubble,
                   ]}
                 >
                   <Text style={styles.chatText}>{msg.text}</Text>
-                  {msg.createdAt && msg.createdAt.seconds && (
+                  {msg.createdAt?.seconds && (
                     <Text style={styles.timestamp}>
                       {new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], {
                         hour: "2-digit",
@@ -278,6 +283,8 @@ export default function ChatScreen() {
             )}
           </ScrollView>
         </View>
+
+        {/* Text Input + Send */}
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
@@ -338,10 +345,13 @@ export default function ChatScreen() {
         </View>
         <View style={styles.profileWithDrink}>
           <TouchableOpacity onPress={() => setShowPartnerModal(true)}>
-            {partnerProfile && partnerProfile.photoUri ? (
+            {partnerProfile?.photoUri ? (
               <Image source={{ uri: partnerProfile.photoUri }} style={styles.partnerImage} />
             ) : (
-              <Image source={require("../assets/images/person1.jpg")} style={styles.partnerImage} />
+              <Image
+                source={require("../assets/images/person1.jpg")}
+                style={styles.partnerImage}
+              />
             )}
           </TouchableOpacity>
           <View style={styles.drinkOverlay}>
@@ -367,22 +377,34 @@ export default function ChatScreen() {
             </TouchableOpacity>
             <View style={styles.profileCard}>
               <View style={styles.modalImageContainer}>
-                {partnerProfile && partnerProfile.photoUri ? (
-                  <Image source={{ uri: partnerProfile.photoUri }} style={styles.modalProfileImage} />
+                {partnerProfile?.photoUri ? (
+                  <Image
+                    source={{ uri: partnerProfile.photoUri }}
+                    style={styles.modalProfileImage}
+                  />
                 ) : (
-                  <Image source={require("../assets/images/person1.jpg")} style={styles.modalProfileImage} />
+                  <Image
+                    source={require("../assets/images/person1.jpg")}
+                    style={styles.modalProfileImage}
+                  />
                 )}
               </View>
+
               <View style={styles.modalDrinkContainer}>
-                <TouchableOpacity onPress={() => setShowModalDrinkSpeech(!showModalDrinkSpeech)}>
+                <TouchableOpacity
+                  onPress={() => setShowModalDrinkSpeech(!showModalDrinkSpeech)}
+                >
                   <Image source={partnerDrinkIcon} style={styles.modalDrinkIcon} />
                 </TouchableOpacity>
                 {showModalDrinkSpeech && (
                   <View style={styles.modalDrinkSpeechBubble}>
-                    <Text style={styles.modalDrinkSpeechBubbleText}>{partnerDrinkText}</Text>
+                    <Text style={styles.modalDrinkSpeechBubbleText}>
+                      {partnerDrinkText}
+                    </Text>
                   </View>
                 )}
               </View>
+
               <View style={styles.modalInfoContainer}>
                 <Text style={styles.nameText}>
                   {partnerProfile ? partnerProfile.name : "Partner"},{" "}
@@ -415,7 +437,9 @@ export default function ChatScreen() {
             >
               <Text style={styles.mingModalCloseButtonText}>X</Text>
             </TouchableOpacity>
-            <Text style={styles.mingModalText}>Wait for them to answer. Don't be a creep!</Text>
+            <Text style={styles.mingModalText}>
+              Wait for them to answer. Don't be a creep!
+            </Text>
             <View style={styles.mingTriangleContainer}>
               <View style={styles.mingOuterTriangle} />
               <View style={styles.mingInnerTriangle} />
@@ -437,221 +461,195 @@ export default function ChatScreen() {
   );
 }
 
-const typingModalStyles = StyleSheet.create({
+// Keep the separate typingModalStyles, but also convert numeric values there.
+const typingModalStyles = ScaledSheet.create({
   container: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.8)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: "20@ms",
   },
   inputBox: {
     backgroundColor: "#fff",
     width: "90%",
-    borderRadius: 10,
-    padding: 20,
+    borderRadius: "10@ms",
+    padding: "20@ms",
     alignItems: "center",
   },
   textInput: {
     width: "100%",
-    height: 100,
-    fontSize: 18,
-    borderWidth: 1,
+    height: "100@vs", // vertical scale
+    fontSize: "18@ms",
+    borderWidth: "1@ms",
     borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 10,
+    borderRadius: "8@ms",
+    padding: "10@ms",
     textAlignVertical: "top",
   },
   doneButton: {
-    marginTop: 20,
+    marginTop: "20@ms",
     backgroundColor: "#4a0a0f",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingVertical: "10@ms",
+    paddingHorizontal: "20@ms",
+    borderRadius: "8@ms",
   },
   doneButtonText: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: "18@ms",
   },
 });
 
-const styles = StyleSheet.create({
-  background: { flex: 1, resizeMode: "cover", width: "100%", height: "100%" },
-  mirrorContainer: {
-    position: "absolute",
-    top: 140,
-    padding: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    alignSelf: "center",
-    width: "80%",
-    textAlign: "center",
-  },
-  header: {
-    fontSize: 32,
-    fontWeight: "500",
-    letterSpacing: 1,
-    color: "#908db3",
-    marginBottom: 20,
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 1,
-    fontFamily: FontNames.MontSerratSemiBold,
-  },
-  input: {
+const styles = ScaledSheet.create({
+  /* Basic background fill */
+  background: {
+    flex: 1,
     width: "100%",
-    fontSize: 21,
-    textAlign: "center",
-    color: "#908db3",
-    fontFamily: FontNames.MontserratBold,
+    height: "100%",
   },
-  locationContainer: {
-    flexDirection: "column",
-    alignItems: "center",
-    width: "80%",
-    marginBottom: 15,
-  },
-  editButton: {
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 20,
-    marginTop: 5,
-    borderWidth: 1,
-    borderColor: "black",
-  },
-  editButtonText: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: "black",
-    fontFamily: FontNames.MontserratBold,
-  },
-  column: {
-    flexDirection: "column",
-    alignItems: "center",
-    width: "100%",
-    marginBottom: 15,
-  },
-  photo: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-  },
-  personIcon: {
-    borderWidth: 2,
-    borderColor: "grey",
-    borderRadius: 100,
-    width: 200,
-    height: 200,
-    paddingTop: 25,
-    textAlign: "center",
-  },
-  aboutText: {
-    fontSize: 14,
-    color: "gray",
-    fontWeight: "400",
-    marginTop: 20,
-    fontFamily: FontNames.MontSerratSemiBold,
-  },
-  editButtonPhoto: {
-    position: "absolute",
-    left: 200,
-    top: 196,
-  },
-  bottomEdit: {
-    position: "relative",
-    left: 140,
-  },
-  logoutContainer: {
-    position: "absolute",
-    bottom: 40,
-    width: "100%",
+
+  /* Loading */
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
   },
-  logoutButton: {
-    backgroundColor: "#D9534F",
-    paddingVertical: 15,
-    paddingHorizontal: 50,
-    borderRadius: 30,
-    elevation: 5,
+
+  /* Top-level container for content under the navbar */
+  container: {
+    flex: 1,
   },
-  logoutButtonText: {
-    color: "#fff",
-    fontSize: 20,
-    fontFamily: FontNames.MontserratBold,
-  },
-  // Chat area wrapper limits visible messages and clips overflow.
+
+  /* The region that holds the chat messages */
   chatWrapper: {
-    height: height * 0.50,
+    // Instead of referencing Dimensions for 50% of the screen height, use 50% directly:
+    height: "50%", // fills half the screen
     overflow: "hidden",
   },
-  chatContainer: { flex: 1 },
-  // The chatContent now uses flexGrow with justifyContent "flex-end" so that newer messages are anchored at the bottom.
+  chatContainer: {
+    flex: 1,
+  },
   chatContent: {
     flexGrow: 1,
     justifyContent: "flex-end",
-    paddingHorizontal: 10,
-    paddingBottom: height * 0.03,
+    paddingHorizontal: "10@ms",
+    // used to be paddingBottom: height * 0.03 => let's do 3% here:
+    paddingBottom: "3%",
   },
+
+  /* Chat bubbles */
   chatBubble: {
     maxWidth: "70%",
-    padding: 10,
-    borderRadius: 10,
-    marginVertical: 5,
+    padding: "10@ms",
+    borderRadius: "10@ms",
+    marginVertical: "5@ms",
     position: "relative",
   },
-  userBubble: { backgroundColor: "#e4ddff", alignSelf: "flex-start" },
-  partnerBubble: { backgroundColor: "#dde5ff", alignSelf: "flex-end" },
-  chatText: { fontSize: 16, color: "#000" },
+  userBubble: {
+    backgroundColor: "#e4ddff",
+    alignSelf: "flex-start",
+  },
+  partnerBubble: {
+    backgroundColor: "#dde5ff",
+    alignSelf: "flex-end",
+  },
+  chatText: {
+    fontSize: "16@ms",
+    color: "#000",
+  },
   timestamp: {
-    fontSize: 12,
+    fontSize: "12@ms",
     color: "#666",
     alignSelf: "flex-end",
-    marginTop: 4,
+    marginTop: "4@ms",
   },
+
+  /* Input area fixed to bottom, originally bottom:-250 => use percentages now */
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
     position: "absolute",
-    bottom: -250,
+    bottom: "15%", // approximate the same offset
     width: "100%",
-    paddingHorizontal: 20,
+    paddingHorizontal: "20@ms",
   },
   textInput: {
     flex: 1,
     backgroundColor: "#fff",
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    fontSize: 16,
+    borderRadius: "20@ms",
+    paddingHorizontal: "15@ms",
+    paddingVertical: "10@ms",
+    fontSize: "16@ms",
   },
   sendButton: {
-    marginLeft: 10,
+    marginLeft: "10@ms",
     backgroundColor: "#4a0a0f",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: "20@ms",
+    paddingVertical: "10@ms",
+    borderRadius: "20@ms",
   },
   sendButtonText: {
     color: "#ffe3d0",
-    fontSize: 16,
+    fontSize: "16@ms",
     fontFamily: FontNames.MontserratRegular,
   },
+
+  /* Bottom profile images & drink overlays */
   bottomProfiles: {
     position: "absolute",
-    bottom: 250,
+    // originally bottom: '28%' => keep that if it works for your layout
+    bottom: "28%",
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
+    paddingHorizontal: "20@ms",
     alignItems: "center",
   },
-  profileWithDrink: { position: "relative" },
-  currentUserImage: { width: 110, height: 110, borderRadius: 55 },
-  partnerImage: { width: 110, height: 110, borderRadius: 55 },
-  drinkOverlay: { position: "absolute", bottom: 0, right: 0 },
-  drinkIcon: { width: 52, height: 59 },
-  myDrink: { position: "absolute", left: 18, bottom: 67 },
-  otherDrink: { position: "absolute", right: 123, bottom: 67 },
-  bottomNavbarContainer: { position: "absolute", bottom: 0, width: "100%" },
+  profileWithDrink: {
+    position: "relative",
+  },
+  currentUserImage: {
+    width: "110@ms",
+    height: "110@ms",
+    position: "relative",
+    right: "5%",
+    borderRadius: "55@ms",
+  },
+  partnerImage: {
+    width: "110@ms",
+    height: "110@ms",
+    position: "relative",
+    left: "5%",
+    borderRadius: "55@ms",
+  },
+  drinkOverlay: {
+    position: "absolute",
+    width: moderateScale(10),
+    height: moderateScale(50),
+    bottom: "54%", // keep percentage for consistent positioning
+    right: 0,
+  },
+  drinkIcon: {
+    width: "52@ms",
+    height: "59@ms",
+  },
+  // For absolute offsets, switch to approximate percentages
+  myDrink: {
+    left: "50%"
+  },
+  otherDrink: {
+    position: "relative",
+    right: "1450%"
+  },
+
+  /* Bottom navbar pinned to absolute bottom */
+  bottomNavbarContainer: {
+    position: "absolute",
+    bottom: 0,
+    width: "100%",
+  },
+
+  /* Partner Profile Modal */
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.8)",
@@ -661,64 +659,99 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     width: "90%",
-    height: 500,
-    paddingVertical: 20,
-    paddingHorizontal: 8,
+    // was height:500 => scale it
+    height: "500@vs",
+    paddingVertical: "20@ms",
+    paddingHorizontal: "8@ms",
     alignItems: "center",
     position: "relative",
-    bottom: 80,
+    // was bottom:80 => approximate as percentage
+    bottom: "10%",
   },
-  modalCloseButton: { position: "absolute", top: 30, right: 40, zIndex: 10 },
-  modalCloseButtonText: { fontSize: 24, color: "#fff" },
+  modalCloseButton: {
+    position: "absolute",
+    // was top:30 => ~5%
+    top: "5%",
+    // was right:40 => ~10%
+    right: "10%",
+    zIndex: 10,
+  },
+  modalCloseButtonText: {
+    fontSize: "24@ms",
+    color: "#fff",
+  },
   profileCard: {
     backgroundColor: "rgba(69,26,31,0.8)",
     borderColor: "#371015",
-    borderWidth: 8,
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-    height: 470,
+    borderWidth: "8@ms",
+    borderRadius: "20@ms",
+    paddingHorizontal: "20@ms",
+    paddingVertical: "30@ms",
+    // was height:470 => "470@vs"
+    height: "470@vs",
     alignItems: "center",
   },
-  modalImageContainer: { marginBottom: 10 },
-  modalProfileImage: { width: 250, height: 250, borderRadius: 130 },
-  modalDrinkContainer: { alignItems: "center", marginVertical: 10 },
-  modalDrinkIcon: { height: 65, width: 50, position: "absolute", left: 50, bottom: -20 },
+  modalImageContainer: {
+    marginBottom: "10@ms",
+  },
+  // was 250 => scale them
+  modalProfileImage: {
+    width: "250@ms",
+    height: "250@ms",
+    borderRadius: "130@ms",
+  },
+  modalDrinkContainer: {
+    alignItems: "center",
+    marginVertical: "10@ms",
+  },
+  // was height:65 => 65@ms, width:50 => 50@ms
+  // left:50 => approximate => left:'20%', bottom:-20 => bottom:'-15%'
+  modalDrinkIcon: {
+    height: "65@ms",
+    width: "50@ms",
+    position: "absolute",
+    left: "20%",
+    bottom: "-15%",
+  },
   modalDrinkSpeechBubble: {
     position: "absolute",
-    bottom: 50,
-    left: -10,
+    bottom: "50%",
+    left: "-10%",
     backgroundColor: "rgba(0,0,0,0.8)",
-    padding: 5,
-    borderRadius: 10,
+    padding: "5@ms",
+    borderRadius: "10@ms",
   },
   modalDrinkSpeechBubbleText: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: "14@ms",
     fontFamily: FontNames.MontserratRegular,
   },
-  modalInfoContainer: { alignItems: "flex-start", marginTop: 10 },
+  modalInfoContainer: {
+    alignItems: "flex-start",
+    marginTop: "10@ms",
+  },
   nameText: {
     color: "red",
-    fontSize: 32,
+    fontSize: "32@ms",
     fontWeight: "bold",
-    marginBottom: 5,
+    marginBottom: "5@ms",
     fontFamily: FontNames.MontserratRegular,
   },
   locationText: {
     color: "orange",
-    fontSize: 22,
-    marginBottom: 10,
+    fontSize: "22@ms",
+    marginBottom: "10@ms",
     fontFamily: FontNames.MontserratRegular,
   },
   descriptionText: {
     color: "beige",
-    fontSize: 23,
+    fontSize: "23@ms",
     textAlign: "left",
-    width: 300,
+    width: "300@ms",
     fontFamily: FontNames.MontserratRegular,
   },
-  // "Don't be a creep" modal
+
+  /* "Don't be a creep" modal */
   mingModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.8)",
@@ -728,65 +761,75 @@ const styles = StyleSheet.create({
   },
   mingModalContainer: {
     width: "90%",
-    height: 400,
+    height: "400@vs",
     backgroundColor: "#020621",
-    borderWidth: 4,
+    borderWidth: "4@ms",
     borderColor: "#fff",
-    borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 8,
+    borderRadius: "20@ms",
+    paddingVertical: "20@ms",
+    paddingHorizontal: "8@ms",
     alignItems: "center",
     position: "relative",
-    bottom: 140,
+    // was bottom:140 => about 18% or so
+    bottom: "18%",
   },
-  mingModalCloseButton: { position: "absolute", top: 40, right: 20, zIndex: 100 },
+  mingModalCloseButton: {
+    position: "absolute",
+    top: "5%", // was 40 => ~5%
+    right: "5%", // was 20 => ~5%
+    zIndex: 100,
+  },
   mingModalCloseButtonText: {
     color: "#fff",
-    fontSize: 48,
+    fontSize: "48@ms",
     fontFamily: FontNames.MontserratExtraLight,
   },
   mingModalText: {
     color: "#eceded",
-    fontSize: 32,
+    fontSize: "32@ms",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: "20@ms",
     fontWeight: "400",
     fontFamily: FontNames.MontserratExtraLight,
   },
-  mingTriangleContainer: { position: "absolute", bottom: -24, right: 24, width: 0, height: 0 },
+  mingTriangleContainer: {
+    position: "absolute",
+    bottom: "-24@ms",
+    right: "24@ms",
+    width: 0,
+    height: 0,
+  },
   mingOuterTriangle: {
     width: 5,
     height: 5,
-    borderLeftWidth: 26,
-    borderRightWidth: 26,
-    borderTopWidth: 24,
+    borderLeftWidth: "26@ms",
+    borderRightWidth: "26@ms",
+    borderTopWidth: "24@ms",
     position: "absolute",
-    left: -44,
-    top: -24,
+    left: "-44@ms",
+    top: "-24@ms",
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
     borderTopColor: "#fff",
   },
   mingInnerTriangle: {
     position: "absolute",
-    top: -25,
-    left: -40,
+    top: "-25@ms",
+    left: "-40@ms",
     width: 0,
     height: 0,
-    borderLeftWidth: 22,
-    borderRightWidth: 22,
-    borderTopWidth: 22,
+    borderLeftWidth: "22@ms",
+    borderRightWidth: "22@ms",
+    borderTopWidth: "22@ms",
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
     borderTopColor: "#020621",
   },
   mingMrMingles: {
-    width: 350,
-    height: 420,
+    width: "350@ms",
+    height: "420@ms",
     position: "absolute",
-    bottom: -440,
-    right: -100,
+    bottom: "-80%",
+    right: "-20%",
   },
 });
-
-export { ChatScreen };

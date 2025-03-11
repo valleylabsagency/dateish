@@ -4,35 +4,35 @@ import {
   Text,
   ActivityIndicator,
   ImageBackground,
-  StyleSheet,
   TouchableOpacity,
   Image,
   Modal,
   Animated,
   Dimensions,
-  Platform,
+  StyleSheet,
 } from "react-native";
-import MaskedView from "@react-native-masked-view/masked-view";
+import { MaterialIcons } from "@expo/vector-icons";
+import { useFonts } from "expo-font";
+import { useRouter } from "expo-router";
 import { NavbarContext } from "./_layout";
 import { ProfileContext } from "../contexts/ProfileContext";
 import BottomNavbar from "../components/BottomNavbar";
-import { useFonts } from "expo-font";
-import { FontNames } from "../constants/fonts";
-import { useRouter } from "expo-router";
 import { auth } from "../firebase";
-import { MaterialIcons } from "@expo/vector-icons";
+import { FontNames } from "../constants/fonts";
+import {
+  ScaledSheet,
+  moderateScale,
+  scale,
+  verticalScale,
+} from "react-native-size-matters";
 
 const { width, height } = Dimensions.get("window");
+// Keep the dynamic width approach, but wrap in a scale() call
+const BUBBLE_WIDTH = scale(320);
 
-// Calculate relative dimensions for the speech bubble.
-const SPEECH_WIDTH = width * 0.9;
-const SPEECH_HEIGHT = SPEECH_WIDTH; // Square speech bubble
-const MASKED_HEIGHT = SPEECH_WIDTH * 0.75;
-
-// Define a base width for the design (iOS reference)
-const baseWidth = 375;
-const scaleFactor = width / baseWidth;
-
+/* -------------------------------------------------------------------------- */
+/*                                BarMessages                                 */
+/* -------------------------------------------------------------------------- */
 function BarMessages() {
   const messages = [
     "Beep Boop Beep Mothafuckas!",
@@ -41,7 +41,7 @@ function BarMessages() {
     "Yes. It’s another dating app.",
     "Kinda…",
     "We're not like other dating apps.",
-    "We don't have a fancy algorithm to match you with your \"perfect match\".",
+    'We don\'t have a fancy algorithm to match you with your "perfect match".',
     "Here you have to talk to people to actually know if you're a good match.",
     "Kinda old school… Go to a bar, talk to several people",
     "And if you like someone, ask for their number!",
@@ -55,44 +55,47 @@ function BarMessages() {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [displayedText, setDisplayedText] = useState("");
   const [isTyping, setIsTyping] = useState(true);
+  const [showMessages, setShowMessages] = useState(false);
+
   const { setShowWcButton } = useContext(NavbarContext);
 
-  // Hide the WC button on mount.
+  // Hide WC button on mount
   useEffect(() => {
     setShowWcButton(false);
   }, [setShowWcButton]);
 
-  // Delay showing messages for 2 seconds.
-  const [showMessages, setShowMessages] = useState(false);
+  // Delay showing messages a bit
   useEffect(() => {
-    const timer = setTimeout(() => setShowMessages(true), 2000);
+    const timer = setTimeout(() => setShowMessages(true), 1500);
     return () => clearTimeout(timer);
   }, []);
 
-  // Animated values for pointers.
+  // Animated pointer values
   const speechPointerAnim = useRef(new Animated.Value(0)).current;
   const wcPointerAnim = useRef(new Animated.Value(0)).current;
 
-  // Type out the current message gradually.
+  // Typewriter effect
   useEffect(() => {
     if (!showMessages) return;
-    const currentMessage = messages[currentMessageIndex];
+    const current = messages[currentMessageIndex];
     setDisplayedText("");
     setIsTyping(true);
-    let index = 0;
+
+    let idx = 0;
     const interval = setInterval(() => {
-      index++;
-      if (index > currentMessage.length) {
+      idx++;
+      if (idx > current.length) {
         clearInterval(interval);
         setIsTyping(false);
       } else {
-        setDisplayedText(currentMessage.substring(0, index));
+        setDisplayedText(current.substring(0, idx));
       }
     }, 30);
+
     return () => clearInterval(interval);
   }, [currentMessageIndex, showMessages]);
 
-  // Animate the speech bubble pointer after the first message completes.
+  // Animate pointer after first message
   useEffect(() => {
     if (showMessages && currentMessageIndex === 0 && !isTyping) {
       Animated.loop(
@@ -110,9 +113,9 @@ function BarMessages() {
         ])
       ).start();
     }
-  }, [currentMessageIndex, isTyping, speechPointerAnim, showMessages]);
+  }, [speechPointerAnim, currentMessageIndex, isTyping, showMessages]);
 
-  // When the last message finishes, show the WC button & animate the pointer.
+  // Show WC pointer after the last message
   useEffect(() => {
     if (showMessages && currentMessageIndex === messages.length - 1 && !isTyping) {
       setShowWcButton(true);
@@ -131,40 +134,53 @@ function BarMessages() {
         ])
       ).start();
     }
-  }, [currentMessageIndex, isTyping, setShowWcButton, wcPointerAnim, showMessages]);
+  }, [
+    showMessages,
+    currentMessageIndex,
+    isTyping,
+    wcPointerAnim,
+    setShowWcButton,
+    messages.length,
+  ]);
 
-  // Handler to cycle messages when pressing the Mr. Mingles area.
-  const handleMessagePress = () => {
+  // Press handler for continuing messages
+  const handlePress = () => {
     if (!isTyping && currentMessageIndex < messages.length - 1) {
       setCurrentMessageIndex(currentMessageIndex + 1);
     }
   };
 
   if (!showMessages) {
-    return <View style={styles.container} />;
+    return <View style={{ flex: 1 }} />;
   }
 
   return (
-    <View style={styles.container}>
-      <Image
-        source={require("../assets/images/speech-bubble.png")}
-        style={[styles.speech, { width: SPEECH_WIDTH, height: SPEECH_HEIGHT }]}
-        resizeMode="contain"
-      />
-      <MaskedView
-        style={[styles.maskedContainer, { width: SPEECH_WIDTH, height: MASKED_HEIGHT }]}
-        maskElement={
-          <Image
-            source={require("../assets/images/speech-bubble.png")}
-            style={[styles.speech, { width: SPEECH_WIDTH, height: SPEECH_HEIGHT }]}
-            resizeMode="contain"
-          />
-        }
-      >
-        <View style={styles.textContainer}>
-          <Text style={styles.text}>{displayedText}</Text>
-        </View>
-      </MaskedView>
+    <View style={styles.bubbleOuterContainer}>
+      {/* The bubble (NOT tappable) */}
+      <View style={styles.bubbleContainer}>
+        <ImageBackground
+          source={require("../assets/images/speech-bubble.png")}
+          style={styles.speechBubbleBackground}
+          resizeMode="contain"
+        >
+          <View style={styles.textInsideBubble}>
+            <Text style={styles.dialogText}>{displayedText}</Text>
+          </View>
+        </ImageBackground>
+      </View>
+
+      {/* 
+        Square area for "Mr. Mingles" bounding box 
+        Tapping it continues the messages 
+      */}
+      <TouchableOpacity style={styles.mrMinglesTouchable} onPress={handlePress}>
+        {/* 
+          If you later add an actual Mr. Mingles image, 
+          put <Image .../> here 
+        */}
+      </TouchableOpacity>
+
+      {/* Speech pointer for first message */}
       {currentMessageIndex === 0 && !isTyping && (
         <Animated.View
           style={[
@@ -173,18 +189,21 @@ function BarMessages() {
               opacity: speechPointerAnim,
               transform: [
                 {
-                  translateY: speechPointerAnim.interpolate({
+                  translateX: speechPointerAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, -10],
+                    outputRange: [0, moderateScale(-10)],
                   }),
                 },
+                { rotate: "90deg" },
               ],
             },
           ]}
         >
-          <MaterialIcons name="pan-tool-alt" size={60} color="#fff" />
+          <MaterialIcons name="pan-tool-alt" size={moderateScale(50)} color="#fff" />
         </Animated.View>
       )}
+
+      {/* WC pointer for last message */}
       {currentMessageIndex === messages.length - 1 && !isTyping && (
         <Animated.View
           style={[
@@ -195,31 +214,65 @@ function BarMessages() {
                 {
                   translateY: wcPointerAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, -10],
+                    outputRange: [0, moderateScale(-10)],
                   }),
                 },
               ],
             },
           ]}
         >
-          <MaterialIcons name="pan-tool-alt" size={60} color="#fff" />
+          <MaterialIcons name="pan-tool-alt" size={moderateScale(50)} color="#fff" />
         </Animated.View>
       )}
-      <TouchableOpacity onPress={handleMessagePress} style={styles.mrMinglesTouchable} />
     </View>
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*                          BarProfileComplete                                */
+/* -------------------------------------------------------------------------- */
 function BarProfileComplete() {
   const [isTapState, setIsTapState] = useState(true);
   const { profile, saveProfile } = useContext(ProfileContext);
   const { setShowWcButton } = useContext(NavbarContext);
 
+  // Decide which text to show
   const bubbleText = isTapState
     ? "What would you like to drink?"
     : "Go talk to some humans!";
 
-  const drinkMapping = {
+  useEffect(() => {
+    setShowWcButton(true);
+  }, [setShowWcButton]);
+
+  // Default to water if no drink
+  useEffect(() => {
+    if (!profile.drink) {
+      saveProfile({ drink: "water" });
+    }
+  }, [profile, saveProfile]);
+
+  // When user taps "TAP," show the drink menu
+  const [showDrinkMenu, setShowDrinkMenu] = useState(false);
+  const handleTapPress = () => setShowDrinkMenu(true);
+
+  // Drink selections
+  const handleDrinkSelect = async (drinkName: string) => {
+    try {
+      await saveProfile({ drink: drinkName });
+    } catch (error) {
+      console.error("Failed to update drink in profile:", error);
+    }
+    setShowDrinkMenu(false);
+    setIsTapState(false);
+  };
+
+  // Toggling bubble text on bubble press
+  const toggleBubbleText = () => {
+    setIsTapState((prev) => !prev);
+  };
+
+  const drinkMapping: { [key: string]: any } = {
     wine: require("../assets/images/icons/wine.png"),
     beer: require("../assets/images/icons/beer.png"),
     whiskey: require("../assets/images/icons/whiskey.png"),
@@ -228,36 +281,6 @@ function BarProfileComplete() {
     tequila: require("../assets/images/icons/tequila.png"),
     absinthe: require("../assets/images/icons/absinthe.png"),
     water: require("../assets/images/icons/water.png"),
-  };
-
-  useEffect(() => {
-    setShowWcButton(true);
-  }, [setShowWcButton]);
-
-  useEffect(() => {
-    if (!profile.drink) {
-      saveProfile({ drink: "water" });
-    }
-  }, [profile, saveProfile]);
-
-  const [showDrinkMenu, setShowDrinkMenu] = useState(false);
-
-  const handleTapPress = () => {
-    setShowDrinkMenu(true);
-  };
-
-  const handleDrinkSelect = async (drinkName: string) => {
-    try {
-      await saveProfile({ drink: drinkName });
-      console.log("Drink updated in profile:", drinkName);
-    } catch (error) {
-      console.error("Failed to update drink in profile:", error);
-    }
-    setShowDrinkMenu(false);
-  };
-
-  const toggleBubbleText = () => {
-    setIsTapState((prev) => !prev);
   };
 
   const [fontsLoaded] = useFonts({
@@ -271,7 +294,7 @@ function BarProfileComplete() {
 
   if (!fontsLoaded) {
     return (
-      <View style={styles.loaderContainer}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#fff" />
       </View>
     );
@@ -279,42 +302,47 @@ function BarProfileComplete() {
 
   return (
     <>
-      <View style={styles.container}>
-        <Image
-          source={require("../assets/images/speech-bubble.png")}
-          style={[styles.speech, { width: SPEECH_WIDTH, height: SPEECH_HEIGHT }]}
-          resizeMode="contain"
-        />
-        <MaskedView
-          style={[styles.maskedContainer, { width: SPEECH_WIDTH, height: MASKED_HEIGHT }]}
-          maskElement={
+      {/* MAIN BUBBLE */}
+      <View style={styles.bubbleOuterContainer}>
+        {/* Tap anywhere on the bubble to toggle text */}
+        <TouchableOpacity
+          style={styles.bubbleContainer}
+          onPress={toggleBubbleText}
+          activeOpacity={1}
+        >
+          <ImageBackground
+            source={require("../assets/images/speech-bubble.png")}
+            style={styles.speechBubbleBackground}
+            resizeMode="contain"
+          >
+            <View style={styles.textInsideBubble}>
+              <Text style={[styles.dialogText, styles.drinkText]}>
+                {bubbleText}
+              </Text>
+              {bubbleText === "What would you like to drink?" && (
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity onPress={handleTapPress}>
+                    <Text style={styles.tapText}>TAP</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </ImageBackground>
+        </TouchableOpacity>
+
+        {/* If user has a drink, show the icon below the bubble */}
+        {profile.drink && (
+          <View style={{ marginTop: moderateScale(25) }}>
             <Image
-              source={require("../assets/images/speech-bubble.png")}
-              style={[styles.speech, { width: SPEECH_WIDTH, height: SPEECH_HEIGHT }]}
+              source={drinkMapping[profile.drink.toLowerCase()]}
+              style={styles.drinkIcon}
               resizeMode="contain"
             />
-          }
-        >
-          <View style={styles.textContainer}>
-            <Text style={[styles.text, styles.drinkText]}>{bubbleText}</Text>
-            {bubbleText === "What would you like to drink?" && (
-              <View style={styles.buttonRow}>
-                <TouchableOpacity onPress={handleTapPress}>
-                  <Text style={styles.tapText}>TAP</Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
-        </MaskedView>
-        {profile.drink && (
-          <Image
-            source={drinkMapping[profile.drink.toLowerCase()]}
-            style={styles.drinkIcon}
-            resizeMode="contain"
-          />
         )}
       </View>
-      <TouchableOpacity onPress={toggleBubbleText} style={styles.mrMinglesTouchable} />
+
+      {/* DRINK MENU MODAL */}
       <Modal animationType="slide" transparent={true} visible={showDrinkMenu}>
         <View style={drinkModalStyles.modalOverlay}>
           <View style={drinkModalStyles.modalContainer}>
@@ -357,13 +385,15 @@ function BarProfileComplete() {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                 BarScreen                                  */
+/* -------------------------------------------------------------------------- */
 export default function BarScreen() {
   const router = useRouter();
   const user = auth.currentUser;
   const { profile, profileComplete } = useContext(ProfileContext);
 
   useEffect(() => {
-    console.log("Is user logged in?", !!user);
     if (!user) {
       router.push("/welcome");
     }
@@ -384,6 +414,7 @@ export default function BarScreen() {
       resizeMode="cover"
     >
       {profileComplete ? <BarProfileComplete /> : <BarMessages />}
+
       {profileComplete && (
         <View style={styles.bottomNavbarContainer}>
           <BottomNavbar selectedTab="Bar" />
@@ -393,7 +424,10 @@ export default function BarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+/* -------------------------------------------------------------------------- */
+/*                                 STYLES                                     */
+/* -------------------------------------------------------------------------- */
+const styles = ScaledSheet.create({
   background: {
     flex: 1,
     width: "100%",
@@ -404,102 +438,94 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  speech: {
-    width: SPEECH_WIDTH,
-    height: SPEECH_HEIGHT,
-    position: "absolute",
-    top: -50,
-  },
-  maskedContainer: {
-    position: "relative",
-    width: SPEECH_WIDTH,
-    height: MASKED_HEIGHT,
-    top: Platform.select({ android: -298, ios: -290 }),
-  },
-  textContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 40,
-    paddingBottom: 60,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  text: {
-    color: "#fff",
-    fontSize: 28,
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  drinkText: {
-    fontFamily: FontNames.MontserratRegular,
-    fontSize: 32,
-  },
-  tapText: {
-    color: "#fff",
-    fontSize: 20,
-    zIndex: 1000,
-    fontFamily: FontNames.MontserratExtraLight,
-  },
-  logoutText: {
-    color: "#fff",
-    fontSize: 20,
-    fontFamily: FontNames.MontserratBold,
-  },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: "80%",
-    marginTop: 10,
-  },
   bottomNavbarContainer: {
     position: "absolute",
     bottom: 0,
     width: "100%",
   },
+
+  /* -------------------- Bubble-based layout -------------------- */
+  bubbleOuterContainer: {
+    flex: 1,
+    justifyContent: "flex-start",
+    alignItems: "center",
+  },
+  bubbleContainer: {
+    width: BUBBLE_WIDTH,
+    aspectRatio: 1,
+    marginTop: moderateScale(20),
+  },
+  speechBubbleBackground: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    position: "relative",
+    bottom: moderateScale(49),
+  },
+  textInsideBubble: {
+    backgroundColor: "transparent",
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(10),
+    alignItems: "center",
+    position: "relative",
+    bottom: moderateScale(15),
+  },
+  dialogText: {
+    color: "#fff",
+    fontSize: moderateScale(26),
+    lineHeight: moderateScale(26),
+    textAlign: "center",
+    fontFamily: FontNames.MontserratRegular,
+  },
+  drinkText: {
+    fontSize: moderateScale(26),
+  },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: moderateScale(15),
+  },
+  tapText: {
+    color: "#fff",
+    fontSize: moderateScale(20),
+    fontFamily: FontNames.MontserratExtraLight,
+  },
+  drinkIcon: {
+    width: moderateScale(100),
+    height: moderateScale(100),
+    position: "relative",
+    right: "15%",
+    bottom: "36%"
+  },
+
+  /* 
+    Mr. Mingles bounding box for continuing messages 
+    (instead of tapping the entire bubble)
+  */
+  mrMinglesTouchable: {
+    position: "absolute",
+    top: "30%",
+    left: "45%",
+    width: "35%",
+    height: "25%",
+    zIndex: 999,
+  },
+
+  // Pointers
   speechPointer: {
     position: "absolute",
-    bottom: 470,
-    left: 240,
-    zIndex: 9999,
+    top: "40%",
+    right: "55%",
   },
   wcPointer: {
     position: "absolute",
-    top: 2,
-    right: 370,
-    zIndex: 9999,
-  },
-  mrMinglesTouchable: {
-    position: "absolute",
-    bottom: 380,
-    left: 200,
-    width: 150,
-    height: 200,
-    zIndex: 10000,
-  },
-  drinkIcon: {
-    width: 120,
-    height: 120,
-    position: "absolute",
-    top: "48%",
-    right: 220,
-    alignSelf: "center",
+    top: "1%",
+    left: "1%",
   },
 });
 
-// Use the scaleFactor in the drink modal styles so the positions are adjusted relative to the screen width.
-const drinkModalStyles = StyleSheet.create({
+/* ---------------- Drink Modal Styles ---------------- */
+const drinkModalStyles = ScaledSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.8)",
@@ -515,10 +541,10 @@ const drinkModalStyles = StyleSheet.create({
   },
   closeHotspot: {
     position: "absolute",
-    top: 50,
+    top: moderateScale(50),
     right: 0,
-    width: 80,
-    height: 80,
+    width: moderateScale(80),
+    height: moderateScale(80),
   },
   menuBackground: {
     width: "100%",
@@ -527,18 +553,16 @@ const drinkModalStyles = StyleSheet.create({
   labelContainer: {
     position: "absolute",
   },
-  wine: { top: 275 * scaleFactor, left: 100 * scaleFactor },
-  beer: { top: 350 * scaleFactor, left: 100 * scaleFactor },
-  whiskey: { top: 430 * scaleFactor, left: 100 * scaleFactor },
-  martini: { top: 510 * scaleFactor, left: 100 * scaleFactor },
-  vodka: { top: 275 * scaleFactor, left: 250 * scaleFactor },
-  tequila: { top: 350 * scaleFactor, left: 250 * scaleFactor },
-  absinthe: { top: 430 * scaleFactor, left: 250 * scaleFactor },
-  water: { top: 510 * scaleFactor, left: 250 * scaleFactor },
+  wine: { top: "41%", left: "28%" },
+  beer: { top: "53.5%", left: "28%" },
+  whiskey: { top: "66%", left: "28%" },
+  martini: { top: "80%", left: "28%" },
+  vodka: { top: "41%", left: "75%" },
+  tequila: { top: "53.5%", left: "75%" },
+  absinthe: { top: "66%", left: "75%" },
+  water: { top: "80%", left: "75%" },
   labelImage: {
-    width: 65,
-    height: 65,
+    width: moderateScale(65),
+    height: moderateScale(65),
   },
 });
-
-export { BarScreen };

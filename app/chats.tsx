@@ -4,27 +4,21 @@ import {
   ImageBackground,
   ScrollView,
   ActivityIndicator,
-  StyleSheet,
-  Dimensions,
   TouchableOpacity,
 } from "react-native";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import { useRouter } from "expo-router";
 import { auth, firestore } from "../firebase";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  doc,
-  getDocs,
-} from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, doc } from "firebase/firestore";
 import BottomNavbar from "../components/BottomNavbar";
 import ConversationPreview from "../components/ConversationPreview";
-
-const { width } = Dimensions.get("window");
+import {
+  ScaledSheet,
+  moderateScale,
+  scale,
+  verticalScale,
+} from "react-native-size-matters";
 
 export default function ChatsScreen() {
   const router = useRouter();
@@ -52,8 +46,8 @@ export default function ChatsScreen() {
       q,
       (querySnapshot) => {
         const convs: any[] = [];
-        querySnapshot.forEach((doc) => {
-          convs.push({ id: doc.id, ...doc.data() });
+        querySnapshot.forEach((docSnap) => {
+          convs.push({ id: docSnap.id, ...docSnap.data() });
         });
         setConversations(convs);
         setLoading(false);
@@ -110,7 +104,10 @@ export default function ChatsScreen() {
             return (
               <View
                 key={conv.id}
-                style={[chatsStyles.conversationContainer, chatsStyles.disabledConversation]}
+                style={[
+                  chatsStyles.conversationContainer,
+                  chatsStyles.disabledConversation,
+                ]}
               >
                 <ConversationPreview conversation={conv} currentUserId={currentUserId} />
               </View>
@@ -136,12 +133,13 @@ export default function ChatsScreen() {
   );
 }
 
-const chatsStyles = StyleSheet.create({
+const chatsStyles = ScaledSheet.create({
   background: {
     flex: 1,
     resizeMode: "cover",
     justifyContent: "center",
     alignItems: "center",
+    height: "100%"
   },
   loadingContainer: {
     flex: 1,
@@ -149,17 +147,22 @@ const chatsStyles = StyleSheet.create({
     alignItems: "center",
   },
   scrollContent: {
-    paddingVertical: 20,
+    paddingVertical: "50@ms",   // replaced 20 with moderateScale(20)
     alignItems: "center",
     width: "100%",
   },
-  bottomNavbarContainer: { position: "absolute", bottom: 0, width: "100%" },
+  bottomNavbarContainer: {
+    position: "absolute",
+    bottom: 0,
+    width: "100%",
+  },
   conversationContainer: {
     width: "100%",
+    height: "100@ms", // replaced scale(100) with a moderate scale
+    justifyContent: "center", // keep conversation preview centered
+    paddingVertical: 0,
   },
   disabledConversation: {
     opacity: 0.5, // greyed out look
   },
 });
-
-export { ChatsScreen };
