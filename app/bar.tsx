@@ -322,7 +322,7 @@ function BarProfileComplete() {
                     </Text>
                    
                       <View style={styles.buttonRow}>
-                        <TouchableOpacity onPress={handleTapPress}>
+                        <TouchableOpacity>
                           <Text style={styles.tapText}>TAP</Text>
                         </TouchableOpacity>
                       </View>
