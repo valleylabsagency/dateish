@@ -51,6 +51,8 @@ export default function ProfileScreen() {
   const [location, setLocation] = useState("");
   const [about, setAbout] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [descriptionError, setDescriptionError] = useState("");
 
   // State to control modal for editing the "about" field
   const [editingAbout, setEditingAbout] = useState(false);
@@ -132,21 +134,41 @@ export default function ProfileScreen() {
 
   // Back button handler: if any field is missing, show the modal
   const handleSubmit = async () => {
+    // If any required field is missing, show the modal.
     if (!name || !age || !location || !about || !photoUri) {
       setModalVisible(true);
       setModalTypedText("");
-      return; // Prevent navigation if the profile is incomplete
-    } else {
-      try {
-        await saveProfile({ name, age, location, about, photoUri });
-        setProfileComplete(true);
-        console.log("Profile saved successfully");
-        router.back();
-      } catch (error) {
-        console.error("Error saving profile:", error);
-      }
+      return; // Prevent navigation if the profile is incomplete.
+    }
+  
+    // Compare the current fields with the original profile.
+    const originalProfile = profile || {};
+    if (
+      name === originalProfile.name &&
+      age === originalProfile.age &&
+      location === originalProfile.location &&
+      about === originalProfile.about &&
+      photoUri === originalProfile.photoUri
+    ) {
+      // No changes made – simply go back.
+      router.back();
+      return;
+    }
+  
+    // Otherwise, update Firebase with the new profile information.
+    setIsSaving(true);
+    try {
+      await saveProfile({ name, age, location, about, photoUri });
+      setProfileComplete(true);
+      console.log("Profile saved successfully");
+      router.back();
+    } catch (error) {
+      console.error("Error saving profile:", error);
+    } finally {
+      setIsSaving(false);
     }
   };
+  
 
   // Get location
   const handleRequestLocation = async () => {
@@ -174,7 +196,9 @@ export default function ProfileScreen() {
     try {
       await logout();
       await AsyncStorage.removeItem("userProfile");
-      router.push("/");
+      setTimeout(() => {
+        router.push("/welcome");
+      }, 100)
     } catch (error) {
       console.error("Logout error:", error);
     }
@@ -197,15 +221,31 @@ export default function ProfileScreen() {
           <TextInput
             style={editorStyles.editorInput}
             value={about}
-            onChangeText={setAbout}
+            onChangeText={(text) => {
+              setAbout(text);
+              if (text.length > 30) {
+                setDescriptionError("Character limit exceeded!");
+              } else {
+                setDescriptionError("");
+              }
+            }}
             placeholder="Write something about yourself..."
             placeholderTextColor="#999"
             multiline
             autoFocus
           />
+          {descriptionError ? (
+            <Text style={editorStyles.errorText}>{descriptionError}</Text>
+          ) : null}
+
           <TouchableOpacity
             style={editorStyles.doneButton}
-            onPress={() => setEditingAbout(false)}
+            onPress={() => {
+              if (descriptionError === "") {
+                setEditingAbout(false)
+              }
+             
+            }}
           >
             <Text style={editorStyles.doneButtonText}>Done</Text>
           </TouchableOpacity>
@@ -318,6 +358,12 @@ export default function ProfileScreen() {
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
               <Text style={styles.logoutButtonText}>LOG OUT</Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        {isSaving && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size={"large"} color="#fff" />
           </View>
         )}
       </>
@@ -470,6 +516,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // semi-transparent black overlay
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000, // ensure it sits on top of other elements
+  },
 });
 
 // ----- EDITOR STYLES -----
@@ -507,6 +564,12 @@ const editorStyles = StyleSheet.create({
     color: "#333",
     backgroundColor: "#f9f9f9",
     textAlignVertical: "top",
+  },
+  errorText: {
+    color: "red",
+    marginTop: verticalScale(5),
+    fontSize: scale(10),
+    fontFamily: FontNames.MontserratRegular,
   },
   doneButton: {
     marginTop: verticalScale(20),

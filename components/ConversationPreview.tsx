@@ -5,16 +5,21 @@ import { useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import { firestore } from "../firebase";
 import { FontNames } from "../constants/fonts";
+import { MaterialIcons } from "@expo/vector-icons";
+
 
 interface ConversationPreviewProps {
   conversation: any;
   currentUserId: string;
+  online: boolean;
 }
 
-const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation, currentUserId }) => {
+const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation, currentUserId, online }) => {
   const router = useRouter();
   const partnerUid = conversation.users.filter((uid: string) => uid !== currentUserId)[0];
-  const partnerName = conversation.partnerName || partnerUid;
+  
+  // Instead of using conversation.partnerName directly, fetch the partner's name from Firestore.
+  const [partnerName, setPartnerName] = useState("");
   const lastMsg = conversation.lastMessage || "";
   const timestamp =
     conversation.updatedAt && conversation.updatedAt.seconds
@@ -35,6 +40,9 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation,
         if (data.photoUri && typeof data.photoUri === "string" && data.photoUri.trim().length > 0) {
           setPhotoUri(data.photoUri);
         }
+        if (data.name && typeof data.name === "string") {
+          setPartnerName(data.name);
+        }
       }
     };
     fetchPartnerProfile();
@@ -43,12 +51,25 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation,
   return (
     <TouchableOpacity
       style={conversationStyles.chatPreview}
-      onPress={() => router.push(`/chat?partner=${partnerUid}`)}
+      onPress={() => {
+        if (online) {
+          router.push(`/chat?partner=${partnerUid}`)
+        }
+      }}
     >
-      <Image
-        source={photoUri ? { uri: photoUri } : require("../assets/images/person1.jpg")}
+      {photoUri ? (
+        <Image
+        source={{ uri: photoUri }}
         style={conversationStyles.previewImage}
       />
+      ) : (
+        <MaterialIcons
+          name="person"
+          size={120}
+          color="white"
+        />
+      )}
+      
       <View style={conversationStyles.previewTextContainer}>
         <Text style={conversationStyles.previewName}>{partnerName}</Text>
         <Text style={conversationStyles.previewLastMessage}>
@@ -92,6 +113,7 @@ const conversationStyles = StyleSheet.create({
     fontSize: 14,
     alignSelf: "flex-end",
   },
+
 });
 
 export default ConversationPreview;

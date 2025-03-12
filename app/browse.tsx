@@ -81,6 +81,13 @@ export default function BrowseScreen() {
     setShowDrinkSpeech(false);
   };
 
+  const truncateDescription = (text: string, limit: number = 35) => {
+    if (text.length > limit) {
+      return text.slice(0, limit) + "...";
+    }
+    return text;
+  };
+
   const handleChat = () => {
     if (!profiles[currentIndex]) return;
     router.push(`/chat?partner=${profiles[currentIndex].id}`);
@@ -177,7 +184,7 @@ export default function BrowseScreen() {
               {currentProfile.location || "No location set"}
             </Text>
             <Text style={styles.descriptionText}>
-              {currentProfile.about || "No description provided."}
+              {truncateDescription(currentProfile.about) || "No description provided."}
             </Text>
           </View>
         </View>
@@ -253,7 +260,7 @@ const styles = ScaledSheet.create({
     width: "90%",
     alignSelf: "center",
     marginTop: "30@ms", // moderateScale(30)
-    height: "60%", // keep as a percentage of screen height
+    height: "65%", // keep as a percentage of screen height
     justifyContent: "center",
     alignItems: "center",
   },
@@ -333,7 +340,7 @@ const styles = ScaledSheet.create({
     color: "beige",
     fontSize: "23@ms", // moderateScale(23)
     textAlign: "left",
-    width: "300@ms", // moderateScale(300)
+    width: "298@ms", // moderateScale(300)
     fontFamily: FontNames.MontserratRegular,
   },
 

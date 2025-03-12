@@ -1,11 +1,12 @@
 import React, { useState, createContext, useEffect, useContext } from "react";
 import { View, StyleSheet, TouchableWithoutFeedback } from "react-native";
-import { Stack, usePathname } from "expo-router";
+import { Stack, usePathname, useRouter, useLocalSearchParams} from "expo-router";
 import Navbar from "../components/Navbar";
 import { ProfileProvider } from "../contexts/ProfileContext";
 import { FirstTimeProvider } from "../contexts/FirstTimeContext";
 import { MusicProvider } from "@/contexts/MusicContext";
 import { NotificationProvider, NotificationContext } from "@/contexts/NotificationContext";
+import PresenceWrapper from "@/contexts/PresenceContext"
 import AuthWrapper from "@/contexts/AuthContext";
 
 import { StatusBar } from "expo-status-bar";
@@ -41,6 +42,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthWrapper>
+      <PresenceWrapper>
       {shouldWrapMusic ? (
         <MusicProvider>
           <NotificationProvider>
@@ -78,6 +80,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </FirstTimeProvider>
         </NotificationProvider>
       )}
+      </PresenceWrapper>
     </AuthWrapper>
   );
 }
@@ -101,10 +104,12 @@ function NotificationDisplay() {
 function GlobalChatNotifier() {
   const { showNotification } = useContext(NotificationContext);
   const currentUser = auth.currentUser;
-  
+  const pathname = usePathname();
+  const params = useLocalSearchParams();
+  const currentChatPartner = params.partner; // the partner ID if on /chat?partner=...
+
   useEffect(() => {
     if (!currentUser) return;
-    // Query chats where current user is a participant.
     const chatsRef = collection(firestore, "chats");
     const q = query(
       chatsRef,
@@ -115,27 +120,33 @@ function GlobalChatNotifier() {
       snapshot.docChanges().forEach((change) => {
         if (change.type === "modified") {
           const chatData = change.doc.data();
-          // Assuming chatData includes lastMessage, lastMessageSender, and partnerName.
           if (
             chatData.lastMessage &&
             chatData.lastMessageSender &&
             chatData.lastMessageSender !== currentUser.uid
           ) {
-            // Only trigger if not already on the chat page.
-            // You can further check pathname if needed.
+            // Only trigger if we're NOT already in this chat.
+            if (
+              pathname.startsWith("/chat") &&
+              currentChatPartner &&
+              change.doc.id === [currentUser.uid, currentChatPartner].sort().join("_")
+            ) {
+              return; // Skip showing the notification if we're already in this chat.
+            }
             showNotification(
               chatData.lastMessage,
               change.doc.id, // using doc id as chatId
-              chatData.partnerName || "Partner"
+              chatData.partnerName ? chatData.partnerName : "Partner"
             );
           }
         }
       });
     });
     return () => unsubscribe();
-  }, [currentUser, showNotification]);
+  }, [currentUser, showNotification, pathname, currentChatPartner]);
   return null;
 }
+
 
 const styles = StyleSheet.create({
   container: {

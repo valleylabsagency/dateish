@@ -305,31 +305,54 @@ function BarProfileComplete() {
       {/* MAIN BUBBLE */}
       <View style={styles.bubbleOuterContainer}>
         {/* Tap anywhere on the bubble to toggle text */}
-        <TouchableOpacity
-          style={styles.bubbleContainer}
-          onPress={toggleBubbleText}
-          activeOpacity={1}
-        >
-          <ImageBackground
-            source={require("../assets/images/speech-bubble.png")}
-            style={styles.speechBubbleBackground}
-            resizeMode="contain"
-          >
-            <View style={styles.textInsideBubble}>
-              <Text style={[styles.dialogText, styles.drinkText]}>
-                {bubbleText}
-              </Text>
-              {bubbleText === "What would you like to drink?" && (
-                <View style={styles.buttonRow}>
-                  <TouchableOpacity onPress={handleTapPress}>
-                    <Text style={styles.tapText}>TAP</Text>
-                  </TouchableOpacity>
-                </View>
+        {bubbleText === "What would you like to drink?" ? (
+                <TouchableOpacity
+                style={styles.bubbleContainer}
+                onPress={handleTapPress}
+                activeOpacity={1}
+              >
+                <ImageBackground
+                  source={require("../assets/images/speech-bubble.png")}
+                  style={styles.speechBubbleBackground}
+                  resizeMode="contain"
+                >
+                  <View style={styles.textInsideBubble}>
+                    <Text style={[styles.dialogText, styles.drinkText]}>
+                      {bubbleText}
+                    </Text>
+                   
+                      <View style={styles.buttonRow}>
+                        <TouchableOpacity onPress={handleTapPress}>
+                          <Text style={styles.tapText}>TAP</Text>
+                        </TouchableOpacity>
+                      </View>
+                   
+                  </View>
+                </ImageBackground>
+              </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                style={styles.bubbleContainer}
+                onPress={toggleBubbleText}
+                activeOpacity={1}
+              >
+                <ImageBackground
+                  source={require("../assets/images/speech-bubble.png")}
+                  style={styles.speechBubbleBackground}
+                  resizeMode="contain"
+                >
+                  <View style={styles.textInsideBubble}>
+                    <Text style={[styles.dialogText, styles.drinkText]}>
+                      {bubbleText}
+                    </Text>
+                  </View>
+                </ImageBackground>
+              </TouchableOpacity>
               )}
-            </View>
-          </ImageBackground>
-        </TouchableOpacity>
-
+              {/* Mr. Mingles bounding box for toggling text */}
+<TouchableOpacity style={styles.mrMinglesTouchable} onPress={toggleBubbleText}>
+  {/* Could add a Mr. Mingles image here if desired */}
+</TouchableOpacity>
         {/* If user has a drink, show the icon below the bubble */}
         {profile.drink && (
           <View style={{ marginTop: moderateScale(25) }}>
@@ -393,12 +416,12 @@ export default function BarScreen() {
   const user = auth.currentUser;
   const { profile, profileComplete } = useContext(ProfileContext);
 
-  useEffect(() => {
+  /*useEffect(() => {
     if (!user) {
       router.push("/welcome");
     }
   }, [user, router]);
-
+*/
   if (!user || profile === null) {
     return (
       <View style={styles.loadingContainer}>

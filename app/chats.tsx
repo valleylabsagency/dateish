@@ -5,6 +5,7 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
+  Text
 } from "react-native";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
@@ -13,6 +14,8 @@ import { auth, firestore } from "../firebase";
 import { collection, query, where, orderBy, onSnapshot, doc } from "firebase/firestore";
 import BottomNavbar from "../components/BottomNavbar";
 import ConversationPreview from "../components/ConversationPreview";
+import { updateDoc, arrayRemove } from "firebase/firestore";
+import { MaterialIcons } from "@expo/vector-icons";
 import {
   ScaledSheet,
   moderateScale,
@@ -39,7 +42,7 @@ export default function ChatsScreen() {
     // Query chat documents that contain the current user in the "users" array.
     const q = query(
       chatsRef,
-      where("users", "array-contains", currentUserId),
+      where("visibleFor", "array-contains", currentUserId),
       orderBy("updatedAt", "desc")
     );
     const unsubscribe = onSnapshot(
@@ -102,15 +105,31 @@ export default function ChatsScreen() {
           // If the partner is offline (explicitly false), grey out the chat and disable click.
           if (isOnline === false) {
             return (
-              <View
-                key={conv.id}
-                style={[
-                  chatsStyles.conversationContainer,
-                  chatsStyles.disabledConversation,
-                ]}
-              >
-                <ConversationPreview conversation={conv} currentUserId={currentUserId} />
-              </View>
+              <View>
+                <View
+                  key={conv.id}
+                  style={[
+                    chatsStyles.conversationContainer,
+                    chatsStyles.disabledConversation,
+                  ]}
+                >
+                  
+                  <ConversationPreview conversation={conv} online={false} currentUserId={currentUserId} />
+                </View>
+                <Text style={chatsStyles.offlineText}>Offline</Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    // Update the conversation document to remove currentUserId from visibleFor.
+                    const chatDocRef = doc(firestore, "chats", conv.id);
+                    await updateDoc(chatDocRef, {
+                      visibleFor: arrayRemove(currentUserId)
+                    });
+                  }}
+                  style={[chatsStyles.trashIconContainer, chatsStyles.trashIconContainerOffline]}
+                >
+                  <MaterialIcons name="delete" size={32} color="red" />
+                </TouchableOpacity>
+               </View>
             );
           } else {
             return (
@@ -118,8 +137,20 @@ export default function ChatsScreen() {
                 key={conv.id}
                 style={chatsStyles.conversationContainer}
                 onPress={() => router.push(`/chat?partner=${partnerUid}`)}
-              >
-                <ConversationPreview conversation={conv} currentUserId={currentUserId} />
+              >          
+                <ConversationPreview conversation={conv} online={true} currentUserId={currentUserId} />
+                <TouchableOpacity
+                  onPress={async () => {
+                    // Update the conversation document to remove currentUserId from visibleFor.
+                    const chatDocRef = doc(firestore, "chats", conv.id);
+                    await updateDoc(chatDocRef, {
+                      visibleFor: arrayRemove(currentUserId)
+                    });
+                  }}
+                  style={[chatsStyles.trashIconContainer, chatsStyles.trashIconContainerOnline]}
+                >
+                  <MaterialIcons name="delete" size={32} color="red" />
+                </TouchableOpacity>
               </TouchableOpacity>
             );
           }
@@ -161,8 +192,29 @@ const chatsStyles = ScaledSheet.create({
     height: "100@ms", // replaced scale(100) with a moderate scale
     justifyContent: "center", // keep conversation preview centered
     paddingVertical: 0,
+    marginBottom: moderateScale(100)
   },
   disabledConversation: {
     opacity: 0.5, // greyed out look
   },
+  offlineText: {
+    fontFamily: FontNames.MontSerratSemiBold,
+    fontSize: 62,
+    position: "absolute",
+    bottom: "55%",
+    color: "#000",
+    zIndex: 2000,
+    left: "20%",
+    opacity: 10
+  },
+  trashIconContainerOnline: {
+    position: "absolute",
+    top: "40%",
+    right: "5%",
+  },
+  trashIconContainerOffline: {
+    position: "absolute",
+    top: "20%",
+    right: "5%"
+  }
 });

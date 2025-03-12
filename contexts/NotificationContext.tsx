@@ -1,4 +1,4 @@
-import React, { createContext, useState, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
 
 interface NotificationContextType {
   visible: boolean;
@@ -7,6 +7,7 @@ interface NotificationContextType {
   senderName: string;
   showNotification: (message: string, chatId: string, senderName: string) => void;
   hideNotification: () => void;
+  updateNotification: (message: string, chatId: string, senderName: string) => void
 }
 
 export const NotificationContext = createContext<NotificationContextType>({
@@ -16,6 +17,7 @@ export const NotificationContext = createContext<NotificationContextType>({
   senderName: '',
   showNotification: () => {},
   hideNotification: () => {},
+  updateNotification: () => {},
 });
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
@@ -31,12 +33,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setVisible(true);
   };
 
+  const updateNotification = (msg: string, senderName: string, chatId: string) => {
+    // Only update the content without showing it.
+    setMessage(msg);
+    setSenderName(senderName);
+    setChatId(chatId);
+    // Do not change visible
+  };
+
   const hideNotification = () => {
     setVisible(false);
   };
 
   return (
-    <NotificationContext.Provider value={{ visible, message, chatId, senderName, showNotification, hideNotification }}>
+    <NotificationContext.Provider value={{ visible, message, chatId, senderName, showNotification, hideNotification, updateNotification }}>
       {children}
     </NotificationContext.Provider>
   );

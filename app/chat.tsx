@@ -12,7 +12,9 @@ import {
   Modal,
   ActivityIndicator,
   Animated,
+  Keyboard
 } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -32,6 +34,7 @@ import {
   doc,
   setDoc,
   updateDoc,
+  arrayUnion
 } from "firebase/firestore";
 import { drinkMapping } from "./utils/drinkMapping";
 // 1) Import size-matters
@@ -43,11 +46,16 @@ import {
 } from "react-native-size-matters";
 
 export default function ChatScreen() {
+  const [displayedText, setDisplayedText] = useState("");
   const router = useRouter();
   // Get the partner's uid from the route (e.g. /chat?partner=partnerUID)
   const { partner } = useLocalSearchParams();
   const partnerId = partner; // Should be the UID string.
   const currentUserId = auth.currentUser?.uid;
+  const [showCurrentUserDrinkSpeech, setShowCurrentUserDrinkSpeech] = useState(false);
+  const [showPartnerDrinkSpeech, setShowPartnerDrinkSpeech] = useState(false);  
+
+  const inputRef = useRef<TextInput | null>(null);
 
   // Compute chatId by sorting the two UIDs and joining them with an underscore.
   const chatId =
@@ -103,23 +111,27 @@ export default function ChatScreen() {
   // Animated value for Mr. Mingles image
   const rollAnim = useRef(new Animated.Value(500)).current;
 
+  // New state and constant for typewriter effect on warning text
+  const [mingDisplayedText, setMingDisplayedText] = useState("");
+  const fullMingText = "Wait for them to answer. Don't be a creep!";
+
   // Notification context
-  const { showNotification } = useContext(NotificationContext);
+  const { updateNotification } = useContext(NotificationContext);
 
   // Create a ref for the ScrollView
   const scrollViewRef = useRef<ScrollView>(null);
-
+  
   // Show a local notification if the last incoming message wasn't ours
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && partnerProfile) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg.sender !== currentUserId) {
-        const senderName = partnerProfile?.name || "Partner";
-        showNotification(lastMsg.text, senderName);
+        const senderName = partnerProfile.name ? partnerProfile.name : "Partner";
+        updateNotification(lastMsg.text, senderName);
       }
     }
-  }, [messages]);
-
+  }, [messages, partnerProfile]);
+  
   // Subscribe to real-time updates from the chat's "messages" subcollection
   useEffect(() => {
     if (!chatId) return;
@@ -157,13 +169,35 @@ export default function ChatScreen() {
     }).start();
   }, [mingModalVisible]);
 
+  // Typewriter effect for Mr. Mingles warning text when modal is visible
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    if (mingModalVisible) {
+      setMingDisplayedText("");
+      let index = 0;
+      intervalId = setInterval(() => {
+        index++;
+        setMingDisplayedText(fullMingText.substring(0, index));
+        if (index === fullMingText.length) {
+          clearInterval(intervalId);
+        }
+      }, 30);
+    } else {
+      setMingDisplayedText("");
+    }
+    return () => clearInterval(intervalId);
+  }, [mingModalVisible]);
+
   // Send a message
   const sendMessage = async () => {
     if (inputMessage.trim() === "" || !chatId) return;
+    setTypingModalVisible(false);
+    Keyboard.dismiss();
+    setInputMessage("");
 
     // Determine if the partner has responded at least once.
     const partnerHasResponded = messages.some((msg) => msg.sender !== currentUserId);
-
+ 
     // If no partner message exists and there's already one user-sent message => warn
     if (!partnerHasResponded && messages.length >= 1) {
       setMingModalVisible(true);
@@ -177,6 +211,7 @@ export default function ChatScreen() {
       if (!chatDocSnap.exists()) {
         await setDoc(chatDocRef, {
           users: [currentUserId, partnerId],
+          visibleFor: [currentUserId, partnerId],
           updatedAt: serverTimestamp(),
           lastMessage: inputMessage,
           partnerName: partnerProfile ? partnerProfile.name : "",
@@ -189,6 +224,8 @@ export default function ChatScreen() {
         await updateDoc(chatDocRef, {
           updatedAt: serverTimestamp(),
           lastMessage: inputMessage,
+          lastMessageSender: currentUserId,
+          visibleFor: arrayUnion(currentUserId, partnerId)
         });
       }
 
@@ -199,9 +236,7 @@ export default function ChatScreen() {
         sender: currentUserId,
         createdAt: serverTimestamp(),
       });
-
       setInputMessage("");
-      setTypingModalVisible(false);
     } catch (error) {
       console.error("Error sending message:", error);
     }
@@ -225,6 +260,7 @@ export default function ChatScreen() {
     water: "I don't need alcohol to have fun",
   };
   const partnerDrinkText = partnerDrinkTextMapping[partnerDrink.toLowerCase()];
+  const currentUserDrinkText = partnerDrinkTextMapping[currentUserDrink.toLowerCase()];
 
   if (!fontsLoaded) {
     return (
@@ -286,16 +322,18 @@ export default function ChatScreen() {
 
         {/* Text Input + Send */}
         <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            value={inputMessage}
-            onChangeText={setInputMessage}
-            placeholder="Type your message..."
-            placeholderTextColor="#999"
-            onFocus={() => setTypingModalVisible(true)}
-            onSubmitEditing={sendMessage}
-            returnKeyType="send"
-          />
+          <TouchableOpacity onPress={() => setTypingModalVisible(true)}>
+            <TextInput
+              ref={inputRef}
+              style={styles.textInput}
+              onPress={() => setTypingModalVisible(true)}
+              placeholder="Type your message..."
+              placeholderTextColor="#999"
+              returnKeyType="send"
+              editable={false}
+            />
+          </TouchableOpacity>
+          
           <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
             <Text style={styles.sendButtonText}>Send</Text>
           </TouchableOpacity>
@@ -307,7 +345,6 @@ export default function ChatScreen() {
         visible={typingModalVisible}
         animationType="fade"
         transparent={true}
-        onRequestClose={() => setTypingModalVisible(false)}
       >
         <View style={typingModalStyles.container}>
           <View style={typingModalStyles.inputBox}>
@@ -323,8 +360,8 @@ export default function ChatScreen() {
             <TouchableOpacity
               style={typingModalStyles.doneButton}
               onPress={() => {
-                sendMessage();
                 setTypingModalVisible(false);
+                sendMessage();
               }}
             >
               <Text style={typingModalStyles.doneButtonText}>Done</Text>
@@ -339,24 +376,38 @@ export default function ChatScreen() {
           <TouchableOpacity onPress={() => router.push("/profile?self=true&from=chat")}>
             <Image source={currentUserImage} style={styles.currentUserImage} />
           </TouchableOpacity>
-          <View style={styles.drinkOverlay}>
-            <Image source={currentUserDrinkIcon} style={[styles.drinkIcon, styles.myDrink]} />
-          </View>
+          {/* Wrap the drink icon in a touchable */}
+          <TouchableOpacity onPress={() => setShowCurrentUserDrinkSpeech(!showCurrentUserDrinkSpeech)}>
+            <View style={styles.drinkOverlay}>
+              <Image source={currentUserDrinkIcon} style={[styles.drinkIcon, styles.myDrink]} />
+              {showCurrentUserDrinkSpeech && (
+                <View style={styles.myDrinkSpeechBubble}>
+                  <Text style={styles.bottomDrinkSpeechBubbleText}>{currentUserDrinkText}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
         <View style={styles.profileWithDrink}>
           <TouchableOpacity onPress={() => setShowPartnerModal(true)}>
             {partnerProfile?.photoUri ? (
               <Image source={{ uri: partnerProfile.photoUri }} style={styles.partnerImage} />
             ) : (
-              <Image
-                source={require("../assets/images/person1.jpg")}
-                style={styles.partnerImage}
-              />
+              <View style={styles.partnerIconContainer}>
+                <MaterialIcons name="person" size={scale(80)} color="grey" />
+              </View>
             )}
           </TouchableOpacity>
-          <View style={styles.drinkOverlay}>
-            <Image source={partnerDrinkIcon} style={[styles.drinkIcon, styles.otherDrink]} />
-          </View>
+          <TouchableOpacity onPress={() => setShowPartnerDrinkSpeech(!showPartnerDrinkSpeech)}>
+            <View style={styles.drinkOverlay}>
+              <Image source={partnerDrinkIcon} style={[styles.drinkIcon, styles.otherDrink]} />
+              {showPartnerDrinkSpeech && (
+                <View style={styles.bottomDrinkSpeechBubble}>
+                  <Text style={styles.bottomDrinkSpeechBubbleText}>{partnerDrinkText}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -383,10 +434,13 @@ export default function ChatScreen() {
                     style={styles.modalProfileImage}
                   />
                 ) : (
-                  <Image
-                    source={require("../assets/images/person1.jpg")}
-                    style={styles.modalProfileImage}
-                  />
+                  <View style={styles.partnerIconContainer}>
+                    <MaterialIcons
+                      name="person"
+                      size={scale(80)}
+                      color="grey"
+                    />
+                  </View>
                 )}
               </View>
 
@@ -422,7 +476,7 @@ export default function ChatScreen() {
         </View>
       </Modal>
 
-      {/* Mr. Mingles Warning Modal */}
+      {/* "Don't be a creep" Warning Modal with Typewriter Effect */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -437,9 +491,7 @@ export default function ChatScreen() {
             >
               <Text style={styles.mingModalCloseButtonText}>X</Text>
             </TouchableOpacity>
-            <Text style={styles.mingModalText}>
-              Wait for them to answer. Don't be a creep!
-            </Text>
+            <Text style={styles.mingModalText}>{mingDisplayedText}</Text>
             <View style={styles.mingTriangleContainer}>
               <View style={styles.mingOuterTriangle} />
               <View style={styles.mingInnerTriangle} />
@@ -508,6 +560,15 @@ const styles = ScaledSheet.create({
     height: "100%",
   },
 
+  
+  partnerIconContainer: {
+    width: "110@ms",
+    height: "110@ms",
+    borderRadius: "55@ms",
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   /* Loading */
   loadingContainer: {
     flex: 1,
@@ -522,8 +583,7 @@ const styles = ScaledSheet.create({
 
   /* The region that holds the chat messages */
   chatWrapper: {
-    // Instead of referencing Dimensions for 50% of the screen height, use 50% directly:
-    height: "50%", // fills half the screen
+    height: "50%",
     overflow: "hidden",
   },
   chatContainer: {
@@ -533,7 +593,6 @@ const styles = ScaledSheet.create({
     flexGrow: 1,
     justifyContent: "flex-end",
     paddingHorizontal: "10@ms",
-    // used to be paddingBottom: height * 0.03 => let's do 3% here:
     paddingBottom: "3%",
   },
 
@@ -564,12 +623,12 @@ const styles = ScaledSheet.create({
     marginTop: "4@ms",
   },
 
-  /* Input area fixed to bottom, originally bottom:-250 => use percentages now */
+  /* Input area fixed to bottom */
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
     position: "absolute",
-    bottom: "15%", // approximate the same offset
+    bottom: "15%",
     width: "100%",
     paddingHorizontal: "20@ms",
   },
@@ -578,8 +637,9 @@ const styles = ScaledSheet.create({
     backgroundColor: "#fff",
     borderRadius: "20@ms",
     paddingHorizontal: "15@ms",
-    paddingVertical: "10@ms",
+    paddingVertical: scale(10),
     fontSize: "16@ms",
+    width: scale(230)
   },
   sendButton: {
     marginLeft: "10@ms",
@@ -597,7 +657,6 @@ const styles = ScaledSheet.create({
   /* Bottom profile images & drink overlays */
   bottomProfiles: {
     position: "absolute",
-    // originally bottom: '28%' => keep that if it works for your layout
     bottom: "28%",
     width: "100%",
     flexDirection: "row",
@@ -626,23 +685,48 @@ const styles = ScaledSheet.create({
     position: "absolute",
     width: moderateScale(10),
     height: moderateScale(50),
-    bottom: "54%", // keep percentage for consistent positioning
+    bottom: "75%", // Moved both drinks up (changed from "65%" to "75%")
     right: 0,
   },
   drinkIcon: {
     width: "52@ms",
     height: "59@ms",
   },
-  // For absolute offsets, switch to approximate percentages
   myDrink: {
-    left: "50%"
+    bottom: "120%",
+    left: "40%" // Moved user drink bubble left (changed from "50%" to "40%")
   },
   otherDrink: {
-    position: "relative",
-    right: "1450%"
+    bottom: "120%",
+    right: "1430%" // Moved partner drink bubble over its icon (changed from "-1500%" to "50%")
+  },
+  myDrinkSpeechBubble: {
+    position: "absolute",
+    top: "-105@ms",
+    right: "-800%",
+    width: scale(100),
+    backgroundColor: "rgba(0,0,0,0.8)",
+    padding: moderateScale(5),
+    borderRadius: moderateScale(10),
+    alignItems: "center",
+  },
+  bottomDrinkSpeechBubble: {
+    position: "absolute",
+    top: "-105@ms",
+    right: "700%",
+    width: scale(100),
+    backgroundColor: "rgba(0,0,0,0.8)",
+    padding: moderateScale(5),
+    borderRadius: moderateScale(10),
+    alignItems: "center",
+  },
+  bottomDrinkSpeechBubbleText: {
+    color: "#fff",
+    fontSize: scale(12),
+    textAlign: "center",
   },
 
-  /* Bottom navbar pinned to absolute bottom */
+  /* Bottom navbar */
   bottomNavbarContainer: {
     position: "absolute",
     bottom: 0,
@@ -659,20 +743,16 @@ const styles = ScaledSheet.create({
   },
   modalContainer: {
     width: "90%",
-    // was height:500 => scale it
     height: "500@vs",
     paddingVertical: "20@ms",
     paddingHorizontal: "8@ms",
     alignItems: "center",
     position: "relative",
-    // was bottom:80 => approximate as percentage
     bottom: "10%",
   },
   modalCloseButton: {
     position: "absolute",
-    // was top:30 => ~5%
     top: "5%",
-    // was right:40 => ~10%
     right: "10%",
     zIndex: 10,
   },
@@ -687,25 +767,22 @@ const styles = ScaledSheet.create({
     borderRadius: "20@ms",
     paddingHorizontal: "20@ms",
     paddingVertical: "30@ms",
-    // was height:470 => "470@vs"
     height: "470@vs",
     alignItems: "center",
   },
   modalImageContainer: {
     marginBottom: "10@ms",
   },
-  // was 250 => scale them
   modalProfileImage: {
     width: "250@ms",
     height: "250@ms",
     borderRadius: "130@ms",
   },
   modalDrinkContainer: {
+    height: scale(30),
     alignItems: "center",
     marginVertical: "10@ms",
   },
-  // was height:65 => 65@ms, width:50 => 50@ms
-  // left:50 => approximate => left:'20%', bottom:-20 => bottom:'-15%'
   modalDrinkIcon: {
     height: "65@ms",
     width: "50@ms",
@@ -715,7 +792,7 @@ const styles = ScaledSheet.create({
   },
   modalDrinkSpeechBubble: {
     position: "absolute",
-    bottom: "50%",
+    bottom: "310%",
     left: "-10%",
     backgroundColor: "rgba(0,0,0,0.8)",
     padding: "5@ms",
@@ -770,13 +847,12 @@ const styles = ScaledSheet.create({
     paddingHorizontal: "8@ms",
     alignItems: "center",
     position: "relative",
-    // was bottom:140 => about 18% or so
     bottom: "18%",
   },
   mingModalCloseButton: {
     position: "absolute",
-    top: "5%", // was 40 => ~5%
-    right: "5%", // was 20 => ~5%
+    top: "5%",
+    right: "5%",
     zIndex: 100,
   },
   mingModalCloseButtonText: {
@@ -833,3 +909,5 @@ const styles = ScaledSheet.create({
     right: "-20%",
   },
 });
+
+export { ChatScreen };
