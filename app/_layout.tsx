@@ -125,18 +125,18 @@ function GlobalChatNotifier() {
             chatData.lastMessageSender &&
             chatData.lastMessageSender !== currentUser.uid
           ) {
-            // Only trigger if we're NOT already in this chat.
-            if (
-              pathname.startsWith("/chat") &&
-              currentChatPartner &&
-              change.doc.id === [currentUser.uid, currentChatPartner].sort().join("_")
-            ) {
-              return; // Skip showing the notification if we're already in this chat.
+            if (pathname.endsWith("/chat")) {
+              return
             }
+            // Only trigger if we're NOT already in this chat.
+            const currentChatId = pathname.startsWith("/chat") && currentChatPartner ?
+            [currentUser.uid, currentChatPartner].sort().join("_") : "";
+
             showNotification(
               chatData.lastMessage,
               change.doc.id, // using doc id as chatId
-              chatData.partnerName ? chatData.partnerName : "Partner"
+              chatData.partnerName ? chatData.partnerName : "Partner",
+              currentChatId,
             );
           }
         }

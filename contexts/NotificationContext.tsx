@@ -5,7 +5,7 @@ interface NotificationContextType {
   message: string;
   chatId: string;
   senderName: string;
-  showNotification: (message: string, chatId: string, senderName: string) => void;
+  showNotification: (message: string, chatId: string, senderName: string, currentChatId: string) => void;
   hideNotification: () => void;
   updateNotification: (message: string, chatId: string, senderName: string) => void
 }
@@ -26,7 +26,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [chatId, setChatId] = useState('');
   const [senderName, setSenderName] = useState('');
 
-  const showNotification = (msg: string, chatId: string, senderName: string) => {
+  const showNotification = (msg: string, chatId: string, senderName: string, currentChatId: string) => {
+    console.log(currentChatId);
+    if (currentChatId && chatId === currentChatId) {
+      return
+    }
     setMessage(msg);
     setChatId(chatId);
     setSenderName(senderName);

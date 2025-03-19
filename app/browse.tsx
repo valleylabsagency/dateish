@@ -164,9 +164,17 @@ export default function BrowseScreen() {
               source={{ uri: currentProfile.photoUri }}
               style={styles.profileImage}
             />
-            <TouchableOpacity onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}>
+            <TouchableOpacity onPress={() => setShowDrinkSpeech(!showDrinkSpeech)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <View style={styles.drinkIconContainer}>
-                <Image source={drinkIcon} style={styles.drinkIcon} />
+                <Image source={drinkIcon} 
+                style={[
+                  styles.drinkIcon,
+                  currentProfile.drink.toLowerCase() === "water" && {
+                    width: moderateScale(40),
+                    height: moderateScale(80)
+                  }
+                ]}
+                />
                 {showDrinkSpeech && (
                   <View style={styles.drinkSpeechBubble}>
                     <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
@@ -192,7 +200,7 @@ export default function BrowseScreen() {
 
       {/* Navigation Buttons */}
       <View style={styles.navigationContainer}>
-        <TouchableOpacity onPress={handlePrev}>
+        <TouchableOpacity onPress={handlePrev} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <View style={styles.triangleLeftContainer}>
             <View style={styles.triangleLeftOuter} />
             <View style={styles.triangleLeftInner} />
@@ -203,7 +211,7 @@ export default function BrowseScreen() {
           <Text style={styles.chatButtonText}>CHAT</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleNext}>
+        <TouchableOpacity onPress={handleNext} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <View style={styles.triangleRightContainer}>
             <View style={styles.triangleRightOuter} />
             <View style={styles.triangleRightInner} />
@@ -367,7 +375,7 @@ const styles = ScaledSheet.create({
    * ============================== */
   triangleLeftContainer: {
     width: scale(43),
-    height: 0,
+    height: scale(40),
     position: "absolute",
     // left: -30, top: -45 => percentages
     left: "-100%",
@@ -401,7 +409,7 @@ const styles = ScaledSheet.create({
 
   triangleRightContainer: {
     width: scale(43),
-    height: 0,
+    height: scale(40),
     // marginLeft:10, marginRight:20 => we can just remove or scale
     position: "absolute",
     top: "-56%",

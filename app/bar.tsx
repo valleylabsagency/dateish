@@ -235,6 +235,7 @@ function BarProfileComplete() {
   const [isTapState, setIsTapState] = useState(true);
   const { profile, saveProfile } = useContext(ProfileContext);
   const { setShowWcButton } = useContext(NavbarContext);
+  const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
 
   // Decide which text to show
   const bubbleText = isTapState
@@ -283,6 +284,21 @@ function BarProfileComplete() {
     water: require("../assets/images/icons/water.png"),
   };
 
+  const drinkTextMapping = {
+    wine: "Where's the romance at?",
+    beer: "Chill night... Sup?",
+    whiskey: "I'm an adult.",
+    martini: "I'm smart and beautiful!",
+    vodka: "Get the party started!",
+    tequila: "Gonna get fucked tonight",
+    absinthe: "Who are you?",
+    water: "I don't need alcohol to have fun",
+  };
+
+
+  const drinkKey = profile.drink ? profile.drink.toLowerCase() : "water";
+  const drinkText = drinkTextMapping[drinkKey] || drinkTextMapping["water"];
+
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
     [FontNames.MontserratBold]: require("../assets/fonts/Montserrat-Bold.ttf"),
@@ -322,7 +338,7 @@ function BarProfileComplete() {
                     </Text>
                    
                       <View style={styles.buttonRow}>
-                        <TouchableOpacity>
+                        <TouchableOpacity onPress={handleTapPress}>
                           <Text style={styles.tapText}>TAP</Text>
                         </TouchableOpacity>
                       </View>
@@ -355,13 +371,20 @@ function BarProfileComplete() {
 </TouchableOpacity>
         {/* If user has a drink, show the icon below the bubble */}
         {profile.drink && (
-          <View style={{ marginTop: moderateScale(25) }}>
-            <Image
-              source={drinkMapping[profile.drink.toLowerCase()]}
-              style={styles.drinkIcon}
-              resizeMode="contain"
-            />
-          </View>
+          <TouchableOpacity onPress={() => setShowDrinkSpeech((prev) => !prev)}>
+            <View style={{ marginTop: moderateScale(25) }}>
+              <Image
+                source={drinkMapping[drinkKey]}
+                style={styles.drinkIcon}
+                resizeMode="contain"
+              />
+              {showDrinkSpeech && (
+                <View style={styles.drinkSpeechBubble}>
+                  <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
         )}
       </View>
 
@@ -475,7 +498,7 @@ const styles = ScaledSheet.create({
   },
   bubbleContainer: {
     width: BUBBLE_WIDTH,
-    aspectRatio: 1,
+    height: moderateScale(180),
     marginTop: moderateScale(20),
   },
   speechBubbleBackground: {
@@ -483,7 +506,8 @@ const styles = ScaledSheet.create({
     height: "100%",
     justifyContent: "center",
     position: "relative",
-    bottom: moderateScale(49),
+    paddingTop: 0,
+    bottom: moderateScale(-20),
   },
   textInsideBubble: {
     backgroundColor: "transparent",
@@ -515,10 +539,26 @@ const styles = ScaledSheet.create({
   },
   drinkIcon: {
     width: moderateScale(100),
-    height: moderateScale(100),
+    height: moderateScale(110),
     position: "relative",
-    right: "15%",
-    bottom: "36%"
+    right: "55%",
+    bottom: scale(-100)
+  },
+  drinkSpeechBubble: {
+    position: "absolute",
+    // was bottom:70, right:0 => now relative
+    bottom: "15%", // place speech bubble above the icon
+    right: "45%",
+    backgroundColor: "rgba(0,0,0,0.8)",
+    padding: "5@ms",
+    borderRadius: "10@ms",
+    width: scale(100),
+  },
+  drinkSpeechBubbleText: {
+    color: "#fff",
+    fontSize: "14@ms", // moderateScale(14)
+    fontFamily: FontNames.MontserratRegular,
+    textAlign: "center"
   },
 
   /* 

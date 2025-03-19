@@ -72,10 +72,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const toggleMusic = async () => {
     if (!shouldPlayMusic) return;
     if (soundLoading) return;
-
+  
     try {
+      // If sound doesn't exist, create & play it.
       if (!sound) {
-        // If there's no sound yet, create & play.
         setSoundLoading(true);
         const { sound: newSound } = await Audio.Sound.createAsync(
           require("../assets/videos/music.mp3"),
@@ -86,34 +86,33 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         setSoundLoading(false);
         return;
       }
-
-      const status = await sound.getStatusAsync();
-      if (!status.isLoaded) {
-        // Forcibly reload.
-        setSoundLoading(true);
-        await sound.unloadAsync();
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          require("../assets/videos/music.mp3"),
-          { shouldPlay: !isPlaying, isLooping: true }
-        );
-        setSound(newSound);
-        setIsPlaying(!isPlaying);
-        setSoundLoading(false);
-        return;
-      }
-
+  
+      // Always unload and recreate the sound when turning music back on.
       if (isPlaying) {
+        // If it's playing, pause and unload.
         await sound.pauseAsync();
+        await sound.unloadAsync();
+        setSound(null);
         setIsPlaying(false);
       } else {
-        await sound.playAsync();
+        // When turning music on, recreate the sound instance.
+        setSoundLoading(true);
+        if (sound) {
+          await sound.unloadAsync();
+        }
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          require("../assets/videos/music.mp3"),
+          { shouldPlay: true, isLooping: true }
+        );
+        setSound(newSound);
         setIsPlaying(true);
+        setSoundLoading(false);
       }
     } catch (err) {
       console.error("Audio playback error:", err);
     }
   };
-
+  
   return (
     <MusicContext.Provider value={{ isPlaying, soundLoading, toggleMusic }}>
       {children}
