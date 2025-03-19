@@ -1,5 +1,5 @@
 import React, { useState, createContext, useEffect, useContext } from "react";
-import { View, StyleSheet, TouchableWithoutFeedback } from "react-native";
+import { View, StyleSheet, TouchableWithoutFeedback, I18nManager } from "react-native";
 import { Stack, usePathname, useRouter, useLocalSearchParams} from "expo-router";
 import Navbar from "../components/Navbar";
 import { ProfileProvider } from "../contexts/ProfileContext";
@@ -27,6 +27,12 @@ export const NavbarContext = createContext({
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [showWcButton, setShowWcButton] = useState(false);
   const pathname = usePathname();
+
+  useEffect(() => {
+    // Stop React Native from flipping the app on RTL devices
+    I18nManager.allowRTL(false);
+    I18nManager.forceRTL(false);
+  }, []);
 
   useEffect(() => {
     // Hide bottom navigation bar
