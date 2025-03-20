@@ -8,6 +8,7 @@ import { MusicProvider } from "@/contexts/MusicContext";
 import { NotificationProvider, NotificationContext } from "@/contexts/NotificationContext";
 import PresenceWrapper from "@/contexts/PresenceContext"
 import AuthWrapper from "@/contexts/AuthContext";
+import * as Updates from "expo-updates";
 
 import { StatusBar } from "expo-status-bar";
 import * as NavigationBar from "expo-navigation-bar";
@@ -27,12 +28,16 @@ export const NavbarContext = createContext({
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [showWcButton, setShowWcButton] = useState(false);
   const pathname = usePathname();
+  const [didForceRTL, setDidForceRTL] = useState(false);
 
   useEffect(() => {
-    // Stop React Native from flipping the app on RTL devices
-    I18nManager.allowRTL(false);
-    I18nManager.forceRTL(false);
-  }, []);
+    if (I18nManager.isRTL && !didForceRTL) {
+      I18nManager.allowRTL(false);
+      I18nManager.forceRTL(false);
+      setDidForceRTL(true);    // mark that we've done it
+      Updates.reloadAsync();   // reload once
+    }
+  }, [didForceRTL]);
 
   useEffect(() => {
     // Hide bottom navigation bar
