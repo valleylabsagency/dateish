@@ -66,6 +66,13 @@ export default function ChatScreen() {
   // State to store the partner's profile from Firestore.
   const [partnerProfile, setPartnerProfile] = useState(null);
 
+  const truncateDescription = (text: string, limit: number = 35) => {
+    if (text.length > limit) {
+      return text.slice(0, limit) + "...";
+    }
+    return text;
+  };
+
   // Fetch partner's profile from the "users" collection.
   useEffect(() => {
     const fetchPartnerProfile = async () => {
@@ -92,6 +99,7 @@ export default function ChatScreen() {
     ? { uri: profile.photoUri }
     : require("../assets/images/tyler.jpeg");
 
+   
   // Font loading
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
@@ -379,7 +387,18 @@ export default function ChatScreen() {
           {/* Wrap the drink icon in a touchable */}
           <TouchableOpacity onPress={() => setShowCurrentUserDrinkSpeech(!showCurrentUserDrinkSpeech)}>
             <View style={styles.drinkOverlay}>
-              <Image source={currentUserDrinkIcon} style={[styles.drinkIcon, styles.myDrink]} />
+            <Image
+                source={currentUserDrinkIcon}
+                style={[
+                  styles.drinkIcon,
+                  styles.myDrink,
+                  currentUserDrink.toLowerCase() === "water" && {
+                    width: moderateScale(30),
+                    height: moderateScale(65),
+                    bottom: "130%"
+                  },
+                ]}
+              />
               {showCurrentUserDrinkSpeech && (
                 <View style={styles.myDrinkSpeechBubble}>
                   <Text style={styles.bottomDrinkSpeechBubbleText}>{currentUserDrinkText}</Text>
@@ -400,7 +419,18 @@ export default function ChatScreen() {
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowPartnerDrinkSpeech(!showPartnerDrinkSpeech)}>
             <View style={styles.drinkOverlay}>
-              <Image source={partnerDrinkIcon} style={[styles.drinkIcon, styles.otherDrink]} />
+            <Image
+                source={partnerDrinkIcon}
+                style={[
+                  styles.drinkIcon,
+                  styles.otherDrink,
+                  partnerDrink.toLowerCase() === "water" && {
+                    width: moderateScale(30),
+                    height: moderateScale(65),
+                    bottom: "130%"
+                  },
+                ]}
+              />
               {showPartnerDrinkSpeech && (
                 <View style={styles.bottomDrinkSpeechBubble}>
                   <Text style={styles.bottomDrinkSpeechBubbleText}>{partnerDrinkText}</Text>
@@ -448,7 +478,16 @@ export default function ChatScreen() {
                 <TouchableOpacity
                   onPress={() => setShowModalDrinkSpeech(!showModalDrinkSpeech)}
                 >
-                  <Image source={partnerDrinkIcon} style={styles.modalDrinkIcon} />
+                  <Image
+                source={partnerDrinkIcon}
+                style={[
+                 styles.modalDrinkIcon,
+                  partnerDrink.toLowerCase() === "water" && {
+                    width: moderateScale(40),
+                    height: moderateScale(80),
+                  },
+                ]}
+              />
                 </TouchableOpacity>
                 {showModalDrinkSpeech && (
                   <View style={styles.modalDrinkSpeechBubble}>
@@ -468,7 +507,7 @@ export default function ChatScreen() {
                   {partnerProfile ? partnerProfile.location : ""}
                 </Text>
                 <Text style={styles.descriptionText}>
-                  {partnerProfile ? partnerProfile.about : ""}
+                  {partnerProfile ? truncateDescription(partnerProfile.about) : ""}
                 </Text>
               </View>
             </View>
@@ -843,7 +882,7 @@ const styles = ScaledSheet.create({
     borderWidth: "4@ms",
     borderColor: "#fff",
     borderRadius: "20@ms",
-    paddingVertical: "20@ms",
+    paddingVertical: "50@ms",
     paddingHorizontal: "8@ms",
     alignItems: "center",
     position: "relative",
@@ -851,13 +890,13 @@ const styles = ScaledSheet.create({
   },
   mingModalCloseButton: {
     position: "absolute",
-    top: "5%",
+    top: "2%",
     right: "5%",
     zIndex: 100,
   },
   mingModalCloseButtonText: {
     color: "#fff",
-    fontSize: "48@ms",
+    fontSize: "32@ms",
     fontFamily: FontNames.MontserratExtraLight,
   },
   mingModalText: {
@@ -905,7 +944,7 @@ const styles = ScaledSheet.create({
     width: "350@ms",
     height: "420@ms",
     position: "absolute",
-    bottom: "-80%",
+    bottom: "-95%",
     right: "-20%",
   },
 });
