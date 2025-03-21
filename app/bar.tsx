@@ -371,7 +371,7 @@ function BarProfileComplete() {
 </TouchableOpacity>
         {/* If user has a drink, show the icon below the bubble */}
         {profile.drink && (
-          <TouchableOpacity onPress={() => setShowDrinkSpeech((prev) => !prev)} hitSlop={{ top: 15, bottom: 40, left: 20, right: 20 }}>
+          <TouchableOpacity onPress={() => setShowDrinkSpeech((prev) => !prev)} hitSlop={{ top: 15, bottom: 60, left: 20, right: 20 }}>
             <View style={{ marginTop: moderateScale(25) }}>
               <Image
                 source={drinkMapping[drinkKey]}

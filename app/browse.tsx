@@ -164,7 +164,7 @@ export default function BrowseScreen() {
               source={{ uri: currentProfile.photoUri }}
               style={styles.profileImage}
             />
-            <TouchableOpacity onPress={() => setShowDrinkSpeech(!showDrinkSpeech)} hitSlop={{ top: 0, bottom: 40, left: 20, right: 20 }}>
+            <TouchableOpacity onPress={() => setShowDrinkSpeech(!showDrinkSpeech)} hitSlop={{ top: 0, bottom: 60, left: 20, right: 20 }}>
               <View style={styles.drinkIconContainer}>
                 <Image source={drinkIcon} 
                 style={[
@@ -200,7 +200,7 @@ export default function BrowseScreen() {
 
       {/* Navigation Buttons */}
       <View style={styles.navigationContainer}>
-        <TouchableOpacity onPress={handlePrev} hitSlop={{ top: 10, bottom: 10, left: 15, right: 15 }}>
+        <TouchableOpacity onPress={handlePrev} hitSlop={{ top: 10, bottom: 10, left: 35, right: 35 }}>
           <View style={styles.triangleLeftContainer}>
             <View style={styles.triangleLeftOuter} />
             <View style={styles.triangleLeftInner} />
@@ -211,7 +211,7 @@ export default function BrowseScreen() {
           <Text style={styles.chatButtonText}>CHAT</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleNext} hitSlop={{ top: 10, bottom: 10, left: 15, right: 15 }}>
+        <TouchableOpacity onPress={handleNext} hitSlop={{ top: 10, bottom: 10, left: 35, right: 35 }}>
           <View style={styles.triangleRightContainer}>
             <View style={styles.triangleRightOuter} />
             <View style={styles.triangleRightInner} />
