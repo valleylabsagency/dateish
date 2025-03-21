@@ -385,7 +385,7 @@ export default function ChatScreen() {
             <Image source={currentUserImage} style={styles.currentUserImage} />
           </TouchableOpacity>
           {/* Wrap the drink icon in a touchable */}
-          <TouchableOpacity onPress={() => setShowCurrentUserDrinkSpeech(!showCurrentUserDrinkSpeech)} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
+          <TouchableOpacity onPress={() => setShowCurrentUserDrinkSpeech(!showCurrentUserDrinkSpeech)} hitSlop={{ top: 15, bottom: 40, left: 20, right: 20 }}>
             <View style={styles.drinkOverlay}>
             <Image
                 source={currentUserDrinkIcon}
@@ -417,7 +417,7 @@ export default function ChatScreen() {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowPartnerDrinkSpeech(!showPartnerDrinkSpeech)} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
+          <TouchableOpacity onPress={() => setShowPartnerDrinkSpeech(!showPartnerDrinkSpeech)} hitSlop={{ top: 15, bottom: 40, left: 20, right: 20 }}>
             <View style={styles.drinkOverlay}>
             <Image
                 source={partnerDrinkIcon}
@@ -477,7 +477,7 @@ export default function ChatScreen() {
               <View style={styles.modalDrinkContainer}>
                 <TouchableOpacity
                   onPress={() => setShowModalDrinkSpeech(!showModalDrinkSpeech)}
-                  hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                  hitSlop={{ top: 15, bottom: 40, left: 20, right: 20 }}
                 >
                   <Image
                 source={partnerDrinkIcon}

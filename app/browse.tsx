@@ -82,7 +82,7 @@ export default function BrowseScreen() {
   };
 
   const truncateDescription = (text: string, limit: number = 35) => {
-    if (text.length > limit) {
+    if (text && text.length > limit) {
       return text.slice(0, limit) + "...";
     }
     return text;
@@ -164,12 +164,12 @@ export default function BrowseScreen() {
               source={{ uri: currentProfile.photoUri }}
               style={styles.profileImage}
             />
-            <TouchableOpacity onPress={() => setShowDrinkSpeech(!showDrinkSpeech)} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
+            <TouchableOpacity onPress={() => setShowDrinkSpeech(!showDrinkSpeech)} hitSlop={{ top: 0, bottom: 40, left: 20, right: 20 }}>
               <View style={styles.drinkIconContainer}>
                 <Image source={drinkIcon} 
                 style={[
                   styles.drinkIcon,
-                  currentProfile.drink.toLowerCase() === "water" && {
+                  currentProfile.drink && currentProfile.drink.toLowerCase() === "water" && {
                     width: moderateScale(40),
                     height: moderateScale(80)
                   }
@@ -200,7 +200,7 @@ export default function BrowseScreen() {
 
       {/* Navigation Buttons */}
       <View style={styles.navigationContainer}>
-        <TouchableOpacity onPress={handlePrev} hitSlop={{ top: 10, bottom: 10, left: 10, right: 12 }}>
+        <TouchableOpacity onPress={handlePrev} hitSlop={{ top: 10, bottom: 10, left: 15, right: 15 }}>
           <View style={styles.triangleLeftContainer}>
             <View style={styles.triangleLeftOuter} />
             <View style={styles.triangleLeftInner} />
@@ -211,7 +211,7 @@ export default function BrowseScreen() {
           <Text style={styles.chatButtonText}>CHAT</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleNext} hitSlop={{ top: 10, bottom: 10, left: 12, right: 10 }}>
+        <TouchableOpacity onPress={handleNext} hitSlop={{ top: 10, bottom: 10, left: 15, right: 15 }}>
           <View style={styles.triangleRightContainer}>
             <View style={styles.triangleRightOuter} />
             <View style={styles.triangleRightInner} />
