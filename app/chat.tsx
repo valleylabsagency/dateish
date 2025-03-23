@@ -256,6 +256,15 @@ export default function ChatScreen() {
   const partnerDrink = partnerProfile?.drink ? partnerProfile.drink : "water";
   const partnerDrinkIcon = drinkMapping[partnerDrink.toLowerCase()];
 
+  const userHasWater = (currentUserDrink && currentUserDrink.toLowerCase() === "water");
+  const partnerHasWater = (partnerDrink && partnerDrink.toLowerCase() === "water");
+
+  const currentUserDrinkWidth = userHasWater ? moderateScale(30) : moderateScale(60);
+  const currentUserDrinkHeight = userHasWater ? moderateScale(70) : moderateScale(60);
+  const partnerDrinkWidth = partnerHasWater ? moderateScale(30) : moderateScale(60);
+  const partnerDrinkHeight = partnerHasWater ? moderateScale(70) : moderateScale(60);
+
+
   // Map each partner drink to text
   const partnerDrinkTextMapping = {
     wine: "Where's the romance at?",
@@ -385,26 +394,20 @@ export default function ChatScreen() {
             <Image source={currentUserImage} style={styles.currentUserImage} />
           </TouchableOpacity>
           {/* Wrap the drink icon in a touchable */}
-          <TouchableOpacity onPress={() => setShowCurrentUserDrinkSpeech(!showCurrentUserDrinkSpeech)} hitSlop={{ top: 15, bottom: 60, left: 20, right: 20 }}>
-            <View style={styles.drinkOverlay}>
-            <Image
-                source={currentUserDrinkIcon}
-                style={[
-                  styles.drinkIcon,
-                  styles.myDrink,
-                  currentUserDrink.toLowerCase() === "water" && {
-                    width: moderateScale(30),
-                    height: moderateScale(65),
-                    bottom: "130%"
-                  },
-                ]}
-              />
+          <TouchableOpacity style={[styles.drinkIcon,
+            {
+              width: currentUserDrinkWidth,
+              height: currentUserDrinkHeight,
+              left: "100%",
+            }
+          ]} onPress={() => setShowCurrentUserDrinkSpeech(!showCurrentUserDrinkSpeech)}>
+            
+            <Image source={currentUserDrinkIcon} style={{width: "100%", height: "100%", position: "relative"}} />
               {showCurrentUserDrinkSpeech && (
                 <View style={styles.myDrinkSpeechBubble}>
                   <Text style={styles.bottomDrinkSpeechBubbleText}>{currentUserDrinkText}</Text>
                 </View>
               )}
-            </View>
           </TouchableOpacity>
         </View>
         <View style={styles.profileWithDrink}>
@@ -417,26 +420,23 @@ export default function ChatScreen() {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowPartnerDrinkSpeech(!showPartnerDrinkSpeech)} hitSlop={{ top: 15, bottom: 60, left: 20, right: 20 }}>
-            <View style={styles.drinkOverlay}>
+          <TouchableOpacity style={[styles.drinkIcon, 
+              {
+                width: partnerDrinkWidth,
+                height: partnerDrinkHeight,
+                right: "100%",
+              }
+            ]} onPress={() => setShowPartnerDrinkSpeech(!showPartnerDrinkSpeech)} hitSlop={{ top: 15, bottom: 60, left: 20, right: 20 }}>
+            
             <Image
                 source={partnerDrinkIcon}
-                style={[
-                  styles.drinkIcon,
-                  styles.otherDrink,
-                  partnerDrink.toLowerCase() === "water" && {
-                    width: moderateScale(30),
-                    height: moderateScale(65),
-                    bottom: "130%"
-                  },
-                ]}
+                style={{width: "100%", height: "100%", position: "relative"}}
               />
               {showPartnerDrinkSpeech && (
                 <View style={styles.bottomDrinkSpeechBubble}>
                   <Text style={styles.bottomDrinkSpeechBubbleText}>{partnerDrinkText}</Text>
                 </View>
               )}
-            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -477,17 +477,14 @@ export default function ChatScreen() {
               <View style={styles.modalDrinkContainer}>
                 <TouchableOpacity
                   onPress={() => setShowModalDrinkSpeech(!showModalDrinkSpeech)}
-                  hitSlop={{ top: 15, bottom: 60, left: 20, right: 20 }}
+                 style={[styles.modalDrinkIcon, {
+                  width: partnerDrinkWidth,
+                  height: partnerDrinkHeight
+                 }]}
                 >
                   <Image
                 source={partnerDrinkIcon}
-                style={[
-                 styles.modalDrinkIcon,
-                  partnerDrink.toLowerCase() === "water" && {
-                    width: moderateScale(40),
-                    height: moderateScale(80),
-                  },
-                ]}
+                style={{width: "100%", height: "100%", position: "relative"}}
               />
                 </TouchableOpacity>
                 {showModalDrinkSpeech && (
@@ -729,21 +726,13 @@ const styles = ScaledSheet.create({
     right: 0,
   },
   drinkIcon: {
-    width: "52@ms",
-    height: "59@ms",
-  },
-  myDrink: {
-    bottom: "120%",
-    left: "40%" // Moved user drink bubble left (changed from "50%" to "40%")
-  },
-  otherDrink: {
-    bottom: "120%",
-    right: "1430%" // Moved partner drink bubble over its icon (changed from "-1500%" to "50%")
+   position: "absolute",
+   top: "-8%",
   },
   myDrinkSpeechBubble: {
     position: "absolute",
-    top: "-105@ms",
-    right: "-800%",
+    top: "-100%",
+    right: "-80%",
     width: scale(100),
     backgroundColor: "rgba(0,0,0,0.8)",
     padding: moderateScale(5),
@@ -752,8 +741,8 @@ const styles = ScaledSheet.create({
   },
   bottomDrinkSpeechBubble: {
     position: "absolute",
-    top: "-105@ms",
-    right: "700%",
+    top: "-100%",
+    left: "-80%",
     width: scale(100),
     backgroundColor: "rgba(0,0,0,0.8)",
     padding: moderateScale(5),
@@ -827,13 +816,14 @@ const styles = ScaledSheet.create({
     height: "65@ms",
     width: "50@ms",
     position: "absolute",
-    left: "20%",
-    bottom: "-15%",
+    left: "30%",
+    bottom: "100%",
   },
   modalDrinkSpeechBubble: {
     position: "absolute",
-    bottom: "310%",
-    left: "-10%",
+    bottom: "340%",
+    left: "20%",
+    width: scale(100),
     backgroundColor: "rgba(0,0,0,0.8)",
     padding: "5@ms",
     borderRadius: "10@ms",
@@ -841,6 +831,7 @@ const styles = ScaledSheet.create({
   modalDrinkSpeechBubbleText: {
     color: "#fff",
     fontSize: "14@ms",
+    textAlign: "center",
     fontFamily: FontNames.MontserratRegular,
   },
   modalInfoContainer: {

@@ -227,6 +227,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     width: 220,
+
   },
   inputContainer: {
     flexDirection: "row",
@@ -248,6 +249,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: FontNames.MVBoli,
     padding: 5,
+    height: 40,
+    includeFontPadding: false,
+    textAlignVertical: "bottom",
     color: "#000",
   },
   button: {

@@ -371,11 +371,11 @@ function BarProfileComplete() {
 </TouchableOpacity>
         {/* If user has a drink, show the icon below the bubble */}
         {profile.drink && (
-          <TouchableOpacity onPress={() => setShowDrinkSpeech((prev) => !prev)} hitSlop={{ top: 15, bottom: 60, left: 20, right: 20 }}>
-            <View style={{ marginTop: moderateScale(25) }}>
+          <TouchableOpacity style={styles.drinkIcon} onPress={() => setShowDrinkSpeech((prev) => !prev)}>
+            
               <Image
                 source={drinkMapping[drinkKey]}
-                style={styles.drinkIcon}
+                style={{width: "100%", height: "100%", position: "relative"}}
                 resizeMode="contain"
               />
               {showDrinkSpeech && (
@@ -383,7 +383,7 @@ function BarProfileComplete() {
                   <Text style={styles.drinkSpeechBubbleText} >{drinkText}</Text>
                 </View>
               )}
-            </View>
+
           </TouchableOpacity>
         )}
       </View>
@@ -538,17 +538,17 @@ const styles = ScaledSheet.create({
     fontFamily: FontNames.MontserratExtraLight,
   },
   drinkIcon: {
-    width: moderateScale(100),
-    height: moderateScale(110),
-    position: "relative",
-    right: "55%",
-    bottom: scale(-100)
+    width: scale(100),
+    height: scale(100),
+    position: "absolute",
+    top: "48%",
+    right: scale(175)
   },
   drinkSpeechBubble: {
     position: "absolute",
     // was bottom:70, right:0 => now relative
-    bottom: "15%", // place speech bubble above the icon
-    right: "45%",
+    bottom: "110%", // place speech bubble above the icon
+    right: "5%",
     backgroundColor: "rgba(0,0,0,0.8)",
     padding: "5@ms",
     borderRadius: "10@ms",

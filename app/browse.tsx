@@ -51,7 +51,15 @@ export default function BrowseScreen() {
           const data = doc.data();
           // Only add profiles that are not the current user and are online
           if (auth.currentUser && doc.id !== auth.currentUser.uid && data.online) {
-            loadedProfiles.push({ id: doc.id, ...data });
+            if (
+              data.online &&
+              data.name &&
+              data.age &&
+              data.photoUri
+            ) {
+              loadedProfiles.push({ id: doc.id, ...data });
+            }
+            
           }
         });
 
@@ -137,6 +145,10 @@ export default function BrowseScreen() {
       ? currentProfile.drink.toLowerCase()
       : "water";
   const drinkIcon = drinkMapping[profileDrink] || drinkMapping["water"];
+  const isWater = (profileDrink && profileDrink.toLowerCase() === "water")
+  const drinkWidth = isWater ? scale(35) : scale(70);
+  const drinkHeight = isWater ? scale(75) : scale(70);
+  const drinkPosition = isWater ? "60%" : "58%";
 
   // Drink text
   const drinkTextMapping = {
@@ -164,23 +176,20 @@ export default function BrowseScreen() {
               source={{ uri: currentProfile.photoUri }}
               style={styles.profileImage}
             />
-            <TouchableOpacity onPress={() => setShowDrinkSpeech(!showDrinkSpeech)} hitSlop={{ top: 0, bottom: 60, left: 20, right: 20 }}>
-              <View style={styles.drinkIconContainer}>
+            <TouchableOpacity style={[styles.drinkIcon, {
+              width: drinkWidth,
+              height: drinkHeight,
+              left: drinkPosition
+            }]} onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}>
+              
                 <Image source={drinkIcon} 
-                style={[
-                  styles.drinkIcon,
-                  currentProfile.drink && currentProfile.drink.toLowerCase() === "water" && {
-                    width: moderateScale(40),
-                    height: moderateScale(80)
-                  }
-                ]}
+                style={{width: "100%", height: "100%", position: "relative"}}
                 />
                 {showDrinkSpeech && (
                   <View style={styles.drinkSpeechBubble}>
                     <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
                   </View>
                 )}
-              </View>
             </TouchableOpacity>
           </View>
 
@@ -200,7 +209,7 @@ export default function BrowseScreen() {
 
       {/* Navigation Buttons */}
       <View style={styles.navigationContainer}>
-        <TouchableOpacity onPress={handlePrev} hitSlop={{ top: 10, bottom: 10, left: 35, right: 35 }}>
+        <TouchableOpacity onPress={handlePrev}>
           <View style={styles.triangleLeftContainer}>
             <View style={styles.triangleLeftOuter} />
             <View style={styles.triangleLeftInner} />
@@ -211,7 +220,7 @@ export default function BrowseScreen() {
           <Text style={styles.chatButtonText}>CHAT</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleNext} hitSlop={{ top: 10, bottom: 10, left: 35, right: 35 }}>
+        <TouchableOpacity onPress={handleNext}>
           <View style={styles.triangleRightContainer}>
             <View style={styles.triangleRightOuter} />
             <View style={styles.triangleRightInner} />
@@ -295,23 +304,16 @@ const styles = ScaledSheet.create({
   /* ==============================
    * Drink Icon + speech bubble
    * ============================== */
-  drinkIconContainer: {
-    position: "absolute",
-    // Instead of bottom:-40, right:-30, use percentages
-    // so it is pinned in the same relative area
-    bottom: "-15%", // example
-    right: "-12%", // example
-    padding: moderateScale(2),
-  },
   drinkIcon: {
-    width: moderateScale(67),
-    height: moderateScale(80),
+   position: "absolute",
+   top: "75%",
+
   },
   drinkSpeechBubble: {
     position: "absolute",
     // was bottom:70, right:0 => now relative
-    bottom: "100%", // place speech bubble above the icon
-    right: 0,
+    bottom: "110%", // place speech bubble above the icon
+    left: "-20%",
     backgroundColor: "rgba(0,0,0,0.8)",
     padding: "5@ms",
     borderRadius: "10@ms",
