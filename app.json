@@ -19,11 +19,8 @@
       "bundleIdentifier": "com.tylerjvalley.Dateish"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "package": "com.tylerjvalley.Dateish"
+      "package": "com.tylerjvalley.Dateish",
+      "icon": "./assets/images/icon.png"
     },
     "web": {
       "bundler": "metro",

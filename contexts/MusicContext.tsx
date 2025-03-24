@@ -23,13 +23,6 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(shouldPlayMusic);
   const [soundLoading, setSoundLoading] = useState(false);
 
-  // Whenever the route changes, if we are on a welcome route, pause/unload music.
-  useEffect(() => {
-    if (!shouldPlayMusic && sound) {
-      sound.pauseAsync();
-      setIsPlaying(false);
-    }
-  }, [shouldPlayMusic, sound]);
 
   useEffect(() => {
     if (!shouldPlayMusic) return;
