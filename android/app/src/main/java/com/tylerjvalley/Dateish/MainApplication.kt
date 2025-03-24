@@ -1,4 +1,4 @@
-package com.dateish
+package com.tylerjvalley.Dateish
 
 import android.app.Application
 import android.content.res.Configuration
