@@ -168,6 +168,10 @@ export default function ChatScreen() {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: false });
+  }, []);
+
   // Animate Mr. Mingles image when the warning modal is shown
   useEffect(() => {
     Animated.timing(rollAnim, {
@@ -259,10 +263,10 @@ export default function ChatScreen() {
   const userHasWater = (currentUserDrink && currentUserDrink.toLowerCase() === "water");
   const partnerHasWater = (partnerDrink && partnerDrink.toLowerCase() === "water");
 
-  const currentUserDrinkWidth = userHasWater ? moderateScale(30) : moderateScale(60);
-  const currentUserDrinkHeight = userHasWater ? moderateScale(70) : moderateScale(60);
-  const partnerDrinkWidth = partnerHasWater ? moderateScale(30) : moderateScale(60);
-  const partnerDrinkHeight = partnerHasWater ? moderateScale(70) : moderateScale(60);
+  const currentUserDrinkWidth = userHasWater ? moderateScale(30) : moderateScale(45);
+  const currentUserDrinkHeight = userHasWater ? moderateScale(70) : moderateScale(65);
+  const partnerDrinkWidth = partnerHasWater ? moderateScale(30) : moderateScale(45);
+  const partnerDrinkHeight = partnerHasWater ? moderateScale(70) : moderateScale(65);
 
 
   // Map each partner drink to text
@@ -727,7 +731,7 @@ const styles = ScaledSheet.create({
   },
   drinkIcon: {
    position: "absolute",
-   top: "-8%",
+   top: "-4%",
   },
   myDrinkSpeechBubble: {
     position: "absolute",

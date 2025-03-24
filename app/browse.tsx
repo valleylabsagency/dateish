@@ -146,7 +146,7 @@ export default function BrowseScreen() {
       : "water";
   const drinkIcon = drinkMapping[profileDrink] || drinkMapping["water"];
   const isWater = (profileDrink && profileDrink.toLowerCase() === "water")
-  const drinkWidth = isWater ? scale(35) : scale(70);
+  const drinkWidth = isWater ? scale(35) : scale(50);
   const drinkHeight = isWater ? scale(75) : scale(70);
   const drinkPosition = isWater ? "60%" : "58%";
 
@@ -209,7 +209,7 @@ export default function BrowseScreen() {
 
       {/* Navigation Buttons */}
       <View style={styles.navigationContainer}>
-        <TouchableOpacity onPress={handlePrev}>
+        <TouchableOpacity onPress={handlePrev} hitSlop={{ top: 10, bottom: 10, left: 35, right: 35 }}>
           <View style={styles.triangleLeftContainer}>
             <View style={styles.triangleLeftOuter} />
             <View style={styles.triangleLeftInner} />
@@ -220,7 +220,7 @@ export default function BrowseScreen() {
           <Text style={styles.chatButtonText}>CHAT</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleNext}>
+        <TouchableOpacity onPress={handleNext} hitSlop={{ top: 10, bottom: 10, left: 35, right: 35 }}>
           <View style={styles.triangleRightContainer}>
             <View style={styles.triangleRightOuter} />
             <View style={styles.triangleRightInner} />
