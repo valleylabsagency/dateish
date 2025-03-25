@@ -256,15 +256,18 @@ function BarProfileComplete() {
   // When user taps "TAP," show the drink menu
   const [showDrinkMenu, setShowDrinkMenu] = useState(false);
   const handleTapPress = () => setShowDrinkMenu(true);
+  const [drinkLoading, setDrinkLoading] = useState(false);
 
   // Drink selections
   const handleDrinkSelect = async (drinkName: string) => {
+    setDrinkLoading(true);
     try {
       await saveProfile({ drink: drinkName });
     } catch (error) {
       console.error("Failed to update drink in profile:", error);
     }
     setShowDrinkMenu(false);
+    setDrinkLoading(false);
     setIsTapState(false);
   };
 
@@ -423,6 +426,11 @@ function BarProfileComplete() {
                   />
                 </TouchableOpacity>
               ))}
+              {drinkLoading && (
+                <View style={drinkModalStyles.loadingOverlay}>
+                  <ActivityIndicator size="large" color="#fff" />
+                </View>
+              )}
             </ImageBackground>
           </View>
         </View>
@@ -616,16 +624,26 @@ const drinkModalStyles = ScaledSheet.create({
   labelContainer: {
     position: "absolute",
   },
-  wine: { top: "41%", left: "28%" },
-  beer: { top: "53.5%", left: "28%" },
-  whiskey: { top: "66%", left: "28%" },
-  martini: { top: "80%", left: "28%" },
-  vodka: { top: "41%", left: "75%" },
-  tequila: { top: "53.5%", left: "75%" },
-  absinthe: { top: "66%", left: "75%" },
-  water: { top: "80%", left: "75%" },
+  wine: { top: "42.3%", left: "28%" },
+  beer: { top: "54.8%", left: "28%" },
+  whiskey: { top: "67%", left: "28%" },
+  martini: { top: "82%", left: "28%" },
+  vodka: { top: "42.3%", left: "75%" },
+  tequila: { top: "54.8%", left: "75%" },
+  absinthe: { top: "66.8%", left: "75%" },
+  water: { top: "82%", left: "75%" },
   labelImage: {
-    width: moderateScale(65),
-    height: moderateScale(65),
+    width: moderateScale(55),
+    height: moderateScale(55),
   },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)"
+  }
 });

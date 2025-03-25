@@ -53,6 +53,7 @@ export default function ProfileScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [descriptionError, setDescriptionError] = useState("");
+  const [locationLoading, setLocationLoading] = useState(false);
 
   // State to control modal for editing the "about" field
   const [editingAbout, setEditingAbout] = useState(false);
@@ -172,9 +173,11 @@ export default function ProfileScreen() {
 
   // Get location
   const handleRequestLocation = async () => {
+    setLocationLoading(true);
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") {
       alert("Permission to access location was denied.");
+      setLocationLoading(false);
       return;
     }
     try {
@@ -188,6 +191,8 @@ export default function ProfileScreen() {
     } catch (error) {
       console.error("Error fetching location:", error);
       alert("Unable to retrieve location.");
+    } finally {
+      setLocationLoading(false);
     }
   };
 
@@ -288,13 +293,18 @@ export default function ProfileScreen() {
             keyboardType="numeric"
           />
           <View style={styles.locationContainer}>
-            <TextInput
+            {locationLoading ? (
+              <ActivityIndicator size="small" color="#000"/>
+            ) : (
+              <TextInput
               style={styles.input}
               placeholder="Location"
               placeholderTextColor="#999"
               value={location}
               onChangeText={setLocation}
             />
+            )}
+            
             <TouchableOpacity style={styles.editButton} onPress={handleRequestLocation}>
               <Text style={styles.editButtonText}>Get Location</Text>
             </TouchableOpacity>

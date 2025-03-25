@@ -112,9 +112,9 @@ export default function BrowseScreen() {
 
   if (!fontsLoaded || loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <ImageBackground source={require("../assets/images/background-bricks.png")} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#fff" />
-      </View>
+      </ImageBackground>
     );
   }
 
