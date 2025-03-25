@@ -1,19 +1,28 @@
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, ReactNode } from 'react';
 
 interface NotificationContextType {
   visible: boolean;
   message: string;
-  chatId: string;
+  partnerId: string;
   senderName: string;
-  showNotification: (message: string, chatId: string, senderName: string, currentChatId: string) => void;
+  showNotification: (
+    message: string,
+    partnerId: string,
+    senderName: string,
+    currentChatId: string
+  ) => void;
   hideNotification: () => void;
-  updateNotification: (message: string, chatId: string, senderName: string) => void
+  updateNotification: (
+    message: string,
+    partnerId: string,
+    senderName: string
+  ) => void;
 }
 
 export const NotificationContext = createContext<NotificationContextType>({
   visible: false,
   message: '',
-  chatId: '',
+  partnerId: '',
   senderName: '',
   showNotification: () => {},
   hideNotification: () => {},
@@ -23,26 +32,35 @@ export const NotificationContext = createContext<NotificationContextType>({
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
   const [message, setMessage] = useState('');
-  const [chatId, setChatId] = useState('');
+  const [partnerId, setPartnerId] = useState('');
   const [senderName, setSenderName] = useState('');
 
-  const showNotification = (msg: string, chatId: string, senderName: string, currentChatId: string) => {
+  const showNotification = (
+    msg: string,
+    partnerId: string,
+    senderName: string,
+    currentChatId: string
+  ) => {
+    // If you're already in the current chat with this partner, don't show the notification.
     console.log(currentChatId);
-    if (currentChatId && chatId === currentChatId) {
-      return
+    if (currentChatId && partnerId === currentChatId) {
+      return;
     }
     setMessage(msg);
-    setChatId(chatId);
+    setPartnerId(partnerId);
     setSenderName(senderName);
     setVisible(true);
   };
 
-  const updateNotification = (msg: string, senderName: string, chatId: string) => {
-    // Only update the content without showing it.
+  const updateNotification = (
+    msg: string,
+    partnerId: string,
+    senderName: string
+  ) => {
     setMessage(msg);
+    setPartnerId(partnerId);
     setSenderName(senderName);
-    setChatId(chatId);
-    // Do not change visible
+    // Keep visible as is.
   };
 
   const hideNotification = () => {
@@ -50,7 +68,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <NotificationContext.Provider value={{ visible, message, chatId, senderName, showNotification, hideNotification, updateNotification }}>
+    <NotificationContext.Provider
+      value={{
+        visible,
+        message,
+        partnerId,
+        senderName,
+        showNotification,
+        hideNotification,
+        updateNotification,
+      }}
+    >
       {children}
     </NotificationContext.Provider>
   );

@@ -135,7 +135,7 @@ export default function ChatScreen() {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg.sender !== currentUserId) {
         const senderName = partnerProfile.name ? partnerProfile.name : "Partner";
-        updateNotification(lastMsg.text, senderName);
+        updateNotification(lastMsg.text, partnerId, senderName); // Pass partnerId here!
       }
     }
   }, [messages, partnerProfile]);

@@ -97,12 +97,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 }
 
 function NotificationDisplay() {
-  const { visible, message, chatId, senderName, hideNotification } = useContext(NotificationContext);
+  const { visible, message, partnerId, senderName, hideNotification } = useContext(NotificationContext);
   return (
     <InAppNotification
       visible={visible}
       message={message}
-      chatId={chatId}
+      partnerId={partnerId}
       senderName={senderName}
       onDismiss={hideNotification}
     />
@@ -145,7 +145,7 @@ function GlobalChatNotifier() {
 
             showNotification(
               chatData.lastMessage,
-              change.doc.id, // using doc id as chatId
+              chatData.lastMessageSender, // using doc id as chatId
               chatData.partnerName ? chatData.partnerName : "Partner",
               currentChatId,
             );

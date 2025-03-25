@@ -16,15 +16,15 @@ const { width } = Dimensions.get("window");
 interface InAppNotificationProps {
   visible: boolean;
   message: string;
-  chatId: string;
   senderName: string;
+  partnerId: string;
   onDismiss: () => void;
 }
 
 export default function InAppNotification({
   visible,
   message,
-  chatId,
+  partnerId,
   senderName,
   onDismiss,
 }: InAppNotificationProps) {
@@ -94,7 +94,7 @@ export default function InAppNotification({
     >
       <TouchableOpacity
         onPress={() => {
-          router.push(`/chat?chatId=${chatId}`);
+          router.push(`/chat?partner=${partnerId}`);
           onDismiss();
         }}
       >
