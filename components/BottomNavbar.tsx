@@ -88,14 +88,14 @@ const styles = StyleSheet.create({
   },
   browseLabel: {
     position: "relative",
-    bottom: 12,
+    bottom: 15,
   },
   // Adjusted Browse icon
   browseIcon: {
     width: 85,
     height: 75,
     position: "relative",
-    top: 0,
+    top: -2,
   },
   stageLabel: {
     position: "relative",
