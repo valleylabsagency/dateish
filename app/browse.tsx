@@ -19,6 +19,7 @@ import {
   scale,
   moderateScale,
   verticalScale,
+  moderateVerticalScale,
 } from "react-native-size-matters";
 // Import Realtime Database functions
 import { getDatabase, ref, onValue } from "firebase/database";
@@ -388,17 +389,14 @@ const styles = ScaledSheet.create({
    * Navigation Container
    * ============================== */
   navigationContainer: {
-    // originally: bottom: 90, position: "absolute"
-    // so let's do percentages for bottom or keep scale?
-    // per instructions: "replace number values with percentages for absolute pos."
     position: "absolute",
-    bottom: "10%", // approx to replicate "90" from certain screen heights
+    bottom: moderateVerticalScale(81), // approx to replicate "90" from certain screen heights
     backgroundColor: "#4a0a0f",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
-    paddingTop: "12@ms",
-    paddingBottom: "5@ms",
+    paddingTop: "13@ms",
+    paddingBottom: "8@ms",
     width: "100%",
   },
 
@@ -411,7 +409,7 @@ const styles = ScaledSheet.create({
     position: "absolute",
     // left: -30, top: -45 => percentages
     left: "-100%",
-    top: "-61%",
+    top: "-56%",
   },
   triangleLeftOuter: {
     width: 0,
@@ -444,7 +442,7 @@ const styles = ScaledSheet.create({
     height: scale(40),
     // marginLeft:10, marginRight:20 => we can just remove or scale
     position: "absolute",
-    top: "-61%",
+    top: "-56%",
     right: "15%", 
   },
   triangleRightOuter: {

@@ -90,7 +90,7 @@ export default function InAppNotification({
         styles.notificationContainer, 
         { transform: [{ translateY }], height: Platform.OS === 'ios' ? 100 : 70 }
       ]}
-      {...panResponder.panHandlers}
+     /* {...panResponder.panHandlers} */
     >
       <TouchableOpacity
         onPress={() => {

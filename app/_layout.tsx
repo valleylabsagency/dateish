@@ -1,5 +1,5 @@
 import React, { useState, createContext, useEffect, useContext } from "react";
-import { View, StyleSheet, TouchableWithoutFeedback, I18nManager } from "react-native";
+import { View, StyleSheet, TouchableWithoutFeedback, I18nManager, BackHandler } from "react-native";
 import { Stack, usePathname, useRouter, useLocalSearchParams} from "expo-router";
 import Navbar from "../components/Navbar";
 import { ProfileProvider } from "../contexts/ProfileContext";
@@ -25,10 +25,30 @@ export const NavbarContext = createContext({
   setShowWcButton: (value: boolean) => {},
 });
 
+function useDisableBackButton() {
+  useEffect(() => {
+    const onBackPress = () => {
+      // Return true to prevent the default behavior (exit app or navigate back)
+      return true;
+    };
+
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      onBackPress
+    );
+
+    return () => subscription.remove();
+  }, []);
+}
+
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [showWcButton, setShowWcButton] = useState(false);
   const pathname = usePathname();
   const [didForceRTL, setDidForceRTL] = useState(false);
+
+  //prevent android back button from affecting app
+  useDisableBackButton();
 
   useEffect(() => {
     if (I18nManager.isRTL && !didForceRTL) {

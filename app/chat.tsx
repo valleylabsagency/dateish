@@ -312,6 +312,9 @@ export default function ChatScreen() {
             style={styles.chatContainer}
             contentContainerStyle={styles.chatContent}
             keyboardShouldPersistTaps="handled"
+            onContentSizeChange={() => 
+              scrollViewRef.current?.scrollToEnd({ animated: true })
+            }
           >
             {loadingMessages ? (
               <ActivityIndicator size="large" color="#fff" />
