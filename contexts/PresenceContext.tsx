@@ -1,3 +1,4 @@
+// PresenceContext.tsx
 import React, { useEffect, ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { getDatabase, ref, onDisconnect, onValue, set } from 'firebase/database';
@@ -18,13 +19,14 @@ export default function PresenceWrapper({ children }: PresenceWrapperProps) {
     // Listen for connection state changes
     const unsubscribeConnected = onValue(connectedRef, (snap) => {
       if (snap.val() === true) {
-        // When connected, schedule onDisconnect and set online status
+        // Schedule onDisconnect: if the connection is lost, set status to offline.
         onDisconnect(userStatusRef).set({ online: false });
+        // Set status to online immediately
         set(userStatusRef, { online: true });
       }
     });
 
-    // Monitor app state changes
+    // Update presence when the app state changes (e.g., active vs. background)
     const handleAppStateChange = (nextAppState: string) => {
       if (auth.currentUser) {
         if (nextAppState === 'active') {

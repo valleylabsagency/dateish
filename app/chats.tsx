@@ -32,6 +32,8 @@ import {
   scale,
   verticalScale,
 } from "react-native-size-matters";
+import { getDatabase, ref, onValue } from "firebase/database";
+
 
 export default function ChatsScreen() {
   const router = useRouter();
@@ -79,15 +81,17 @@ export default function ChatsScreen() {
 
   // For each conversation, subscribe to the partner's online status.
   useEffect(() => {
+    const db = getDatabase();
     const unsubscribes: (() => void)[] = [];
     if (currentUserId && conversations.length > 0) {
       conversations.forEach((conv) => {
         const partnerUid = conv.users.filter((uid: string) => uid !== currentUserId)[0];
-        const partnerDocRef = doc(firestore, "users", partnerUid);
-        const unsub = onSnapshot(partnerDocRef, (docSnap) => {
+        const statusRef = ref(db, `status/${partnerUid}`);
+        const unsub = onValue(statusRef, (snapshot) => {
+          const data = snapshot.val();
           setPartnerStatus((prev) => ({
             ...prev,
-            [partnerUid]: docSnap.data()?.online,
+            [partnerUid]: data?.online ?? false,
           }));
         });
         unsubscribes.push(unsub);
@@ -97,6 +101,7 @@ export default function ChatsScreen() {
       unsubscribes.forEach((unsub) => unsub());
     };
   }, [conversations, currentUserId]);
+  
 
   // ADDED / CHANGED: Handler to confirm deletion
   const handleTrashPress = (chatId: string) => {
