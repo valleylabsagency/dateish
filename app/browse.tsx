@@ -137,8 +137,9 @@ export default function BrowseScreen() {
   if (!fontsLoaded || loading) {
     return (
       <ImageBackground
-        source={require("../assets/images/background-bricks.png")}
+        source={require("../assets/images/chat-background.png")}
         style={styles.loadingContainer}
+        blurRadius={5}
       >
         <ActivityIndicator size="large" color="#fff" />
       </ImageBackground>
