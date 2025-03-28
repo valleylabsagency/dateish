@@ -42,7 +42,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     currentChatId: string
   ) => {
     // If you're already in the current chat with this partner, don't show the notification.
-    console.log(currentChatId);
     if (currentChatId && partnerId === currentChatId) {
       return;
     }
@@ -60,6 +59,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setMessage(msg);
     setPartnerId(partnerId);
     setSenderName(senderName);
+    setVisible(true);
     // Keep visible as is.
   };
 
