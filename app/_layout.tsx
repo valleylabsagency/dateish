@@ -6,6 +6,7 @@ import { ProfileProvider } from "../contexts/ProfileContext";
 import { FirstTimeProvider } from "../contexts/FirstTimeContext";
 import { MusicProvider } from "@/contexts/MusicContext";
 import { NotificationProvider, NotificationContext } from "@/contexts/NotificationContext";
+import InactivityHandler from "../components/InactivityHandler";
 import PresenceWrapper from "@/contexts/PresenceContext"
 import AuthWrapper from "@/contexts/AuthContext";
 import * as Updates from "expo-updates";
@@ -72,7 +73,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const shouldWrapMusic = pathname !== "/welcome";
 
   return (
-    <AuthWrapper>
+    <InactivityHandler>
+      <AuthWrapper>
       <PresenceWrapper>
       {shouldWrapMusic ? (
         <MusicProvider>
@@ -113,6 +115,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}
       </PresenceWrapper>
     </AuthWrapper>
+    </InactivityHandler>
+    
   );
 }
 

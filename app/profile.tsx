@@ -228,13 +228,13 @@ export default function ProfileScreen() {
             value={about}
             onChangeText={(text) => {
               setAbout(text);
-              if (text.length > 30) {
+              if (text.length > 50) {
                 setDescriptionError("Character limit exceeded!");
               } else {
                 setDescriptionError("");
               }
             }}
-            placeholder="Write something about yourself..."
+            placeholder="Short and sweet... 50 characters max"
             placeholderTextColor="#999"
             multiline
             autoFocus
@@ -325,9 +325,13 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.column}>
-            <Text style={styles.aboutText}>
-              {about ? about : "Write something about yourself..."}
-            </Text>
+            <TouchableOpacity
+                onPress={() => setEditingAbout(true)}
+              >
+                <Text style={styles.aboutText}>
+                  {about ? about : "Write something about yourself..."}
+                </Text>
+              </TouchableOpacity>
             <TouchableOpacity
               style={[styles.editButton, styles.bottomEdit]}
               onPress={() => setEditingAbout(true)}
