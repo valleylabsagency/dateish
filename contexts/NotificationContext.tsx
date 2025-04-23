@@ -14,6 +14,8 @@ import {
   onSnapshot,
   orderBy,
   limit,
+  doc,
+  getDoc
 } from 'firebase/firestore';
 
 interface NotificationContextType {
@@ -102,7 +104,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           orderBy('createdAt', 'desc'),
           limit(1)
         );
-        const unsubMsg = onSnapshot(msgsQ, (msgSnap) => {
+        const unsubMsg = onSnapshot(msgsQ, async (msgSnap) => {
           if (msgSnap.empty) return;
           const msgData = msgSnap.docs[0].data() as any;
           if (!msgData.createdAt) return;
@@ -122,10 +124,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             ts > startTimeRef.current &&
             chatId !== currentChatIdRef.current
           ) {
+            const userRef = doc(firestore, 'users', msgData.sender);
+            const userSnap = await getDoc(userRef);
+            const realName = userSnap.exists()
+             ? (userSnap.data() as any).name
+              : 'New message';
             showNotification(
               msgData.text,
               partner,
-              partnerName,
+              realName,
               currentChatIdRef.current
             );
           }
