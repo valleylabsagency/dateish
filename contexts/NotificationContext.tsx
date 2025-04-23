@@ -54,6 +54,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   // record startup time so we ignore old messages
   const startTimeRef = useRef<number>(Date.now());
+  const lastNotifiedRef = useRef<{ [chatId: string]: string }>({});
 
   // keep a ref in sync with state so callbacks always see the latest
   const currentChatIdRef = useRef<string | null>(null);
@@ -104,37 +105,51 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           orderBy('createdAt', 'desc'),
           limit(1)
         );
-        const unsubMsg = onSnapshot(msgsQ, async (msgSnap) => {
+        const unsubMsg = onSnapshot(msgsQ, (msgSnap) => {
           if (msgSnap.empty) return;
-          const msgData = msgSnap.docs[0].data() as any;
+        
+          // grab the single newest doc and its ID
+          const newestDoc = msgSnap.docs[0];
+          const msgId     = newestDoc.id;
+        
+          // if we've already shown this one, skip
+          if (lastNotifiedRef.current[chatId] === msgId) return;
+        
+          const msgData = newestDoc.data() as any;
           if (!msgData.createdAt) return;
-
+        
           // normalize timestamp
           const ts =
             typeof msgData.createdAt.toMillis === 'function'
               ? msgData.createdAt.toMillis()
               : msgData.createdAt.seconds * 1000;
-
-          // only fire if:
-          // • it's not me
-          // • it's newer than startTime
-          // • I'm not currently in that chat
+        
+          // check your “new” & “not in open chat” conditions
           if (
             msgData.sender !== uid &&
             ts > startTimeRef.current &&
             chatId !== currentChatIdRef.current
           ) {
+            // 1) load the sender’s profile first
             const userRef = doc(firestore, 'users', msgData.sender);
-            const userSnap = await getDoc(userRef);
-            const realName = userSnap.exists()
-             ? (userSnap.data() as any).name
-              : 'New message';
-            showNotification(
-              msgData.text,
-              partner,
-              realName,
-              currentChatIdRef.current
-            );
+            getDoc(userRef)
+              .then(userSnap => {
+                const realName = userSnap.exists()
+                  ? (userSnap.data() as any).name
+                  : 'Unknown';
+        
+                // 2) only now show the notification
+                showNotification(
+                  msgData.text,
+                  msgData.sender,
+                  realName,
+                  currentChatIdRef.current
+                );
+        
+                // 3) mark this message as “already shown”
+                lastNotifiedRef.current[chatId] = msgId;
+              })
+              .catch(console.error);
           }
         });
 

@@ -166,13 +166,6 @@ function GlobalChatNotifier() {
             // Only trigger if we're NOT already in this chat.
             const currentChatId = pathname.startsWith("/chat") && currentChatPartner ?
             [currentUser.uid, currentChatPartner].sort().join("_") : "";
-
-            showNotification(
-              chatData.lastMessage,
-              chatData.lastMessageSender, // using doc id as chatId
-              chatData.partnerName ? chatData.partnerName : "Partner",
-              currentChatId,
-            );
           }
         }
       });
