@@ -124,22 +124,21 @@ export default function ChatScreen() {
   const fullMingText = "Wait for them to answer. Don't be a creep!";
 
   // Notification context
-  const { updateNotification } = useContext(NotificationContext);
+  const { setCurrentChatId } = useContext(NotificationContext);
+  
+  useEffect(() => {
+    if (chatId) {
+      setCurrentChatId(chatId);
+    }
+    return () => {
+      setCurrentChatId(null);
+    };
+  }, [chatId]);
 
   // Create a ref for the ScrollView
   const scrollViewRef = useRef<ScrollView>(null);
   
-  // Show a local notification if the last incoming message wasn't ours
-  useEffect(() => {
-    if (messages.length > 0 && partnerProfile) {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg.sender !== currentUserId) {
-        const senderName = partnerProfile.name ? partnerProfile.name : "Partner";
-        updateNotification(lastMsg.text, partnerId, senderName); // Pass partnerId here!
-      }
-    }
-  }, [messages, partnerProfile]);
-  
+
   // Subscribe to real-time updates from the chat's "messages" subcollection
   useEffect(() => {
     if (!chatId) return;
