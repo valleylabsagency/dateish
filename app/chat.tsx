@@ -23,6 +23,7 @@ import BottomNavbar from "../components/BottomNavbar";
 import ProfileNavbar from "../components/ProfileNavbar";
 import { auth, firestore } from "../firebase";
 import { NotificationContext } from "../contexts/NotificationContext";
+import { useIsFocused } from '@react-navigation/native';
 import {
   collection,
   query,
@@ -56,6 +57,7 @@ export default function ChatScreen() {
   const [showPartnerDrinkSpeech, setShowPartnerDrinkSpeech] = useState(false);  
 
   const inputRef = useRef<TextInput | null>(null);
+  const isFocused = useIsFocused();
 
   // Compute chatId by sorting the two UIDs and joining them with an underscore.
   const chatId =
@@ -126,15 +128,14 @@ export default function ChatScreen() {
   // Notification context
   const { setCurrentChatId } = useContext(NotificationContext);
   
-  useEffect(() => {
-    if (chatId) {
+   // replace your old mount/unmount effect with:
+   useEffect(() => {
+    if (isFocused && chatId) {
       setCurrentChatId(chatId);
-    }
-    return () => {
+    } else {
       setCurrentChatId(null);
-    };
-  }, [chatId]);
-
+    }
+  }, [isFocused, chatId]);
   // Create a ref for the ScrollView
   const scrollViewRef = useRef<ScrollView>(null);
   

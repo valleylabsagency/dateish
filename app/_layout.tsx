@@ -79,15 +79,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {shouldWrapMusic ? (
         <MusicProvider>
           <NotificationProvider>
-            <GlobalChatNotifier />
+            
             <FirstTimeProvider>
               <ProfileProvider>
                 <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
                   <View style={styles.container}>
-                    <OfflineNotice />
-                    <NotificationDisplay />
+                  <NotificationDisplay />
+                  <OfflineNotice />
+                 
                     {!hideNavbar && <Navbar />}
                     <Stack screenOptions={{ headerShown: false }} />
+                        
                     <StatusBar hidden />
                   </View>
                 </NavbarContext.Provider>
@@ -97,13 +99,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </MusicProvider>
       ) : (
         <NotificationProvider>
-          <GlobalChatNotifier />
+         
           <FirstTimeProvider>
             <ProfileProvider>
               <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
                 <View style={styles.container}>
+                <NotificationDisplay />
                   <OfflineNotice />
-                  <NotificationDisplay />
                   {!hideNavbar && <Navbar />}
                   <Stack screenOptions={{ headerShown: false }} />
                   <StatusBar hidden />
@@ -122,6 +124,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
 function NotificationDisplay() {
   const { visible, message, partnerId, senderName, hideNotification } = useContext(NotificationContext);
+  //console.log('🔔 NotificationDisplay →', { visible, message, senderName });
   return (
     <InAppNotification
       visible={visible}
@@ -133,47 +136,6 @@ function NotificationDisplay() {
   );
 }
 
-// GlobalChatNotifier subscribes to any chat the current user is in,
-// so that if a new message arrives (and is not sent by the current user),
-// a notification is shown.
-function GlobalChatNotifier() {
-  const { showNotification } = useContext(NotificationContext);
-  const currentUser = auth.currentUser;
-  const pathname = usePathname();
-  const params = useLocalSearchParams();
-  const currentChatPartner = params.partner; // the partner ID if on /chat?partner=...
-
-  useEffect(() => {
-    if (!currentUser) return;
-    const chatsRef = collection(firestore, "chats");
-    const q = query(
-      chatsRef,
-      where("users", "array-contains", currentUser.uid),
-      orderBy("updatedAt", "desc")
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === "modified") {
-          const chatData = change.doc.data();
-          if (
-            chatData.lastMessage &&
-            chatData.lastMessageSender &&
-            chatData.lastMessageSender !== currentUser.uid
-          ) {
-            if (pathname.endsWith("/chat")) {
-              return
-            }
-            // Only trigger if we're NOT already in this chat.
-            const currentChatId = pathname.startsWith("/chat") && currentChatPartner ?
-            [currentUser.uid, currentChatPartner].sort().join("_") : "";
-          }
-        }
-      });
-    });
-    return () => unsubscribe();
-  }, [currentUser, showNotification, pathname, currentChatPartner]);
-  return null;
-}
 
 
 const styles = StyleSheet.create({

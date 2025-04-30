@@ -1,10 +1,9 @@
-// NotificationContext.tsx
 import React, {
   createContext,
   useState,
+  useEffect,
   useRef,
   ReactNode,
-  useEffect,
 } from 'react';
 import { auth, firestore } from '../firebase';
 import {
@@ -15,21 +14,15 @@ import {
   orderBy,
   limit,
   doc,
-  getDoc
+  getDoc,
 } from 'firebase/firestore';
 
 interface NotificationContextType {
   visible: boolean;
   message: string;
-  partnerId: string;
   senderName: string;
+  partnerId: string;
   currentChatId: string | null;
-  showNotification: (
-    message: string,
-    partnerId: string,
-    senderName: string,
-    currentChatId: string | null
-  ) => void;
   hideNotification: () => void;
   setCurrentChatId: (chatId: string | null) => void;
 }
@@ -37,10 +30,9 @@ interface NotificationContextType {
 export const NotificationContext = createContext<NotificationContextType>({
   visible: false,
   message: '',
-  partnerId: '',
   senderName: '',
+  partnerId: '',
   currentChatId: null,
-  showNotification: () => {},
   hideNotification: () => {},
   setCurrentChatId: () => {},
 });
@@ -48,138 +40,106 @@ export const NotificationContext = createContext<NotificationContextType>({
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
   const [message, setMessage] = useState('');
-  const [partnerId, setPartnerId] = useState('');
   const [senderName, setSenderName] = useState('');
+  const [partnerId, setPartnerId] = useState('');
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
 
-  const subscribedChats = useRef<Set<string>>(new Set());
-
-
-  // record startup time so we ignore old messages
-  const startTimeRef = useRef<number>(Date.now());
-  const lastNotifiedRef = useRef<{ [chatId: string]: string }>({});
-
-  // keep a ref in sync with state so callbacks always see the latest
+  // keep a ref in sync
   const currentChatIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    currentChatIdRef.current = currentChatId;
-  }, [currentChatId]);
+  useEffect(() => { currentChatIdRef.current = currentChatId; }, [currentChatId]);
 
-  const showNotification = (
-    msg: string,
-    pid: string,
-    sName: string,
-    _cid: string | null
-  ) => {
-    setMessage(msg);
-    setPartnerId(pid);
-    setSenderName(sName);
-    setVisible(true);
-  };
+  const uidRef = useRef<string | null>(null);
+  const startTimeRef = useRef<number>(Date.now());
+  const lastNotifiedRef = useRef<{ [chat: string]: string }>({});
+  const subscribedChats = useRef<Set<string>>(new Set());
+  const msgUnsubs = useRef<(() => void)[]>([]);
 
   const hideNotification = () => {
     setVisible(false);
   };
 
-  // subscribe once, on mount
+  const showNotification = (msg: string, pid: string, name: string) => {
+    setVisible(false);
+    setMessage(msg);
+    setPartnerId(pid);
+    setSenderName(name);
+    setTimeout(() => setVisible(true), 50);
+  };
+
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
+    const unsubscribeAuth = auth.onAuthStateChanged(user => {
+      if (!user) return;
+      uidRef.current = user.uid;
+      startTimeRef.current = Date.now();
 
-    // we'll collect all our unsub-functions here
-    const unsubs: (() => void)[] = [];
+      const chatsQ = query(
+        collection(firestore, 'chats'),
+        where('users', 'array-contains', user.uid)
+      );
 
-    // 1) subscribe to all chats where I'm a participant
-    const chatsQ = query(
-      collection(firestore, 'chats'),
-      where('users', 'array-contains', uid)
-    );
-    const unsubChats = onSnapshot(chatsQ, (chatSnap) => {
-      // for each chat, open a "latest message" listener
-      chatSnap.forEach((chatDoc) => {
-        const chatId = chatDoc.id;
+      const unsubChats = onSnapshot(chatsQ, snapshot => {
+        // clear previous message listeners
+        msgUnsubs.current.forEach(unsub => unsub());
+        msgUnsubs.current = [];
 
-        if (subscribedChats.current.has(chatId)) return;
-        subscribedChats.current.add(chatId);
-        const data = chatDoc.data() as any;
-        const users: string[] = data.users || [];
-        const partner = users.find((u) => u !== uid) || '';
-        const partnerName = data.partnerName || 'New message';
+        snapshot.forEach(chatDoc => {
+          const chatId = chatDoc.id;
 
-        const msgsQ = query(
-          collection(firestore, 'chats', chatId, 'messages'),
-          orderBy('createdAt', 'desc'),
-          limit(1)
-        );
-        const unsubMsg = onSnapshot(msgsQ, (msgSnap) => {
-          if (msgSnap.empty) return;
-        
-          // grab the single newest doc and its ID
-          const newestDoc = msgSnap.docs[0];
-          const msgId     = newestDoc.id;
-        
-          // if we've already shown this one, skip
-          if (lastNotifiedRef.current[chatId] === msgId) return;
-        
-          const msgData = newestDoc.data() as any;
-          if (!msgData.createdAt) return;
-        
-          // normalize timestamp
-          const ts =
-            typeof msgData.createdAt.toMillis === 'function'
-              ? msgData.createdAt.toMillis()
-              : msgData.createdAt.seconds * 1000;
-        
-          // check your “new” & “not in open chat” conditions
-          if (
-            msgData.sender !== uid &&
-            ts > startTimeRef.current &&
-            chatId !== currentChatIdRef.current
-          ) {
-            // 1) load the sender’s profile first
-            const userRef = doc(firestore, 'users', msgData.sender);
-            getDoc(userRef)
-              .then(userSnap => {
-                const realName = userSnap.exists()
-                  ? (userSnap.data() as any).name
-                  : 'Unknown';
-        
-                // 2) only now show the notification
-                showNotification(
-                  msgData.text,
-                  msgData.sender,
-                  realName,
-                  currentChatIdRef.current
-                );
-        
-                // 3) mark this message as “already shown”
-                lastNotifiedRef.current[chatId] = msgId;
-              })
-              .catch(console.error);
-          }
+          const msgsQ = query(
+            collection(firestore, 'chats', chatId, 'messages'),
+            orderBy('createdAt', 'desc'),
+            limit(1)
+          );
+
+          const unsubMsg = onSnapshot(msgsQ, msgSnap => {
+            if (msgSnap.empty) return;
+            
+
+            const doc0 = msgSnap.docs[0];
+            const id0 = doc0.id;
+            const data0 = doc0.data() as any;
+
+            if (!data0.createdAt || !data0.sender) return;
+            const ts =
+              typeof data0.createdAt.toMillis === 'function'
+                ? data0.createdAt.toMillis()
+                : data0.createdAt.seconds * 1000;
+
+            if (
+              ts > startTimeRef.current &&
+              data0.sender !== uidRef.current &&
+              currentChatIdRef.current !== chatId &&
+              lastNotifiedRef.current[chatId] !== id0
+            ) {
+              getDoc(doc(firestore, 'users', data0.sender)).then(u => {
+                const realName = u.exists() ? (u.data() as any).name : 'Unknown';
+                showNotification(data0.text, data0.sender, realName);
+                lastNotifiedRef.current[chatId] = id0;
+              });
+            }
+          });
+
+          msgUnsubs.current.push(unsubMsg);
         });
-
-        unsubs.push(unsubMsg);
       });
+
+      return () => {
+        unsubChats();
+        msgUnsubs.current.forEach(unsub => unsub());
+      };
     });
 
-    unsubs.push(unsubChats);
-
-    // cleanup all listeners on unmount
-    return () => {
-      unsubs.forEach((fn) => fn());
-    };
-  }, []); // ← empty—only mount once
+    return () => unsubscribeAuth();
+  }, []);
 
   return (
     <NotificationContext.Provider
       value={{
         visible,
         message,
-        partnerId,
         senderName,
+        partnerId,
         currentChatId,
-        showNotification,
         hideNotification,
         setCurrentChatId,
       }}

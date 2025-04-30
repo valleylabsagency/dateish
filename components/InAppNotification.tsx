@@ -1,17 +1,17 @@
+// components/InAppNotification.tsx
 import React, { useRef, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  Animated, 
-  PanResponder, 
-  TouchableOpacity, 
-  StyleSheet, 
+import {
+  View,
+  Text,
+  Animated,
+  TouchableOpacity,
+  StyleSheet,
   Dimensions,
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
-const { width } = Dimensions.get("window");
+const { width } = Dimensions.get('window');
 
 interface InAppNotificationProps {
   visible: boolean;
@@ -31,77 +31,54 @@ export default function InAppNotification({
   const translateY = useRef(new Animated.Value(-150)).current;
   const router = useRouter();
 
-  // Auto dismiss notification after 3 seconds
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (visible) {
-      timer = setTimeout(() => {
-        onDismiss();
-      }, 3000);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [visible]);
-
-  // Animate notification in/out when 'visible' changes.
+  // Animate in/out whenever `visible` toggles
   useEffect(() => {
     if (visible) {
+      // reset position then spring in
+      translateY.setValue(-150);
       Animated.spring(translateY, {
         toValue: 0,
         useNativeDriver: true,
       }).start();
     } else {
+      // slide back up
       Animated.timing(translateY, {
         toValue: -150,
         duration: 200,
         useNativeDriver: true,
       }).start();
     }
-  }, [visible]);
+  }, [visible, translateY]);
 
-  // PanResponder to allow swiping upward to dismiss.
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) =>
-        gestureState.dy < -10, // trigger if swiping up
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy < -50) {
-          Animated.timing(translateY, {
-            toValue: -150,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => onDismiss());
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
+  // Auto-dismiss after 3s
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (visible) {
+      timer = setTimeout(onDismiss, 3000);
+    }
+    return () => clearTimeout(timer);
+  }, [visible, onDismiss]);
 
-  if (!visible) return null;
-
+  // ALWAYS render the container so `translateY` can animate
   return (
     <Animated.View
       style={[
-        styles.notificationContainer, 
-        { transform: [{ translateY }], height: Platform.OS === 'ios' ? 100 : 70 }
+        styles.notificationContainer,
+        { transform: [{ translateY }] },
       ]}
-     /* {...panResponder.panHandlers} */
     >
-      <TouchableOpacity
-        onPress={() => {
-          router.push(`/chat?partner=${partnerId}`);
-          onDismiss();
-        }}
-      >
-        <Text style={styles.notificationText}>
-          {senderName}: {message}
-        </Text>
-      </TouchableOpacity>
+      {visible && (
+        <TouchableOpacity
+          onPress={() => {
+            router.push(`/chat?partner=${partnerId}`);
+            onDismiss();
+          }}
+        >
+          <Text style={styles.notificationText}>
+            {senderName}: {message}
+          </Text>
+        </TouchableOpacity>
+      )}
     </Animated.View>
   );
 }
@@ -110,10 +87,9 @@ const styles = StyleSheet.create({
   notificationContainer: {
     position: 'absolute',
     top: 0,
-    width: width,
+    width,
     backgroundColor: '#460b2a',
     padding: 20,
-    // Increase top padding for iOS to push the text lower so it's not hidden behind the camera view
     paddingTop: Platform.OS === 'ios' ? 40 : 20,
     zIndex: 1000,
     elevation: 10,
