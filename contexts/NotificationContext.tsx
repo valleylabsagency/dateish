@@ -52,6 +52,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [senderName, setSenderName] = useState('');
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
 
+  const subscribedChats = useRef<Set<string>>(new Set());
+
+
   // record startup time so we ignore old messages
   const startTimeRef = useRef<number>(Date.now());
   const lastNotifiedRef = useRef<{ [chatId: string]: string }>({});
@@ -95,6 +98,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       // for each chat, open a "latest message" listener
       chatSnap.forEach((chatDoc) => {
         const chatId = chatDoc.id;
+
+        if (subscribedChats.current.has(chatId)) return;
+        subscribedChats.current.add(chatId);
         const data = chatDoc.data() as any;
         const users: string[] = data.users || [];
         const partner = users.find((u) => u !== uid) || '';
