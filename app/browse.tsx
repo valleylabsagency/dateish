@@ -290,7 +290,7 @@ const styles = ScaledSheet.create({
     alignItems: "center",
   },
   noProfilesText: {
-    color: "#fff",
+    color: "yellow",
     fontFamily: FontNames.MontserratRegular,
     fontSize: "28@ms",
     textAlign: "center",

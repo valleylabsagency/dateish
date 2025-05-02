@@ -207,5 +207,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  message: { fontSize: 32, textAlign: "center", padding: 20, color: "white" },
+  message: { fontSize: 32, textAlign: "center", padding: 20, color: "yellow" },
 });
