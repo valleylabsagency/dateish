@@ -70,6 +70,22 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     })();
   }, [isPlaying, shouldPlayMusic]);
 
+  useEffect(() => {
+    if (!shouldPlayMusic && sound) {
+      (async () => {
+        try {
+          await sound.pauseAsync();
+          await sound.unloadAsync();
+        } catch (err) {
+          console.error("Audio unload error on route change:", err);
+        } finally {
+          setSound(null);
+          setIsPlaying(false);
+        }
+      })();
+    }
+  }, [shouldPlayMusic, sound]);
+
   // The toggle function simply flips the isPlaying state.
   const toggleMusic = () => {
     if (!shouldPlayMusic || soundLoading) return;

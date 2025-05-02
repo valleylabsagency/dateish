@@ -24,6 +24,8 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { ProfileContext } from "../contexts/ProfileContext";
 import ProfileNavbar from "@/components/ProfileNavbar";
 import { logout } from "../services/authservice";
+import { MusicContext } from "../contexts/MusicContext";
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 // NEW IMPORTS FOR FIREBASE STORAGE
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -54,6 +56,7 @@ export default function ProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [descriptionError, setDescriptionError] = useState("");
   const [locationLoading, setLocationLoading] = useState(false);
+  const { isPlaying, toggleMusic } = useContext(MusicContext);
 
   // State to control modal for editing the "about" field
   const [editingAbout, setEditingAbout] = useState(false);
@@ -198,6 +201,9 @@ export default function ProfileScreen() {
 
   // Logout
   const handleLogout = async () => {
+    if (isPlaying) {
+      toggleMusic();
+    }
     try {
       await logout();
       await AsyncStorage.removeItem("userProfile");
