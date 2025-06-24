@@ -1,8 +1,7 @@
-import { initializeApp } from "firebase/app";
-import { initializeAuth, getReactNativePersistence } from "firebase/auth";
-import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getDatabase } from "firebase/database";  // Import getDatabase
+import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBLSTw5hKlnlZ1oiEsXVMuDkcBYfZiL0zw",
@@ -14,11 +13,11 @@ const firebaseConfig = {
   measurementId: "G-WVJK03806D"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
-});
+// ✅ Only initialize once
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
+const auth = getAuth(app);
 const firestore = getFirestore(app);
-const database = getDatabase(app); // Initialize the Realtime Database
+const database = getDatabase(app);
 
 export { auth, firestore, database };
