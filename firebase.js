@@ -1,6 +1,7 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore"; // Import getFirestore
+import { getFirestore } from "firebase/firestore";
+import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBLSTw5hKlnlZ1oiEsXVMuDkcBYfZiL0zw",
@@ -12,8 +13,11 @@ const firebaseConfig = {
   measurementId: "G-WVJK03806D"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const firestore = getFirestore(app); // Initialize Firestore
+// ✅ Only initialize once
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-export { auth, firestore };
+const auth = getAuth(app);
+const firestore = getFirestore(app);
+const database = getDatabase(app);
+
+export { auth, firestore, database };

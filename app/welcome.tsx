@@ -15,14 +15,13 @@ import { NavigationProp } from "../types";
 import { useRouter } from "expo-router";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
-import typography from "@/assets/styles/typography";
 import { FirstTimeContext } from "../contexts/FirstTimeContext";
-import { signUp } from "../services/authservice"; // Updated signUp
+import { signUp, login } from "../services/authservice";
 
 export default function WelcomeScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const [showSignup, setShowSignup] = useState(true); // Always show signup form for new accounts
-  const [username, setUsername] = useState(""); // Now represents the username
+  const [showSignup, setShowSignup] = useState(false);
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showError, setShowError] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -33,23 +32,22 @@ export default function WelcomeScreen() {
   // Use the FirstTimeContext to access and update the global boolean.
   const { firstTime, setFirstTime } = useContext(FirstTimeContext);
 
-  const handleSignUp = async () => {
-    // Example check: if username is "unknown" and firstTime is not set, show error
-    if (username.trim().toLowerCase() === "unknown" && !firstTime) {
-      setShowError(true);
-      return;
-    }
-
+  const handleSignUpOrIn = async () => {
     setLoading(true);
     setShowError(false);
 
     try {
-      // Use the username to sign up. The authservice will append the domain.
-      const user = await signUp(username, password);
-      console.log("Account created for:", username);
-      router.push("/bar"); // Navigate after successful signup
-    } catch (error) {
-      console.error("Sign up error:", error);
+      if (!firstTime) {
+        // Sign in to existing account.
+        await login(username, password);
+        router.push("/bar");
+      } else {
+        // Create new account.
+        await signUp(username, password);
+        router.push("/bar");
+      }
+    } catch (error: any) {
+      console.error("Auth error:", error);
       setShowError(true);
     } finally {
       setLoading(false);
@@ -62,7 +60,7 @@ export default function WelcomeScreen() {
     [FontNames.MontserratExtraLight]: require("../assets/fonts/Montserrat-ExtraLight.ttf"),
     [FontNames.MontserratExtraLightItalic]: require("../assets/fonts/Montserrat-ExtraLightItalic.ttf"),
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
-    [FontNames.MVBoli]: require("../assets/fonts/mvboli.ttf")
+    [FontNames.MVBoli]: require("../assets/fonts/mvboli.ttf"),
   });
 
   if (!fontsLoaded) {
@@ -93,44 +91,53 @@ export default function WelcomeScreen() {
             resizeMode="contain"
           >
             <View style={styles.signupContainer}>
-              <Text style={[styles.title, { marginTop: 20 }]}>Sign Up Sheet</Text>
-              <Text style={[styles.date, { marginTop: 10 }]}>{today}</Text>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Username:</Text>
-                <TextInput
-                  style={styles.input}
-                  value={username}
-                  onChangeText={setUsername}
-                  autoCapitalize="none"
-                />
+              {/* Title + date */}
+              <View style={styles.topSection}>
+                <Text style={styles.title}>Sign Up Sheet</Text>
+                <Text style={styles.date}>{today}</Text>
               </View>
 
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Password:</Text>
-                <TextInput
-                  style={styles.input}
-                  secureTextEntry
-                  value={password}
-                  onChangeText={setPassword}
-                />
+              {/* Inputs */}
+              <View style={styles.inputSection}>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Username:</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={username}
+                    onChangeText={setUsername}
+                    autoCapitalize="none"
+                    multiline={false}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Password:</Text>
+                  <TextInput
+                    style={styles.input}
+                    secureTextEntry
+                    value={password}
+                    onChangeText={setPassword}
+                    multiline={false}
+                  />
+                </View>
+
+                <TouchableOpacity style={styles.button} onPress={handleSignUpOrIn}>
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>GO IN!</Text>
+                  )}
+                </TouchableOpacity>
               </View>
 
-              <TouchableOpacity style={styles.button} onPress={handleSignUp}>
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>GO IN!</Text>
-                )}
-              </TouchableOpacity>
+              {/* Error between button and checkbox, 
+                  but in its own container so it won't push the checkbox. */}
+              <View style={styles.errorContainer}>
+                {showError && <Text style={styles.errorText}>Never heard of you...</Text>}
+              </View>
 
-              {showError && (
-                <Text style={styles.errorText}>
-                  Never heard of you...
-                </Text>
-              )}
-
-              <View style={styles.checkboxContainer}>
+              {/* Checkbox at bottom */}
+              <View style={styles.bottomSection}>
                 <TouchableOpacity
                   onPress={() => setFirstTime(!firstTime)}
                   style={styles.checkbox}
@@ -151,6 +158,11 @@ export default function WelcomeScreen() {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                  Styles                                    */
+/* -------------------------------------------------------------------------- */
+const { width, height } = Dimensions.get("window");
+
 const styles = StyleSheet.create({
   background: {
     flex: 1,
@@ -161,62 +173,74 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "transparent",
   },
   logo: {
-    width: 400,
-    height: 400,
+    width: width * 2,
+    height: width * 0.9,
     position: "absolute",
-    top: 30,
+    top: height * 0.02,
   },
   enterText: {
-    fontSize: 48,
+    fontSize: width * 0.1,
     fontFamily: "Montserrat-Regular",
     fontWeight: "700",
     letterSpacing: 3,
     color: "#8b003e",
-    marginTop: 300,
+    marginTop: height * 0.4,
   },
+  // 90% width, 75% height
   clipboard: {
-    marginTop: 90,
-    width: Dimensions.get("window").width * 0.8,
-    height: Dimensions.get("window").height * 0.6,
+    marginTop: height * 0.1 + 15,
+    width: width * 0.9,
+    height: height * 0.75,
     justifyContent: "center",
     alignItems: "center",
   },
+  // Overall container with exact top/bottom padding
   signupContainer: {
-    width: "80%",
+    width: 320,
+    height: 350,
+    paddingTop: 40,   // about 20px from the top
+    paddingBottom: 10, // about 10px from the bottom
     alignItems: "center",
   },
+
+  /* ---------- Top Section (title & date) ---------- */
+  topSection: {
+    alignItems: "center",
+    marginBottom: 15,
+  },
   title: {
-    fontSize: 28,
-    fontFamily: "Montserrat-Bold",
-    fontWeight: "700",
+    fontSize: 27,
+    fontFamily: FontNames.MontserratBold,
     color: "#000",
-    position: "relative",
-    top: 10,
   },
   date: {
     fontSize: 18,
-    fontFamily: "Montserrat-ExtraLightItalic",
-    fontWeight: "600",
+    fontFamily: FontNames.MontserratExtraLightItalic,
     color: "#000",
-    marginBottom: 20,
-    position: "relative",
-    top: 3,
+    marginTop: 2,
+  },
+
+  /* ---------- Middle (inputs) ---------- */
+  inputSection: {
+    alignItems: "center",
+    marginBottom: 10,
+    width: 220,
+
   },
   inputContainer: {
     flexDirection: "row",
-    alignItems: "center",
-    width: "80%",
-    marginBottom: 15,
+    alignItems: "flex-end",
+    width: "100%", // fixed width so it doesn't vary between iOS / Android
+    marginBottom: 12,
   },
   inputLabel: {
     fontSize: 15,
-    fontFamily: "Montserrat-Black",
-    fontWeight: "600",
+    fontFamily: FontNames.MontserratBlack,
     color: "#000",
-    width: 100,
+    minWidth: 75,
+    flexShrink: 0,
   },
   input: {
     flex: 1,
@@ -225,18 +249,50 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: FontNames.MVBoli,
     padding: 5,
-    position: "relative",
-    bottom: 10,
-    left: 2,
+    height: 40,
+    includeFontPadding: false,
+    textAlignVertical: "bottom",
     color: "#000",
   },
-  checkboxContainer: {
+  button: {
+    width: 200,
+    height: 60,
+    backgroundColor: "#610e14",
+    borderWidth: 5,
+    borderColor: "#4a0a0f",
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#4a0a0f",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 5,
+    marginTop: 10,
+  },
+  buttonText: {
+    fontSize: 32,
+    fontFamily: FontNames.MontserratExtraLight,
+    color: "white",
+  },
+
+  /* ---------- Error between button and checkbox ---------- */
+  errorContainer: {
+    height: 25, // fixed height so the text won't push the checkbox
+    marginBottom: 10,
+    justifyContent: "center",
+  },
+  errorText: {
+    fontSize: 16,
+    color: "red",
+    fontFamily: FontNames.MontserratRegular,
+    textAlign: "center",
+  },
+
+  /* ---------- Bottom (checkbox) ---------- */
+  bottomSection: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 0,
-    marginTop: 20,
-    position: "relative",
-    top: 30,
   },
   checkbox: {
     width: 25,
@@ -245,49 +301,16 @@ const styles = StyleSheet.create({
     borderColor: "#000",
     justifyContent: "center",
     alignItems: "center",
-    overflow: "visible",
-    position: "relative",
+    marginRight: 8,
   },
   checkmark: {
-    position: "absolute",
-    top: -10,
-    right: -10,
-    fontSize: 28,
-    width: 25,
+    fontSize: 20,
     color: "black",
-    fontFamily: "Montserrat-Black",
-    zIndex: 17,
+    fontFamily: FontNames.MontserratBlack,
   },
   checkboxLabel: {
     fontSize: 16,
-    fontFamily: "Montserrat-Bold",
-    fontWeight: "600",
+    fontFamily: FontNames.MontserratBold,
     color: "#000",
-    marginLeft: 8,
-  },
-  button: {
-    backgroundColor: "#610e14",
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    shadowColor: "#4a0a0f",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    elevation: 5,
-    marginTop: 20,
-  },
-  buttonText: {
-    fontSize: 32,
-    fontFamily: "Montserrat-ExtraLight",
-    color: "white",
-  },
-  errorText: {
-    marginTop: 10,
-    position: "absolute",
-    top: 300,
-    fontSize: 16,
-    color: "red",
-    fontFamily: "Montserrat-Regular",
   },
 });
