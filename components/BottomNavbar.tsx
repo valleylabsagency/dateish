@@ -3,62 +3,50 @@ import { View, TouchableOpacity, Image, StyleSheet, Text } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 
 const tabs = [
-  { label: 'Bar', icon: require('../assets/images/icons/bar-tab-icon.png'), route: '/bar' },
-  { label: 'Browse', icon: require('../assets/images/icons/browse-tab-icon.png'), route: '/browse' },
-  { label: 'Chats', icon: require('../assets/images/icons/chats-icon.png'), route: '/chats' },
-  { label: 'Stage', icon: require('../assets/images/icons/stage-tab-icon.png'), route: '/stage' },
+  { label: 'Games',       icon: require('../assets/images/icons/games-icon.png'),     route: '/games'    },
+  { label: 'Inbox',       icon: require('../assets/images/icons/chats-icon.png'),     route: '/inbox'    },
+  { label: 'Bar',         icon: require('../assets/images/icons/beers-icon.png'),     route: '/bar'      },
+  { label: 'Mr. Mingles', icon: require('../assets/images/icons/mm-icon.png'),        route: '/mingles'  },
+  { label: 'Events',      icon: require('../assets/images/icons/stage-tab-icon.png'), route: '/events'   },
 ];
-
-// Mapping for the selected (pink) icons.
-const pinkIcons = {
-  Bar: require('../assets/images/icons/bar-pink.png'),
-  Browse: require('../assets/images/icons/browse-pink.png'),
-  Chats: require('../assets/images/icons/chat-pink.png'),
-  Stage: require('../assets/images/icons/stage-pink.png'),
-};
 
 export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
   const router = useRouter();
   const currentPath = usePathname();
 
   const handleTabPress = (route: string) => {
-    if (route !== currentPath) {
-      router.push(route);
-    }
+    if (route !== currentPath) router.push(route);
   };
 
   return (
     <View style={styles.navbar}>
-      {tabs.map((tab) => {
-        let labelAdditionalStyle = {};
-        let iconAdditionalStyle = {};
-        let tabAdditionalStyle = {};
-        if (tab.label === "Browse") {
-          labelAdditionalStyle = styles.browseLabel;
-          iconAdditionalStyle = styles.browseIcon;
-          // Override top padding for Browse by specifying it last
-          tabAdditionalStyle = { height: 90, position: "relative", top: 0};
-        } else if (tab.label === "Stage") {
-          labelAdditionalStyle = styles.stageLabel;
-          iconAdditionalStyle = styles.stageIcon;
-          // Override top padding for Stage
-          tabAdditionalStyle = { paddingTop: 9 };
-        }
+      {tabs.map(tab => {
         const isSelected = tab.label === selectedTab;
+        const isBar      = tab.label === 'Bar';
+
         return (
           <TouchableOpacity
             key={tab.label}
-            style={[styles.tab, tabAdditionalStyle, isSelected && styles.selectedTab]}
             onPress={() => handleTabPress(tab.route)}
+            style={[
+              styles.tab,
+              isSelected   && styles.selectedTab,
+              isBar && isSelected && styles.barSelectedTab,
+            ]}
           >
-            <Image
-              source={isSelected ? pinkIcons[tab.label] : tab.icon}
-              style={[styles.icon, iconAdditionalStyle, isSelected && styles.selectedIcon]}
-              resizeMode="contain"
-            />
-            <Text
-              style={[styles.label, labelAdditionalStyle, isSelected && styles.selectedLabel]}
-            >
+            <View style={styles.iconWrapper}>
+              <Image
+                source={tab.icon}
+                resizeMode="contain"
+                style={[
+                  styles.icon,
+                  isSelected          && styles.selectedIcon,
+                  isBar               && styles.barIcon,
+                  isBar && isSelected && styles.barSelectedIcon,
+                ]}
+              />
+            </View>
+            <Text style={[styles.label, isSelected && styles.selectedLabel, isBar && isSelected && styles.barSelectedLabel]}>
               {tab.label}
             </Text>
           </TouchableOpacity>
@@ -67,6 +55,14 @@ export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
     </View>
   );
 }
+
+const ICON_SIZE                = 40;
+const BAR_ICON_SIZE            = 52;
+const BAR_ICON_SELECTED_SIZE   = 90;   // <-- bump this if you want your bar icon even bigger
+const BORDER_WIDTH             = 2;
+const BAR_LIFT                 = -20;  // <-- how far to lift the Bar tab above the navbar
+const PINK                      = '#e98dbd';
+const DARK_BG                   = '#460b2a';
 
 const styles = StyleSheet.create({
   navbar: {
@@ -81,51 +77,68 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 11,
+    borderRadius: 12,
   },
+
+  // ALL selected tabs get this:
   selectedTab: {
-    backgroundColor: '#460b2a', 
+    backgroundColor: DARK_BG,
+    borderWidth: BORDER_WIDTH,
+    borderColor: PINK,
+    borderRadius: 25,
+    height: "100%"
   },
-  browseLabel: {
-    position: "relative",
-    bottom: 15,
+
+  // ONLY the Bar tab (when selected) also gets lifted & slightly taller:
+  barSelectedTab: {
+    marginTop: BAR_LIFT,
+    height: '125%',
+    paddingTop: 15,
+    flex: 1.7,
+    zIndex: 1
   },
-  // Adjusted Browse icon
-  browseIcon: {
-    width: 85,
-    height: 75,
-    position: "relative",
-    top: -2,
+
+  barSelectedLabel: {
+    fontSize: 18,
+    marginTop: 5
   },
-  stageLabel: {
-    position: "relative",
-    bottom: 2,
+
+  iconWrapper: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  // Adjusted Stage icon
-  stageIcon: {
-    width: 80,
-    height: 60,
-    position: "relative",
-    top: 5,
-  },
+
   icon: {
-    width: 45,
-    height: 45,
+    width: ICON_SIZE,
+    height: ICON_SIZE,
     tintColor: '#fff',
   },
   selectedIcon: {
-    tintColor: undefined, // Allow the pink icon to show in its original colors
+    tintColor: PINK,
   },
+
+  // Bar’s normal selected size:
+  barIcon: {
+    width: BAR_ICON_SIZE,
+    height: BAR_ICON_SIZE,
+  },
+  // Bar’s extra‐large selected size:
+  barSelectedIcon: {
+    width: BAR_ICON_SELECTED_SIZE,
+    height: BAR_ICON_SELECTED_SIZE,
+    marginBottom: 15,
+  },
+
   label: {
     fontSize: 10,
-    marginTop: 8,
+    marginTop: 4,
     color: '#fff',
     textTransform: 'uppercase',
   },
   selectedLabel: {
     fontWeight: 'bold',
-    color: '#e98dbd', // Pink color for the selected label
+    color: PINK,
   },
 });
-
-export { BottomNavbar };
