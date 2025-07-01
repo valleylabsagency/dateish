@@ -5,7 +5,7 @@ import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
 
-export default function MinglesScreen() {
+export default function Bar2Screen() {
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
   });
@@ -16,19 +16,18 @@ export default function MinglesScreen() {
 
   return (
     <ImageBackground
-      source={require("../assets/images/mm-back.png")}
+      source={require("../assets/images/bar-back.png")}
       style={styles.background}
-      imageStyle={styles.backgroundImage}
     >
-      <View style={styles.barFrontContainer}>
-                  <Image style={styles.barFront} 
-                  source={require("../assets/images/mm-front.png")} 
-                  resizeMode="contain"
-                  />
-              </View>
+        <View style={styles.barFrontContainer}>
+            <Image style={styles.barFront} 
+            source={require("../assets/images/bar-front.png")} 
+            resizeMode="contain"
+            />
+        </View>
       {/* Bottom Navbar */}
       <View style={styles.bottomNavbarContainer}>
-        <BottomNavbar selectedTab="Mr. Mingles" />
+        <BottomNavbar selectedTab="bar-2" />
       </View>
     </ImageBackground>
   );
@@ -40,11 +39,6 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
     justifyContent: "center",
     alignItems: "center",
-  },
-  backgroundImage: {
-    position: "absolute",
-    top: -100,
-    height: "100%"
   },
   centerContainer: {
     justifyContent: "center",
@@ -68,14 +62,15 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   barFrontContainer: {
-    position: "absolute",
-    bottom: "8%",
+   position: "absolute",
+   bottom: "-5%",
+   width: "100%",
+   alignItems: "center"
+  },
+
+  barFront: {
+    height: 730,
     width: "100%",
-    alignItems: "center"
-   },
-   barFront: {
-     height: 600,
-     width: "100%",
- 
-   }
+
+  }
 });

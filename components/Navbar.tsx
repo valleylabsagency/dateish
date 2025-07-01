@@ -80,7 +80,7 @@ export default function Navbar() {
     <View style={styles.navbar}>
       {/* Conditionally render the WC button */}
       {showWcButton ? (
-        <TouchableOpacity onPress={() => router.push("/profile")}>
+        <TouchableOpacity onPress={() => router.push("/bathroom")}>
           <Image
             source={require("../assets/images/icons/WC.png")}
             style={styles.navIcon}

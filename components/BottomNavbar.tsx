@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'expo-router';
 const tabs = [
   { label: 'Games',       icon: require('../assets/images/icons/games-icon.png'),     route: '/games'    },
   { label: 'Inbox',       icon: require('../assets/images/icons/chats-icon.png'),     route: '/inbox'    },
-  { label: 'Bar',         icon: require('../assets/images/icons/beers-icon.png'),     route: '/bar'      },
+  { label: 'Bar',         icon: require('../assets/images/icons/beers-icon.png'),     route: '/bar-2'      },
   { label: 'Mr. Mingles', icon: require('../assets/images/icons/mm-icon.png'),        route: '/mingles'  },
   { label: 'Events',      icon: require('../assets/images/icons/stage-tab-icon.png'), route: '/events'   },
 ];
