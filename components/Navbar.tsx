@@ -4,6 +4,7 @@ import React, { useContext, useEffect, useRef, useState } from "react";
 import {
   View,
   Image,
+  Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -92,6 +93,10 @@ export default function Navbar() {
       )}
 
       <View style={styles.navSpacer} />
+      <View style={styles.moneysBar}>
+        <Text style={styles.moneysAmount}>10</Text>
+        <Image style={styles.moneysImage} source={require("../assets/images/moneys.png")} />
+      </View>
 
       {/* Speaker icon area */}
       {soundLoading ? (
@@ -144,6 +149,26 @@ const styles = StyleSheet.create({
   },
   navSpacer: {
     flex: 1,
+  },
+  moneysBar: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 8,
+    height: "55%",
+    width: "30%",
+    paddingHorizontal: 10,
+    marginRight: 20,
+    backgroundColor: "#d8bfd8"
+  },
+  moneysAmount: {
+    color: "#460b2a",
+    fontSize: 30,
+    letterSpacing: 3,
+  },
+  moneysImage: {
+    width: "65%",
+    height: "80%"
   },
   speakerWrapper: {
     width: 50,
