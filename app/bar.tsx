@@ -236,6 +236,7 @@ function BarProfileComplete() {
   const { profile, saveProfile } = useContext(ProfileContext);
   const { setShowWcButton } = useContext(NavbarContext);
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
+  
 
   // Decide which text to show
   const bubbleText = isTapState

@@ -49,6 +49,7 @@ function useDisableBackButton() {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [showWcButton, setShowWcButton] = useState(false);
   const pathname = usePathname();
+  const { partner } = useLocalSearchParams<{ partner?: string }>();
   const [didForceRTL, setDidForceRTL] = useState(false);
   const [demoAllowed, setDemoAllowed] = useState<boolean | null>(null);
   const { isPlaying, toggleMusic } = useContext(MusicContext);
@@ -97,7 +98,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   // Hide navbar on /profile, /welcome, and /chat pages.
   const hideNavbar =
-    pathname === "/profile" || pathname === "/welcome" || pathname === "/inbox";
+    pathname.startsWith("/chat") ||
+    (pathname === "/inbox" && Boolean(partner)) ||
+    pathname === "/profile" ||
+    pathname === "/welcome";
+
 
   // Determine if we should wrap in MusicProvider.
   const shouldWrapMusic = pathname !== "/welcome";
