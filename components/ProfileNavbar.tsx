@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from "react";
 import {
   View,
   TouchableOpacity,
+  Text,
   StyleSheet,
   Image,
   ActivityIndicator,
@@ -78,6 +79,11 @@ export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
 
       <View style={profileNavbarStyles.navSpacer} />
 
+      <View style={profileNavbarStyles.moneysBar}>
+              <Text style={profileNavbarStyles.moneysAmount}>10</Text>
+              <Image style={profileNavbarStyles.moneysImage} source={require("../assets/images/moneys.png")} />
+            </View>
+
       {/* Speaker icon area */}
       {soundLoading ? (
         <ActivityIndicator color="#fff" style={{ width: 50, height: 50 }} />
@@ -124,6 +130,26 @@ const profileNavbarStyles = StyleSheet.create({
   },
   navSpacer: {
     flex: 1,
+  },
+  moneysBar: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 8,
+    height: "55%",
+    width: "30%",
+    paddingHorizontal: 10,
+    marginRight: 20,
+    backgroundColor: "#d8bfd8"
+  },
+  moneysAmount: {
+    color: "#460b2a",
+    fontSize: 30,
+    letterSpacing: 3,
+  },
+  moneysImage: {
+    width: "65%",
+    height: "80%"
   },
   speakerWrapper: {
     width: 50,

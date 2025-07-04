@@ -1,3 +1,4 @@
+// inbox.tsx
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -6,136 +7,125 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Text,
-  Modal,                // ADDED
-  StyleSheet            // ADDED
+  Modal,
+  StyleSheet,
 } from "react-native";
 import { useFonts } from "expo-font";
-import { FontNames } from "../constants/fonts";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { auth, firestore } from "../firebase";
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  doc, 
-  updateDoc, 
-  arrayRemove 
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  doc,
+  updateDoc,
+  arrayRemove,
 } from "firebase/firestore";
+import { getDatabase, ref, onValue } from "firebase/database";
 import BottomNavbar from "../components/BottomNavbar";
 import ConversationPreview from "../components/ConversationPreview";
 import { MaterialIcons } from "@expo/vector-icons";
-import {
-  ScaledSheet,
-  moderateScale,
-  scale,
-  verticalScale,
-} from "react-native-size-matters";
-import { getDatabase, ref, onValue } from "firebase/database";
-
+import ChatScreen from "./chat";
+import { FontNames } from "../constants/fonts";
 
 export default function InboxScreen() {
   const router = useRouter();
-  const currentUserId = auth.currentUser?.uid;
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  // partnerStatus maps partnerUid => online (boolean)
-  const [partnerStatus, setPartnerStatus] = useState<{ [uid: string]: boolean }>({});
+  const { partner } = useLocalSearchParams<{ partner?: string }>();
+  const isChatMode = Boolean(partner);
 
-  // ADDED / CHANGED: For the confirmation modal
+  const currentUserId = auth.currentUser?.uid ?? "";
+
+  // List mode state
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [loadingConvs, setLoadingConvs] = useState(true);
+  const [partnerStatus, setPartnerStatus] = useState<Record<string, boolean>>({});
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingDeleteChatId, setPendingDeleteChatId] = useState<string | null>(null);
 
+  // Load custom font
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
   });
 
-  // Query Firestore for chat conversations where the current user is a participant.
+  // Fetch conversations when not in chat mode
   useEffect(() => {
-    if (!currentUserId) return;
+    if (isChatMode || !currentUserId) {
+      setLoadingConvs(false);
+      return;
+    }
     const chatsRef = collection(firestore, "chats");
-    // Query chat documents that contain the current user in the "visibleFor" array.
     const q = query(
       chatsRef,
       where("visibleFor", "array-contains", currentUserId),
       orderBy("updatedAt", "desc")
     );
-    const unsubscribe = onSnapshot(
+    const unsub = onSnapshot(
       q,
-      (querySnapshot) => {
+      (snap) => {
         const convs: any[] = [];
-        querySnapshot.forEach((docSnap) => {
+        snap.forEach(docSnap => {
           convs.push({ id: docSnap.id, ...docSnap.data() });
         });
         setConversations(convs);
-        setLoading(false);
+        setLoadingConvs(false);
       },
-      (error) => {
-        console.error("Error fetching conversations:", error);
-        setLoading(false);
+      (err) => {
+        console.error("Error fetching conversations:", err);
+        setLoadingConvs(false);
       }
     );
-    return () => unsubscribe();
-  }, [currentUserId]);
+    return () => unsub();
+  }, [isChatMode, currentUserId]);
 
-  // For each conversation, subscribe to the partner's online status.
+  // Subscribe to partner online status
   useEffect(() => {
+    if (isChatMode || !currentUserId || conversations.length === 0) return;
     const db = getDatabase();
-    const unsubscribes: (() => void)[] = [];
-    if (currentUserId && conversations.length > 0) {
-      conversations.forEach((conv) => {
-        const partnerUid = conv.users.filter((uid: string) => uid !== currentUserId)[0];
-        const statusRef = ref(db, `status/${partnerUid}`);
-        const unsub = onValue(statusRef, (snapshot) => {
-          const data = snapshot.val();
-          setPartnerStatus((prev) => ({
-            ...prev,
-            [partnerUid]: data?.online ?? false,
-          }));
-        });
-        unsubscribes.push(unsub);
+    const unsubFns: (() => void)[] = [];
+    conversations.forEach(conv => {
+      const partnerUid = conv.users.find((u: string) => u !== currentUserId);
+      if (!partnerUid) return;
+      const statusRef = ref(db, `status/${partnerUid}`);
+      const unsub = onValue(statusRef, snap => {
+        setPartnerStatus(prev => ({
+          ...prev,
+          [partnerUid]: snap.val()?.online ?? false,
+        }));
       });
-    }
-    return () => {
-      unsubscribes.forEach((unsub) => unsub());
-    };
-  }, [conversations, currentUserId]);
-  
+      unsubFns.push(unsub);
+    });
+    return () => unsubFns.forEach(fn => fn());
+  }, [isChatMode, currentUserId, conversations]);
 
-  // ADDED / CHANGED: Handler to confirm deletion
+  // Deletion handlers
   const handleTrashPress = (chatId: string) => {
-    // Store which chat we intend to delete, show modal
     setPendingDeleteChatId(chatId);
     setShowConfirmModal(true);
   };
-
-  // ADDED / CHANGED: Actually delete from "visibleFor"
   const confirmDelete = async () => {
-    if (!pendingDeleteChatId || !currentUserId) return;
-
+    if (!pendingDeleteChatId) return;
     try {
       const chatDocRef = doc(firestore, "chats", pendingDeleteChatId);
       await updateDoc(chatDocRef, {
-        visibleFor: arrayRemove(currentUserId)
+        visibleFor: arrayRemove(currentUserId),
       });
-    } catch (error) {
-      console.error("Error removing from visibleFor:", error);
+    } catch (err) {
+      console.error("Error removing chat:", err);
     }
     setShowConfirmModal(false);
     setPendingDeleteChatId(null);
   };
-
-  // ADDED / CHANGED: Cancel deletion
   const cancelDelete = () => {
     setShowConfirmModal(false);
     setPendingDeleteChatId(null);
   };
 
-  if (!fontsLoaded || loading) {
+  if (!fontsLoaded || (loadingConvs && !isChatMode)) {
     return (
-      <View style={chatsStyles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fff" />
+      <View style={modalStyles.loadingContainer}>
+        <ActivityIndicator size="large" color="gold" />
       </View>
     );
   }
@@ -143,151 +133,118 @@ export default function InboxScreen() {
   return (
     <ImageBackground
       source={require("../assets/images/chat-full.png")}
-      style={chatsStyles.background}
-      blurRadius={5}
+      style={listStyles.background}
+      blurRadius={isChatMode ? 0 : 5}
     >
-      <ScrollView contentContainerStyle={chatsStyles.scrollContent}>
-        {conversations.map((conv) => {
-          const partnerUid = conv.users.filter((uid: string) => uid !== currentUserId)[0];
-          const isOnline = partnerStatus[partnerUid];
-          
-          if (isOnline === false) {
-            // Partner offline: conversation is disabled, plus a trash icon
-            return (
-              <View key={conv.id} style={{ width: "100%" /* ensure key on root */ }}>
-                <View
-                  style={[
-                    chatsStyles.conversationContainer,
-                    chatsStyles.disabledConversation,
-                  ]}
-                >
-                  <ConversationPreview
-                    conversation={conv}
-                    online={false}
-                    currentUserId={currentUserId}
-                  />
-                </View>
-                <Text style={chatsStyles.offlineText}>Offline</Text>
-                <TouchableOpacity
-                  onPress={() => handleTrashPress(conv.id)} // ADDED / CHANGED
-                  style={[chatsStyles.trashIconContainer, chatsStyles.trashIconContainerOffline]}
-                >
-                  <MaterialIcons name="delete" size={32} color="red" />
-                </TouchableOpacity>
-              </View>
-            );
-          } else {
-            // Partner online: clickable conversation + trash icon
+      {isChatMode ? (
+        <ChatScreen partner={partner!} />
+      ) : (
+        <ScrollView contentContainerStyle={listStyles.scrollContent}>
+          {conversations.map(conv => {
+            const partnerUid = conv.users.find((u: string) => u !== currentUserId)!;
+            const online = partnerStatus[partnerUid];
             return (
               <TouchableOpacity
                 key={conv.id}
-                style={chatsStyles.conversationContainer}
-                onPress={() => router.push(`/chat?partner=${partnerUid}`)}
+                style={
+                  online
+                    ? listStyles.conversationContainer
+                    : listStyles.disabledConversation
+                }
+                onPress={() => router.push(`/inbox?partner=${partnerUid}`)}
               >
                 <ConversationPreview
                   conversation={conv}
-                  online={true}
+                  online={online}
                   currentUserId={currentUserId}
                 />
                 <TouchableOpacity
-                  onPress={() => handleTrashPress(conv.id)} // ADDED / CHANGED
-                  style={[chatsStyles.trashIconContainer, chatsStyles.trashIconContainerOnline]}
+                  style={online ? listStyles.trashOnline : listStyles.trashOffline}
+                  onPress={() => handleTrashPress(conv.id)}
                 >
                   <MaterialIcons name="delete" size={32} color="red" />
                 </TouchableOpacity>
               </TouchableOpacity>
             );
-          }
-        })}
-      </ScrollView>
+          })}
+        </ScrollView>
+      )}
 
-      {/* ADDED / CHANGED: Confirmation Modal */}
+      {/* Confirmation Modal */}
       <Modal
         visible={showConfirmModal}
         transparent
         animationType="fade"
         onRequestClose={cancelDelete}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalText}>Are you sure you want to delete this chat?</Text>
-            <View style={styles.modalButtonRow}>
-              <TouchableOpacity style={styles.modalButton} onPress={confirmDelete}>
-                <Text style={styles.modalButtonText}>YES</Text>
+        <View style={modalStyles.modalOverlay}>
+          <View style={modalStyles.modalContainer}>
+            <Text style={modalStyles.modalText}>
+              Are you sure you want to delete this chat?
+            </Text>
+            <View style={modalStyles.modalButtonRow}>
+              <TouchableOpacity style={modalStyles.modalButton} onPress={confirmDelete}>
+                <Text style={modalStyles.modalButtonText}>YES</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalButton} onPress={cancelDelete}>
-                <Text style={styles.modalButtonText}>NO</Text>
+              <TouchableOpacity style={modalStyles.modalButton} onPress={cancelDelete}>
+                <Text style={modalStyles.modalButtonText}>NO</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-      {/* End of confirmation Modal */}
 
-      <View style={chatsStyles.bottomNavbarContainer}>
+      <View style={listStyles.bottomNavbar}>
         <BottomNavbar selectedTab="Inbox" />
       </View>
     </ImageBackground>
   );
 }
 
-const chatsStyles = ScaledSheet.create({
+const listStyles = StyleSheet.create({
   background: {
     flex: 1,
-    resizeMode: "cover",
-    justifyContent: "center",
-    alignItems: "center",
+    width: "100%",
     height: "100%",
   },
+  scrollContent: {
+    paddingVertical: 50,
+    alignItems: "center",
+  },
+  conversationContainer: {
+    width: "100%",
+    position: "relative",
+    marginBottom: 20,
+  },
+  disabledConversation: {
+    width: "100%",
+    opacity: 0.5,
+    position: "relative",
+    marginBottom: 20,
+  },
+  trashOnline: {
+    position: "absolute",
+    top: 20,
+    right: 10,
+  },
+  trashOffline: {
+    position: "absolute",
+    top: 20,
+    right: 10,
+  },
+  bottomNavbar: {
+    position: "absolute",
+    bottom: 0,
+    width: "100%",
+  },
+});
+
+const modalStyles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  scrollContent: {
-    paddingVertical: "50@ms", // replaced 20 with moderateScale(20)
-    alignItems: "center",
-    width: "100%",
-  },
-  bottomNavbarContainer: {
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
-  },
-  conversationContainer: {
-    width: "100%",
-    height: "100@ms", // replaced scale(100) with a moderate scale
-    justifyContent: "center", // keep conversation preview centered
-    paddingVertical: 0,
-    marginBottom: moderateScale(100),
-  },
-  disabledConversation: {
-    opacity: 0.5, // greyed out look
-  },
-  offlineText: {
-    fontFamily: FontNames.MontSerratSemiBold,
-    fontSize: 62,
-    position: "absolute",
-    bottom: "55%",
-    color: "#000",
-    zIndex: 2000,
-    left: "20%",
-    opacity: 10,
-  },
-  trashIconContainerOnline: {
-    position: "absolute",
-    top: "40%",
-    right: "5%",
-  },
-  trashIconContainerOffline: {
-    position: "absolute",
-    top: "20%",
-    right: "5%",
-  },
-});
-
-// ADDED / CHANGED: Basic modal styles outside ScaledSheet
-const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
@@ -297,26 +254,26 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: "80%",
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 20,
   },
   modalText: {
-    fontSize: 20,
+    fontSize: 18,
     marginBottom: 20,
     textAlign: "center",
   },
   modalButtonRow: {
     flexDirection: "row",
-    justifyContent: "space-evenly",
+    justifyContent: "space-around",
   },
   modalButton: {
     backgroundColor: "red",
-    borderRadius: 8,
+    borderRadius: 5,
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
   modalButtonText: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: 16,
   },
 });

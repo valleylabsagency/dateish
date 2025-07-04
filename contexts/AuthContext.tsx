@@ -13,7 +13,7 @@ const AuthWrapper = ({ children }: AuthWrapperProps): JSX.Element => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         // User is logged in, navigate to the bar page
-        router.push("/bar");
+        router.push("/bar-2");
       } else {
         // No user, navigate to the welcome page
         router.push("/welcome");

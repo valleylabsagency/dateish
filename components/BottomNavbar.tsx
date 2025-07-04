@@ -21,7 +21,7 @@ export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
   return (
     <View style={styles.navbar}>
       {tabs.map(tab => {
-        const isSelected = tab.label === selectedTab;
+        const isSelected = currentPath === tab.route;
         const isBar      = tab.label === 'Bar';
 
         return (

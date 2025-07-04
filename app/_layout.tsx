@@ -97,7 +97,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   // Hide navbar on /profile, /welcome, and /chat pages.
   const hideNavbar =
-    pathname === "/profile" || pathname === "/welcome" || pathname === "/chat";
+    pathname === "/profile" || pathname === "/welcome" || pathname === "/inbox";
 
   // Determine if we should wrap in MusicProvider.
   const shouldWrapMusic = pathname !== "/welcome";
