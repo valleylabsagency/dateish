@@ -101,11 +101,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     pathname.startsWith("/chat") ||
     (pathname === "/inbox" && Boolean(partner)) ||
     pathname === "/profile" ||
-    pathname === "/welcome";
+    pathname === "/entrance";
 
 
   // Determine if we should wrap in MusicProvider.
-  const shouldWrapMusic = pathname !== "/welcome";
+  const shouldWrapMusic = pathname !== "/entrance";
 
   // while we wait on the initial flag…
   if (demoAllowed === null) {

@@ -16,7 +16,7 @@ const AuthWrapper = ({ children }: AuthWrapperProps): JSX.Element => {
         router.push("/entrance");
       } else {
         // No user, navigate to the welcome page
-        router.push("/welcome");
+        router.push("/entrance");
       }
     });
 

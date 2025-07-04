@@ -17,7 +17,7 @@ export const MusicContext = createContext<MusicContextValue>({
 export function MusicProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   // Consider both "/" and "/welcome" as routes where we should NOT play music.
-  const shouldPlayMusic = !(pathname === "/welcome" || pathname === "/");
+  const shouldPlayMusic = !(pathname === "/entrance" || pathname === "/");
 
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(shouldPlayMusic);
