@@ -40,11 +40,11 @@ export default function WelcomeScreen() {
       if (!firstTime) {
         // Sign in to existing account.
         await login(username, password);
-        router.push("/bar-2");
+        router.replace("/entrance");
       } else {
         // Create new account.
         await signUp(username, password);
-        router.push("/bar-2");
+        router.replace("/entrance");
       }
     } catch (error: any) {
       console.error("Auth error:", error);
