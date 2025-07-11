@@ -10,6 +10,7 @@ import {
   Modal,
   ScrollView,
   ActivityIndicator,
+  Dimensions,
 } from "react-native";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
@@ -17,7 +18,13 @@ import BottomNavbar from "../components/BottomNavbar";
 import { firestore, auth } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { getDatabase, ref, onValue } from "firebase/database";
-import { useRouter } from 'expo-router';
+import { useRouter } from "expo-router";
+
+const { width, height } = Dimensions.get("window");
+// Spacing for the avatars
+const START_OFFSET_RATIO = 0.085;
+const SPACING_RATIO      = 0.2;
+const AVATAR_SIZE        = 100;
 
 export default function Bar2Screen() {
   const router = useRouter();
@@ -32,7 +39,10 @@ export default function Bar2Screen() {
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // 1. fetch all other users
+  // NEW: whether we've tapped "Start Chatting"
+  const [started, setStarted] = useState(false);
+
+  // 1) fetch all other users
   useEffect(() => {
     (async () => {
       try {
@@ -49,7 +59,7 @@ export default function Bar2Screen() {
     })();
   }, []);
 
-  // 2. subscribe to realtime online status
+  // 2) subscribe to realtime online status
   useEffect(() => {
     const db = getDatabase();
     const unsub: (() => void)[] = [];
@@ -63,7 +73,6 @@ export default function Bar2Screen() {
     return () => unsub.forEach(f => f());
   }, [profiles]);
 
-  // derive only the online ones
   const onlineProfiles = profiles.filter(p => onlineStatus[p.id]);
 
   if (!fontsLoaded || loading) {
@@ -78,35 +87,63 @@ export default function Bar2Screen() {
     );
   }
 
+  const startOffsetPx = width * START_OFFSET_RATIO;
+  const spacingPx     = width * SPACING_RATIO;
+
   return (
     <ImageBackground
       source={require("../assets/images/bar-back.png")}
       style={styles.background}
     >
-      {/* ─── ONLINE USER ROW ────────────────────────── */}
-      {onlineProfiles.length > 0 && (
+      {/* ─── WELCOME MODE: Mr. Mingles + button ────────────────────────── */}
+      {!started && (
+        <>
+          <View style={styles.minglesContainer}>
+            <Image
+              source={require("../assets/images/mr-mingles.png")}
+              style={styles.minglesImage}
+              resizeMode="contain"
+            />
+          </View>
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={() => setStarted(true)}
+          >
+            <Text style={styles.startButtonText}>Start Chatting</Text>
+          </TouchableOpacity>
+        </>
+      )}
+
+      {/* ─── CHAT MODE: avatars appear after "Start Chatting" ─────────── */}
+      {started && onlineProfiles.length > 0 && (
         <View style={styles.onlineRow}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{
-              paddingHorizontal: 16,
-              alignItems: "center"
+              paddingLeft: startOffsetPx,
+              paddingRight: startOffsetPx,
+              alignItems: "center",
             }}
           >
             {onlineProfiles.map(p => (
               <TouchableOpacity
                 key={p.id}
-                style={styles.avatarCircle}
+                style={{
+                  width: AVATAR_SIZE,
+                  height: AVATAR_SIZE,
+                  borderRadius: AVATAR_SIZE / 2,
+                  overflow: "hidden",
+                  marginRight: spacingPx,
+                  borderWidth: 2,
+                  borderColor: "white",
+                }}
                 onPress={() => {
                   setSelectedProfile(p);
                   setModalVisible(true);
                 }}
               >
-                <Image
-                  source={{ uri: p.photoUri }}
-                  style={styles.avatarImage}
-                />
+                <Image source={{ uri: p.photoUri }} style={styles.avatarImage} />
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -160,16 +197,16 @@ export default function Bar2Screen() {
                     {selectedProfile.about}
                   </Text>
                 </View>
-                
+
                 <TouchableOpacity
                   style={styles.modalChatButton}
                   onPress={() => {
-                  setModalVisible(false);
-                  router.push(`/inbox?partner=${selectedProfile.id}`);
-                }}
+                    setModalVisible(false);
+                    router.push(`/inbox?partner=${selectedProfile.id}`);
+                  }}
                 >
-                <Text style={styles.modalChatButtonText}>Chat</Text>
-              </TouchableOpacity>
+                  <Text style={styles.modalChatButtonText}>Chat</Text>
+                </TouchableOpacity>
               </>
             )}
           </View>
@@ -185,43 +222,85 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
     alignItems: "center",
   },
+  // ─── NEW: Mr. Mingles ─────────────────────────
+  minglesContainer: {
+    position: "absolute",
+    bottom: height * 0.06,
+    left: width * 0.08,
+    width: "100%",
+    alignItems: "center",
+    zIndex: 1,
+  },
+  minglesImage: {
+    width: width * 0.8,
+    height: height * 0.8,
+    zIndex: 1
+  },
+  startButton: {
+    position: "absolute",
+    bottom: height * 0.08,
+    alignSelf: "center",
+    backgroundColor: "#6e1944",
+    borderWidth: 4,
+    borderColor: "#460b2a",
+    width: "80%",
+    height: 70,
+    textAlign: "center",
+    //paddingHorizontal: 24,
+   // paddingVertical: 12,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.7,
+    shadowRadius: 6,
+  // boost Android elevation if you want it stronger:
+    elevation: 8,
+    zIndex: 10
+  },
+  startButtonText: {
+    fontSize: 32,
+    fontFamily: FontNames.MontserratRegular,
+    textTransform: "uppercase",
+    color: "#ffe3d0",
+    margin: "auto",
+  },
+
+  // ─── ONLINE ROW (only when started) ─────────
   onlineRow: {
     position: "absolute",
     top: "62%",
     width: "100%",
-    zIndex: 100,
+    zIndex: 5,
   },
-  avatarCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,         
-    overflow: "hidden",
-    marginHorizontal: "17%",    
-    borderWidth: 2,
-    borderColor: "white",
-   },
-
   avatarImage: {
     width: "100%",
     height: "100%",
   },
 
+  // ─── BAR FRONT ───────────────────────────────
   barFrontContainer: {
     position: "absolute",
     bottom: "-5%",
     width: "100%",
     alignItems: "center",
+    zIndex: 2
   },
   barFront: {
     width: "100%",
     height: 730,
+    zIndex: 2
   },
+
+  // ─── NAVBAR ──────────────────────────────────
   bottomNavbarContainer: {
     position: "absolute",
     bottom: 0,
     width: "100%",
+    zIndex: 20,
+    elevation: 20
   },
 
+  // ─── PROFILE MODAL ───────────────────────────
   modalOverlay: {
     flex: 1,
     marginBottom: 220,
@@ -239,11 +318,6 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: "flex-start",
   },
-  modalText: {
-   width: "100%",
-   alignItems: "flex-start",
-   paddingHorizontal: 20
-  },
   closeButton: {
     position: "absolute",
     top: 12,
@@ -258,7 +332,7 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 90,
     marginBottom: 16,
-    alignSelf: "center"
+    alignSelf: "center",
   },
   modalName: {
     color: "white",
@@ -271,13 +345,13 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     fontFamily: FontNames.MontserratRegular,
     textAlign: "left",
-    alignSelf: "flex-start"
+    alignSelf: "flex-start",
   },
   modalDescription: {
     color: "#ffe3d0",
     fontSize: 16,
     textAlign: "left",
-    alignSelf: "flex-start"
+    alignSelf: "flex-start",
   },
   modalChatButton: {
     marginTop: "20%",
@@ -285,7 +359,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 5,
     borderLeftWidth: 5,
     borderRightWidth: 5,
-    borderBottomWidth: 15,          
+    borderBottomWidth: 15,
     borderColor: "#460b2a",
     paddingVertical: 10,
     paddingHorizontal: 30,
