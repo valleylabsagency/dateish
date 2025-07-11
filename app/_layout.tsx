@@ -97,11 +97,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Hide navbar on /profile, /welcome, and /chat pages.
-  const hideNavbar =
-    pathname.startsWith("/chat") ||
-    (pathname === "/inbox" && Boolean(partner)) ||
-    pathname === "/profile" ||
-    pathname === "/entrance";
+  const hideNavbar = [
+    "/profile",
+    "/entrance",
+    "/welcome",
+    "/chat",    // your “normal” chat route
+    //    // chat entry-point from Bar2Screen
+  ].includes(pathname);
 
 
   // Determine if we should wrap in MusicProvider.

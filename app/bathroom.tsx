@@ -28,6 +28,12 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, storage } from "../firebase";
 import { FontNames } from "../constants/fonts";
 
+
+// resolve the asset to get its intrinsic size
+const bathroomImg = require("../assets/images/bathroom.png");
+const { width: imgW, height: imgH } = Image.resolveAssetSource(bathroomImg);
+const BG_ASPECT_RATIO = imgW / imgH;
+
 export default function BathroomScreen() {
   const router = useRouter();
   const { profile, saveProfile, setProfileComplete, profileComplete } = useContext(ProfileContext);
@@ -207,12 +213,11 @@ export default function BathroomScreen() {
 
   return (
     <ImageBackground
-      source={require("../assets/images/bathroom.png")}
+      source={bathroomImg}
       style={styles.background}
-      imageStyle={{ resizeMode: "cover" }}
+      resizeMode="stretch"
+      imageStyle={{ aspectRatio: BG_ASPECT_RATIO }}
     >
-      <ProfileNavbar onBack={handleSubmit} />
-
       <View style={styles.formContainer}>
         <TextInput
           style={styles.input}
@@ -305,10 +310,9 @@ export default function BathroomScreen() {
       </Modal>
 
       <TouchableOpacity
-      style={styles.hitbox}
-      onPress={() => router.push('/settings')}
-    />
-
+        style={styles.hitbox}
+        onPress={() => router.push('/settings')}
+      />
 
       {renderAboutEditor()}
 
@@ -326,19 +330,17 @@ export default function BathroomScreen() {
 }
 
 const styles = StyleSheet.create({
-  background: { flex: 1, width: "100%", height: "100%" },
+  background: {
+    flex: 1,
+    width: "100%",
+    // height removed so aspectRatio determines height
+    alignItems: "center",
+  },
   formContainer: {
     position: "absolute",
-    top: verticalScale(90),
+    top: verticalScale(110),
     alignSelf: "center",
     width: "90%",
-  },
-  header: {
-    fontSize: moderateScale(35),
-    color: "#908db3",
-    textAlign: "center",
-    marginBottom: verticalScale(10),
-    fontFamily: FontNames.MontserratRegular,
   },
   input: {
     width: "100%",
@@ -346,8 +348,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#908db3",
     fontFamily: FontNames.MontserratBold,
-    height: verticalScale(25),
-    //marginVertical: verticalScale(5),
+    height: verticalScale(20),
   },
   locationContainer: {
     alignItems: "center",
@@ -367,7 +368,7 @@ const styles = StyleSheet.create({
   },
   photoContainer: {
     alignItems: "center",
-    marginVertical: verticalScale(10),
+    marginVertical: verticalScale(2),
   },
   photo: {
     width: scale(140),
@@ -390,6 +391,13 @@ const styles = StyleSheet.create({
   bottomEdit: {
     marginTop: verticalScale(5),
   },
+  hitbox: {
+    position: 'absolute',
+    top: "70%",
+    left: "10%",
+    width: 120,
+    height: 120,
+  },
   bottomNavbarContainer: {
     position: "absolute",
     bottom: 0,
@@ -401,15 +409,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
-  hitbox: {
-    position: 'absolute',
-    top: "70%",           
-    left: "10%",           
-    width: 120,         
-    height: 120,        
-  },
-
 });
 
 const editorStyles = StyleSheet.create({

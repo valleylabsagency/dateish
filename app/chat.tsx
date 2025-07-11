@@ -297,8 +297,8 @@ export default function ChatScreen() {
       style={styles.background}
       resizeMode="cover"
     >
-      {/* Top Navbar */}
-      <ProfileNavbar onBack={() => router.back()} />
+     
+      <ProfileNavbar onBack={() => router.back()} /> 
 
       {/* Chat Area */}
       <KeyboardAvoidingView

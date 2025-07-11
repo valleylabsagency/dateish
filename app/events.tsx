@@ -3,6 +3,7 @@ import React from "react";
 import {
   View,
   Text,
+  Image,
   ImageBackground,
   StyleSheet,
   TouchableOpacity,
@@ -11,9 +12,16 @@ import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
 
+// require the background once at module scope
+const bgImage = require("../assets/images/events-full.png");
+// get its intrinsic dimensions and compute aspect ratio
+const { width: imgW, height: imgH } = Image.resolveAssetSource(bgImage);
+const ASPECT_RATIO = imgW / imgH;
+
 export default function EventsScreen() {
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
+    [FontNames.MontserratBold]:    require("../assets/fonts/Montserrat-Bold.ttf"),
   });
 
   if (!fontsLoaded) {
@@ -21,40 +29,49 @@ export default function EventsScreen() {
   }
 
   return (
-    <ImageBackground
-      source={require("../assets/images/events-full.png")}
-      style={styles.background}
-    >
-      {/* Centered overlay content */}
-      <View style={styles.contentContainer}>
-        <Text style={styles.description}>
-          <Text style={styles.bold}>Dateish</Text> is new so there aren’t many
-          people here yet……
-        </Text>
-        <Text style={styles.callToAction}>Help us find more people!</Text>
+    <View style={styles.container}>
+      <ImageBackground
+        source={bgImage}
+        style={styles.background}
+        resizeMode="contain"
+      >
+        {/* Centered overlay content */}
+        <View style={styles.contentContainer}>
+          <Text style={styles.description}>
+            <Text style={styles.bold}>Dateish</Text> is new so there aren’t many
+            people here yet……
+          </Text>
+          <Text style={styles.callToAction}>Help us find more people!</Text>
 
-        <TouchableOpacity
-          style={styles.shareButton}
-          onPress={() => {
-            /* TODO: hook up share sheet */
-          }}
-        >
-          <Text style={styles.shareButtonText}>Sharing Options</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.shareButton}
+            onPress={() => {
+              /* TODO: hook up share sheet */
+            }}
+          >
+            <Text style={styles.shareButtonText}>Sharing Options</Text>
+          </TouchableOpacity>
+        </View>
+      </ImageBackground>
 
       {/* Bottom tab bar */}
       <View style={styles.bottomNavbarContainer}>
         <BottomNavbar selectedTab="Events" />
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
+  container: {
     flex: 1,
-    resizeMode: "cover",
+    alignItems: "center",            // center the ImageBackground
+    backgroundColor: "#000",         // fallback while loading
+  },
+
+  background: {
+    width: "100%",
+    aspectRatio: ASPECT_RATIO,       // enforce the image’s natural ratio
   },
 
   contentContainer: {
@@ -68,7 +85,7 @@ const styles = StyleSheet.create({
     fontFamily: FontNames.MontserratRegular,
     fontSize: 24,
     lineHeight: 30,
-    color: "white",      // light cream
+    color: "white",
     textAlign: "center",
   },
   bold: {
@@ -88,13 +105,13 @@ const styles = StyleSheet.create({
 
   shareButton: {
     marginTop: 32,
-    backgroundColor: "#592540",   // same as your navbar bg
-    borderColor: "#460b2a",       
+    backgroundColor: "#592540",
+    borderColor: "#460b2a",
     borderWidth: 2,
     borderRadius: 30,
     paddingVertical: 14,
     paddingHorizontal: 20,
-    width: 300
+    width: 300,
   },
   shareButtonText: {
     fontFamily: FontNames.MontserratBold,

@@ -202,7 +202,7 @@ export default function Bar2Screen() {
                   style={styles.modalChatButton}
                   onPress={() => {
                     setModalVisible(false);
-                    router.push(`/inbox?partner=${selectedProfile.id}`);
+                    router.push(`/chat?partner=${selectedProfile.id}`);
                   }}
                 >
                   <Text style={styles.modalChatButtonText}>Chat</Text>
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
   },
   startButton: {
     position: "absolute",
-    bottom: height * 0.08,
+    bottom: height * 0.17,
     alignSelf: "center",
     backgroundColor: "#6e1944",
     borderWidth: 4,

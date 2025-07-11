@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
 
   minglesContainer: {
     position: "absolute",
-    bottom: height * 0.07,
+    bottom: height * 0.1,
     right: "8%",
     width: width,
     alignItems: "center",
@@ -215,8 +215,9 @@ const styles = StyleSheet.create({
 
   frontContainer: {
     position: "absolute",
-    bottom: 0,
+    bottom: "0%",
     width: "100%",
+    height: "80%",
     alignItems: "center",
   },
   frontImage: {
@@ -265,10 +266,10 @@ const styles = StyleSheet.create({
   /* ←—— Tweak these to move/resize your hotspot: ——→ */
   overlayTouchable: {
     position: "absolute",
-    bottom: "23%",                   // how far from bottom
+    bottom: "26%",                   // how far from bottom
     right: "27%",                     // how far from right
     width: 70,                     // hotspot width
-    height: 30,                    // hotspot height
+    height: 30,                 // hotspot height
   },
 
   navbarContainer: {
