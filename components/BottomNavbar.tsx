@@ -67,7 +67,7 @@ const DARK_BG                   = '#460b2a';
 const styles = StyleSheet.create({
   navbar: {
     width: '100%',
-    height: 90,
+    height: 80,
     backgroundColor: '#592540',
     flexDirection: 'row',
     justifyContent: 'space-evenly',
