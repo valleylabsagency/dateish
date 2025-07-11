@@ -1,5 +1,5 @@
 // mingles.tsx
-import React, { useState, useContext, useEffect, useRef } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import {
   View,
   Text,
@@ -28,7 +28,6 @@ export default function MinglesScreen() {
   const { profile, saveProfile } = useContext(ProfileContext);
   const { setShowWcButton } = useContext(NavbarContext);
 
-  // Show the WC button once this screen mounts
   useEffect(() => {
     setShowWcButton(true);
   }, [setShowWcButton]);
@@ -43,7 +42,7 @@ export default function MinglesScreen() {
   const prev = () => setIdx(i => Math.max(0, i - 1));
   const next = () => setIdx(i => Math.min(messages.length - 1, i + 1));
 
-  // Drink‐menu modal state (copied from bar.tsx)
+  // Drink‐menu modal state
   const [showDrinkMenu, setShowDrinkMenu] = useState(false);
   const [drinkLoading, setDrinkLoading] = useState(false);
   const drinkMapping: Record<string, any> = {
@@ -96,7 +95,7 @@ export default function MinglesScreen() {
         />
       </View>
 
-      {/* 4) FLIPPED SPEECH BUBBLE WITH ARROWS + TAP */}
+      {/* 4) FLIPPED SPEECH BUBBLE */}
       <View style={styles.bubbleContainer}>
         <ImageBackground
           source={require("../assets/images/speech-bubble.png")}
@@ -114,9 +113,11 @@ export default function MinglesScreen() {
 
           <View style={styles.bubbleContent}>
             <Text style={styles.bubbleText}>{messages[idx]}</Text>
-            {/* Only show TAP on the first screen */}
             {idx === 0 && (
-              <TouchableOpacity style={styles.tapButton} onPress={() => setShowDrinkMenu(true)}>
+              <TouchableOpacity
+                style={styles.tapButton}
+          
+              >
                 <Text style={styles.tapText}>- TAP -</Text>
               </TouchableOpacity>
             )}
@@ -136,7 +137,7 @@ export default function MinglesScreen() {
         </ImageBackground>
       </View>
 
-      {/* 5) DRINK MENU MODAL (exactly like bar.tsx) */}
+      {/* 5) DRINK MENU MODAL */}
       <Modal visible={showDrinkMenu} transparent animationType="slide">
         <View style={drinkModalStyles.modalOverlay}>
           <View style={drinkModalStyles.modalContainer}>
@@ -149,7 +150,7 @@ export default function MinglesScreen() {
                 style={drinkModalStyles.closeHotspot}
                 onPress={() => setShowDrinkMenu(false)}
               />
-              {Object.entries(drinkMapping).map(([name, icon]) => (
+              {Object.entries(drinkMapping).map(([name]) => (
                 <TouchableOpacity
                   key={name}
                   style={drinkModalStyles[name]}
@@ -172,7 +173,14 @@ export default function MinglesScreen() {
         </View>
       </Modal>
 
-      {/* 6) BOTTOM NAVBAR */}
+      {/* 6) ADJUSTABLE HOTSPOT (bottom-right) */}
+      <TouchableOpacity
+        style={styles.overlayTouchable}
+        onPress={() => setShowDrinkMenu(true)}
+        activeOpacity={0.6}
+      />
+
+      {/* 7) BOTTOM NAVBAR */}
       <View style={styles.navbarContainer}>
         <BottomNavbar selectedTab="Mr. Mingles" />
       </View>
@@ -182,7 +190,6 @@ export default function MinglesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
   background: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
@@ -247,12 +254,21 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     position: "relative",
-    bottom: 10
+    bottom: 10,
   },
   tapText: {
     color: "#ffe3d0",
     fontFamily: FontNames.MontserratRegular,
     fontSize: 18,
+  },
+
+  /* ←—— Tweak these to move/resize your hotspot: ——→ */
+  overlayTouchable: {
+    position: "absolute",
+    bottom: "23%",                   // how far from bottom
+    right: "27%",                     // how far from right
+    width: 70,                     // hotspot width
+    height: 30,                    // hotspot height
   },
 
   navbarContainer: {
@@ -262,7 +278,7 @@ const styles = StyleSheet.create({
   },
 });
 
-// === DRINK MODAL STYLES (exact copy from bar.tsx) ===
+// === DRINK MODAL STYLES (same as bar.tsx) ===
 const drinkModalStyles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
