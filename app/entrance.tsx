@@ -40,7 +40,7 @@ export default function EntranceScreen() {
 
   // marquee
   const [textWidth, setTextWidth] = useState(0);
-  const scrollX = useRef(new Animated.Value(0)).current;
+  const scrollX = useRef(new Animated.Value(width)).current;
 
   // load fonts only for the banner/auth UI
   const [fontsLoaded] = useFonts({
@@ -52,6 +52,7 @@ export default function EntranceScreen() {
   // marquee loop
   useEffect(() => {
     if (!textWidth) return;
+    scrollX.setValue(width);
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(scrollX, {
@@ -240,7 +241,7 @@ const styles = StyleSheet.create({
   entranceSign:  { position: "absolute", top: "-15%", width: width * 0.55, height: height * 0.55 },
   bannerContainer: { position: "absolute", top: height * 0.23, width: width * 0.8, height: height * 0.07 },
   bannerBackground: { flex: 1, justifyContent: "center" },
-  bannerMask:      { overflow: "hidden", width: "100%" },
+  bannerMask:      { overflow: "hidden", width: "100%",},
   bannerText:      { fontFamily: "ArcadePixel", fontSize: 32, color: "red", fontWeight: "bold" },
   doorTouchable:   { position: "absolute", top: height * 0.49, width: width * 0.9, height: height * 0.2, alignSelf: "center" },
   doorSign:        { width: "100%", height: "100%" },
