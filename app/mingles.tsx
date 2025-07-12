@@ -17,6 +17,7 @@ import BottomNavbar from "../components/BottomNavbar";
 import { MaterialIcons } from "@expo/vector-icons";
 import { ProfileContext } from "../contexts/ProfileContext";
 import { NavbarContext } from "../app/_layout";
+import PopUp from "../components/PopUp";
 
 const { width, height } = Dimensions.get("window");
 const BUBBLE_HEIGHT = height * 0.18;
@@ -27,6 +28,11 @@ export default function MinglesScreen() {
   });
   const { profile, saveProfile } = useContext(ProfileContext);
   const { setShowWcButton } = useContext(NavbarContext);
+
+  const [showPopupShop, setShowPopupShop] = useState(false);
+  const [showPopupRules, setShowPopupRules] = useState(false);
+  const [showPopupTips, setShowPopupTips] = useState(false);
+  const [popupFlag, setPopupFlag] = useState<string | null>(null);
 
   useEffect(() => {
     setShowWcButton(true);
@@ -69,6 +75,7 @@ export default function MinglesScreen() {
   if (!fontsLoaded) return null;
 
   return (
+    <>
     <View style={styles.container}>
       {/* 1) BACKGROUND */}
       <ImageBackground
@@ -173,10 +180,36 @@ export default function MinglesScreen() {
         </View>
       </Modal>
 
-      {/* 6) ADJUSTABLE HOTSPOT (bottom-right) */}
+      {/* ADJUSTABLE HOTSPOT Drinks */}
       <TouchableOpacity
         style={styles.overlayTouchable}
         onPress={() => setShowDrinkMenu(true)}
+        activeOpacity={0.6}
+      />
+
+      {/* ADJUSTABLE HOTSPOT Shop */}
+      <TouchableOpacity
+        style={styles.overlayTouchableShop}
+        onPress={() => {
+          setPopupFlag("shop");
+          setShowPopupShop(true);
+        }}
+        activeOpacity={0.6}
+      />
+      <TouchableOpacity
+        style={styles.overlayTouchableRules}
+        onPress={() => {
+          setPopupFlag("rules");
+          setShowPopupRules(true);
+        }}
+        activeOpacity={0.6}
+      />
+      <TouchableOpacity
+        style={styles.overlayTouchableTips}
+        onPress={() => {
+          setPopupFlag("tips");
+          setShowPopupTips(true);
+        }}
         activeOpacity={0.6}
       />
 
@@ -185,6 +218,29 @@ export default function MinglesScreen() {
         <BottomNavbar selectedTab="Mr. Mingles" />
       </View>
     </View>
+    <PopUp
+           visible={showPopupShop}
+           flag={popupFlag || undefined}
+           title="Shop"
+           onClose={() => setShowPopupShop(false)}
+         />
+           
+    
+       <PopUp
+           visible={showPopupRules}
+           flag={popupFlag || undefined}
+           title="Rules"
+           onClose={() => setShowPopupRules(false)}
+         />
+         <PopUp
+           visible={showPopupTips}
+           flag={popupFlag || undefined}
+           title="Tips"
+           onClose={() => setShowPopupTips(false)}
+         />
+           
+    
+       </>
   );
 }
 
@@ -266,10 +322,33 @@ const styles = StyleSheet.create({
   /* ←—— Tweak these to move/resize your hotspot: ——→ */
   overlayTouchable: {
     position: "absolute",
-    bottom: "26%",                   // how far from bottom
-    right: "27%",                     // how far from right
-    width: 70,                     // hotspot width
-    height: 30,                 // hotspot height
+    bottom: "26%",                   
+    right: "27%",                    
+    width: 70,                     
+    height: 30,                 
+  },
+  overlayTouchableShop: {
+    position: "absolute",
+    bottom: "21.5%",                  
+    right: "27%",                     
+    width: 70,                     
+    height: 30,   
+  },
+
+  overlayTouchableRules: {
+    position: "absolute",
+    bottom: "17%",                   
+    right: "30%",                    
+    width: 70,                    
+    height: 30,
+  },
+
+  overlayTouchableTips: {
+    position: "absolute",
+    bottom: "42%",                   
+    left: "3%",                    
+    width: 83,                    
+    height: 105
   },
 
   navbarContainer: {

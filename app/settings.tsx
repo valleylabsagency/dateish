@@ -1,5 +1,5 @@
 // app/settings.tsx
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   ImageBackground,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Dimensions,
 } from "react-native";
+import PopUp from "../components/PopUp";
 
 const { width, height } = Dimensions.get("window");
 
@@ -49,33 +50,57 @@ const ICONS = [
   },
 ];
 
+// Map flags to human-readable titles
+const TITLE_MAP: Record<string, string> = {
+  "contact-us": "Contact Us",
+  "FAQ": "FAQ",
+  "my-account": "My Account",
+  "privacy-policy": "Privacy Policy",
+  "terms-conditions": "Terms & Conditions",
+};
+
 export default function SettingsScreen() {
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupFlag, setPopupFlag] = useState<string | null>(null);
+
   return (
-    <View style={styles.container}>
-      <ImageBackground
-        source={require("../assets/images/settings-background.png")}
-        style={styles.background}
-        resizeMode="cover"
-      >
-        {ICONS.map(({ key, source, position, wrapperSize, iconSize }) => (
-          <TouchableOpacity
-            key={key}
-            style={[
-              styles.iconWrapper,
-              position,
-              { width: wrapperSize.width, height: wrapperSize.height },
-            ]}
-            onPress={() => {}}
-          >
-            <Image
-              source={source}
-              style={{ width: iconSize.width, height: iconSize.height }}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        ))}
-      </ImageBackground>
-    </View>
+    <>
+      <View style={styles.container}>
+        <ImageBackground
+          source={require("../assets/images/settings-background.png")}
+          style={styles.background}
+          resizeMode="cover"
+        >
+          {ICONS.map(({ key, source, position, wrapperSize, iconSize }) => (
+            <TouchableOpacity
+              key={key}
+              style={[
+                styles.iconWrapper,
+                position,
+                { width: wrapperSize.width, height: wrapperSize.height },
+              ]}
+              onPress={() => {
+                setPopupFlag(key);
+                setPopupVisible(true);
+              }}
+            >
+              <Image
+                source={source}
+                style={{ width: iconSize.width, height: iconSize.height }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          ))}
+        </ImageBackground>
+      </View>
+
+      <PopUp
+        visible={popupVisible}
+        flag={popupFlag || undefined}
+        title={popupFlag ? TITLE_MAP[popupFlag] : undefined}
+        onClose={() => setPopupVisible(false)}
+      />
+    </>
   );
 }
 

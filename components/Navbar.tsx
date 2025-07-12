@@ -14,6 +14,7 @@ import {
 import { useRouter } from "expo-router";
 import { NavbarContext } from "../app/_layout";
 import { MusicContext } from "../contexts/MusicContext";
+import PopUp from "../components/PopUp";
 
 export default function Navbar() {
   const router = useRouter();
@@ -29,6 +30,9 @@ export default function Navbar() {
 
   // We track whether lines are actually visible on screen at all
   const [linesVisible, setLinesVisible] = useState(false);
+
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupFlag, setPopupFlag] = useState<string | null>(null);
 
   useEffect(() => {
     if (isPlaying) {
@@ -78,6 +82,7 @@ export default function Navbar() {
   }, [isPlaying]);
 
   return (
+    <>
     <View style={styles.navbar}>
       {/* Conditionally render the WC button */}
       
@@ -91,10 +96,19 @@ export default function Navbar() {
      
 
       <View style={styles.navSpacer} />
-      <View style={styles.moneysBar}>
+      <TouchableOpacity 
+        style={styles.moneysBar}
+        onPress={() => {
+          setPopupFlag("moneys");
+          setShowPopup(true);
+        }}
+      >
+     
+         
         <Text style={styles.moneysAmount}>10</Text>
         <Image style={styles.moneysImage} source={require("../assets/images/moneys.png")} />
-      </View>
+        
+      </TouchableOpacity>
 
       {/* Speaker icon area */}
       {soundLoading ? (
@@ -123,6 +137,15 @@ export default function Navbar() {
         </TouchableOpacity>
       )}
     </View>
+
+<PopUp
+       visible={showPopup}
+       flag={popupFlag || undefined}
+       onClose={() => setShowPopup(false)}
+     >
+       
+   </PopUp>
+</>
   );
 }
 

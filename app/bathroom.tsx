@@ -27,6 +27,7 @@ import { scale, verticalScale, moderateScale } from "react-native-size-matters";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, storage } from "../firebase";
 import { FontNames } from "../constants/fonts";
+import PopUp from "../components/PopUp";
 
 
 // resolve the asset to get its intrinsic size
@@ -47,6 +48,8 @@ export default function BathroomScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [descriptionError, setDescriptionError] = useState("");
   const [locationLoading, setLocationLoading] = useState(false);
+   const [showChitChats, setShowChitChats] = useState(false);
+   const [popupFlag, setPopupFlag] = useState<string | null>(null);
 
   // editing-about modal
   const [editingAbout, setEditingAbout] = useState(false);
@@ -212,6 +215,7 @@ export default function BathroomScreen() {
   if (!fontsLoaded) return null;
 
   return (
+    <>
     <ImageBackground
       source={bathroomImg}
       style={styles.background}
@@ -313,6 +317,10 @@ export default function BathroomScreen() {
         style={styles.hitbox}
         onPress={() => router.push('/settings')}
       />
+      <TouchableOpacity
+        style={styles.hitboxChats}
+        onPress={() => setShowChitChats(true)}
+      />
 
       {renderAboutEditor()}
 
@@ -326,6 +334,13 @@ export default function BathroomScreen() {
         <BottomNavbar selectedTab="bathroom" />
       </View>
     </ImageBackground>
+    <PopUp
+       visible={showChitChats}
+       flag={popupFlag || undefined}
+       title="Chit Chats"
+       onClose={() => setShowChitChats(false)}
+    />
+  </>
   );
 }
 
@@ -397,6 +412,13 @@ const styles = StyleSheet.create({
     left: "10%",
     width: 120,
     height: 120,
+  },
+  hitboxChats: {
+    position: 'absolute',
+    top: "70%",
+    right: "10%",
+    width: 120,
+    height: 80,
   },
   bottomNavbarContainer: {
     position: "absolute",
