@@ -219,19 +219,44 @@ export default function MinglesScreen() {
       </View>
     </View>
     <PopUp
-           visible={showPopupShop}
-           flag={popupFlag || undefined}
-           title="Shop"
-           onClose={() => setShowPopupShop(false)}
-         />
+      visible={showPopupShop}
+      flag={popupFlag || undefined}
+      title="Shop"
+      onClose={() => setShowPopupShop(false)}
+    />
            
     
-       <PopUp
-           visible={showPopupRules}
-           flag={popupFlag || undefined}
-           title="Rules"
-           onClose={() => setShowPopupRules(false)}
-         />
+    <PopUp
+    visible={showPopupRules}
+    flag={popupFlag || undefined}
+    title="Bar Rules"
+    onClose={() => setShowPopupRules(false)}
+  >
+  <View style={styles.rulesContainer}>
+    <View style={styles.hoursContainer}>
+      <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
+      <Text style={styles.hours}>17:00–05:00</Text>
+    </View>
+
+    <View style={styles.hoursContainer}>
+      <Text style={styles.hoursText}>Happy Hour:{"\n"}</Text>
+      <Text style={styles.hours}>17:00–21:00</Text>
+    </View> 
+
+    <View style={styles.hoursContainer}>
+      <View style={styles.vipContainer}>
+      <Text style={styles.vipText}>VIP</Text>
+      <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
+      </View>
+     
+      <Text style={styles.hours}>All Day Erry Day</Text>
+    </View>
+
+    <Text style={styles.ruleText}>No Nude Pics</Text>
+    <Text style={[styles.hoursText, {marginBottom: 50}]}>No Links Allowed</Text>
+    <Text style={styles.ruleText}>Age 21 and Up</Text>
+  </View>
+</PopUp>
          <PopUp
            visible={showPopupTips}
            flag={popupFlag || undefined}
@@ -356,6 +381,49 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: "100%",
   },
+  rulesContainer: {
+    marginTop: 8,
+    margin: "auto"
+    // if your content might overflow, you could wrap this View
+    // in a ScrollView instead
+  },
+  hoursContainer: {
+    alignItems: "center",
+    marginBottom: 8
+  },
+  hoursText: {
+    fontSize: 24,
+    color: "#d8bfd8",
+    fontFamily: FontNames.MontserratRegular,
+    textAlign: "center",
+    marginBottom: -25
+  },
+  hours: {
+    fontSize: 26,
+    color: "#ffe3d0",
+    fontFamily: FontNames.MontserratExtraLightItalic,
+    textAlign: "center",
+    marginBottom: 20
+  },
+  vipContainer: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  vipText: {
+    color: "red",          // highlight VIP in red
+    fontSize: 26,
+    fontFamily: FontNames.MontserratBold,
+    marginRight: 6,
+    marginBottom: 5
+  },
+  ruleText: {
+    fontSize: 26,
+    color: "#e78bbb",
+    textAlign: "center",
+    marginBottom: 50
+  }
 });
 
 // === DRINK MODAL STYLES (same as bar.tsx) ===
@@ -384,4 +452,5 @@ const drinkModalStyles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.5)",
   },
+  
 });
