@@ -101,8 +101,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     "/profile",
     "/entrance",
     "/welcome",
-    "/chat",    // your “normal” chat route
-    //    // chat entry-point from Bar2Screen
+    "/chat",
+    "/entranceAnimation"    
   ].includes(pathname);
 
 

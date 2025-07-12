@@ -76,15 +76,16 @@ export default function EntranceScreen() {
     setAuthError(false);
     try {
       if (firstTime) await signUp(username, password);
-      else await login(username, password);
+      else          await login(username, password);
       setShowAuth(false);
-      setPlayAnimation(true);
+      router.replace('/entranceAnimation')
     } catch {
       setAuthError(true);
     } finally {
       setLoadingAuth(false);
     }
   };
+  
 
   const onPlaybackStatusUpdate = (status: any) => {
     if (!hasStartedRef.current && status.positionMillis > 100) {
@@ -95,30 +96,8 @@ export default function EntranceScreen() {
     }
   };
 
-  // 1) VIDEO‐ONLY MODE: bail out entirely
-  if (playAnimation) {
-    return (
-      <View style={styles.container}>
-        <Video
-          ref={videoRef}
-          source={require("../assets/images/entrance-animation.mp4")}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-          shouldPlay
-          isLooping={false}
-          onLoad={() => setVideoReady(true)}
-          onPlaybackStatusUpdate={onPlaybackStatusUpdate}
-        />
-        {!videoReady && (
-          <View style={styles.loading}>
-            <ActivityIndicator size="large" color="#fff" />
-          </View>
-        )}
-      </View>
-    );
-  }
 
-  // 2) WAIT FOR FONTS
+  // WAIT FOR FONTS
   if (!fontsLoaded) {
     return (
       <View style={styles.loading}>
@@ -127,7 +106,7 @@ export default function EntranceScreen() {
     );
   }
 
-  // 3) MAIN + AUTH SHEET
+  //  MAIN + AUTH SHEET
   return (
     <View style={styles.container}>
       {/* — Main entrance screen — */}
@@ -173,7 +152,13 @@ export default function EntranceScreen() {
       </ImageBackground>
 
       {/* — Auth sheet on top, transparent so you can still see the entrance behind it — */}
-      <Modal visible={showAuth} transparent animationType="slide">
+      <Modal 
+            visible={showAuth} 
+            transparent 
+            animationType="slide"
+            onDismiss={() => setPlayAnimation(true)}
+            onRequestClose={() => setPlayAnimation(true)}
+      >
         <View style={authStyles.modalOverlay}>
           <ImageBackground
             source={require("../assets/images/clipboard.png")}
