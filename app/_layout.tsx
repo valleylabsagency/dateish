@@ -1,21 +1,31 @@
-import React, { useState, createContext, useEffect, useContext } from "react";
-import { View, Text, StyleSheet, TouchableWithoutFeedback, ImageBackground, ActivityIndicator, I18nManager, BackHandler } from "react-native";
-import { Stack, usePathname, useRouter, useLocalSearchParams} from "expo-router";
+import React, { useState, createContext, useEffect, useContext, useCallback, useMemo, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableWithoutFeedback,
+  ImageBackground,
+  ActivityIndicator,
+  I18nManager,
+  BackHandler,
+  Animated,
+  useWindowDimensions,
+} from "react-native";
+import { Stack, usePathname, useLocalSearchParams } from "expo-router";
 import Navbar from "../components/Navbar";
 import { ProfileProvider } from "../contexts/ProfileContext";
 import { FirstTimeProvider } from "../contexts/FirstTimeContext";
 import { MusicProvider, MusicContext } from "@/contexts/MusicContext";
 import { NotificationProvider, NotificationContext } from "@/contexts/NotificationContext";
 import InactivityHandler from "../components/InactivityHandler";
-import PresenceWrapper from "@/contexts/PresenceContext"
-import AuthWrapper from "@/contexts/AuthContext";
+import PresenceWrapper from "@/contexts/PresenceContext";
+import AuthWrapper from "../contexts/AuthContext";
 import * as Updates from "expo-updates";
 import { getDatabase, ref, onValue } from "firebase/database";
-
-
+import { Video, AVPlaybackStatus, ResizeMode } from "expo-av";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import * as NavigationBar from "expo-navigation-bar";
-
 import InAppNotification from "../components/InAppNotification";
 import OfflineNotice from "../components/OfflineNotice";
 
@@ -23,6 +33,8 @@ import OfflineNotice from "../components/OfflineNotice";
 import { auth, firestore } from "../firebase";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 
+// Prevent native splash from auto-hiding
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export const NavbarContext = createContext({
   showWcButton: false,
@@ -31,20 +43,105 @@ export const NavbarContext = createContext({
 
 function useDisableBackButton() {
   useEffect(() => {
-    const onBackPress = () => {
-      // Return true to prevent the default behavior (exit app or navigate back)
-      return true;
-    };
-
+    const onBackPress = () => true;
     const subscription = BackHandler.addEventListener(
       "hardwareBackPress",
       onBackPress
     );
-
     return () => subscription.remove();
   }, []);
 }
 
+/**
+ * Renders the splash video and calls onLoaded/onFinish events
+ */
+function SplashVideo({ onLoaded, onFinish }: { onLoaded: () => void; onFinish: () => void; }) {
+  const videoRef = useRef<any>(null);
+  const [lastStatus, setLastStatus] = useState<AVPlaybackStatus>({});
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+
+  return (
+    <Video
+      ref={videoRef}
+      source={
+        isTablet
+          ? require("../assets/images/splash-screen.mp4")
+          : require("../assets/images/splash-screen.mp4")
+      }
+      style={StyleSheet.absoluteFill}
+      shouldPlay={!(lastStatus.isLoaded && lastStatus.didJustFinish)}
+      isLooping={false}
+      resizeMode={ResizeMode.COVER}
+      onPlaybackStatusUpdate={(status) => {
+        if (status.isLoaded) {
+          if (!lastStatus.isLoaded) {
+            onLoaded();
+          }
+          if (status.didJustFinish) {
+            onFinish();
+          }
+        }
+        setLastStatus(status);
+      }}
+    />
+  );
+}
+
+/**
+ * Wraps children with animated fade-out after splash video and app load
+ */
+function AnimatedSplashScreen({ children }: { children: React.ReactNode }) {
+  const animation = useMemo(() => new Animated.Value(1), []);
+  const [isAppReady, setAppReady] = useState(false);
+  const [isSplashVideoComplete, setVideoComplete] = useState(false);
+  const [isSplashAnimationComplete, setAnimationComplete] = useState(false);
+
+  useEffect(() => {
+    if (isAppReady && isSplashVideoComplete) {
+      Animated.timing(animation, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => setAnimationComplete(true));
+    }
+  }, [isAppReady, isSplashVideoComplete]);
+
+  const onVideoLoaded = useCallback(async () => {
+    try {
+      await SplashScreen.hideAsync();
+      // load any resources if needed
+    } catch (e) {
+      console.warn(e);
+    } finally {
+      setAppReady(true);
+    }
+  }, []);
+
+  const videoElement = useMemo(() => (
+    <SplashVideo
+      onLoaded={onVideoLoaded}
+      onFinish={() => setVideoComplete(true)}
+    />
+  ), [onVideoLoaded]);
+
+  return (
+    <View style={{ flex: 1 }}>
+      {isAppReady && children}
+      {!isSplashAnimationComplete && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { opacity: animation },
+          ]}
+        >
+          {videoElement}
+        </Animated.View>
+      )}
+    </View>
+  );
+}
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [showWcButton, setShowWcButton] = useState(false);
@@ -59,57 +156,42 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // subscribe to the Realtime Database “Demo” flag
   useEffect(() => {
     const db = getDatabase();
-    const demoRef = ref(db, "demo"); // ← match your exact key
+    const demoRef = ref(db, "demo");
     const unsub = onValue(
       demoRef,
-      (snap) => {
-        console.log("🔥 demo snapshot:", snap.val());
-        setDemoAllowed(!!snap.val());
-      },
-      (err) => {
-        console.error("❌ demo onValue error:", err);
-        // if there’s a permissions error, bail out so you don’t spin forever
-        setDemoAllowed(false);
-      }
+      (snap) => setDemoAllowed(!!snap.val()),
+      () => setDemoAllowed(false)
     );
     return () => unsub();
   }, []);
-
 
   useEffect(() => {
     if (I18nManager.isRTL && !didForceRTL) {
       I18nManager.allowRTL(false);
       I18nManager.forceRTL(false);
-      setDidForceRTL(true);    // mark that we've done it
-      Updates.reloadAsync();   // reload once
+      setDidForceRTL(true);
+      Updates.reloadAsync();
     }
   }, [didForceRTL]);
 
   useEffect(() => {
-     if (demoAllowed === false && isPlaying) {
-       toggleMusic();
-     }
+    if (demoAllowed === false && isPlaying) toggleMusic();
   }, [demoAllowed]);
 
   useEffect(() => {
-    // Hide bottom navigation bar
     NavigationBar.setVisibilityAsync("hidden");
   }, []);
 
-  // Hide navbar on /profile, /welcome, and /chat pages.
   const hideNavbar = [
     "/profile",
     "/entrance",
     "/welcome",
     "/chat",
-    "/entranceAnimation"    
+    "/entranceAnimation",
   ].includes(pathname);
 
-
-  // Determine if we should wrap in MusicProvider.
   const shouldWrapMusic = pathname !== "/entrance";
 
-  // while we wait on the initial flag…
   if (demoAllowed === null) {
     return (
       <View style={styles.centered}>
@@ -118,79 +200,71 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // demo over screen
   if (demoAllowed === false) {
     return (
       <ImageBackground
-              source={require("../assets/images/chat-background.png")}
-              style={styles.background}
-              resizeMode="cover"
-            >
-              <View style={styles.centered}>
-        <Text style={styles.message}>
-          Demo trial is over, thanks for participating!
-        </Text>
-      </View>
-            </ImageBackground>
-      
+        source={require("../assets/images/chat-background.png")}
+        style={styles.background}
+        resizeMode="cover"
+      >
+        <View style={styles.centered}>
+          <Text style={styles.message}>
+            Demo trial is over, thanks for participating!
+          </Text>
+        </View>
+      </ImageBackground>
     );
   }
 
-
-    return (
+  return (
+    <AnimatedSplashScreen>
       <InactivityHandler>
         <AuthWrapper>
-        <PresenceWrapper>
-        {shouldWrapMusic ? (
-          <MusicProvider>
-            <NotificationProvider>
-              
-              <FirstTimeProvider>
-                <ProfileProvider>
-                  <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-                    <View style={styles.container}>
-                    <NotificationDisplay />
-                    <OfflineNotice />
-                   
-                      {!hideNavbar && <Navbar />}
-                      <Stack screenOptions={{ headerShown: false }} />
-                          
-                      <StatusBar hidden />
-                    </View>
-                  </NavbarContext.Provider>
-                </ProfileProvider>
-              </FirstTimeProvider>
-            </NotificationProvider>
-          </MusicProvider>
-        ) : (
-          <NotificationProvider>
-           
-            <FirstTimeProvider>
-              <ProfileProvider>
-                <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-                  <View style={styles.container}>
-                  <NotificationDisplay />
-                    <OfflineNotice />
-                    {!hideNavbar && <Navbar />}
-                    <Stack screenOptions={{ headerShown: false }} />
-                    <StatusBar hidden />
-                  </View>
-                </NavbarContext.Provider>
-              </ProfileProvider>
-            </FirstTimeProvider>
-          </NotificationProvider>
-        )}
-        </PresenceWrapper>
-      </AuthWrapper>
+          <PresenceWrapper>
+            {shouldWrapMusic ? (
+              <MusicProvider>
+                <NotificationProvider>
+                  <FirstTimeProvider>
+                    <ProfileProvider>
+                      <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
+                        <View style={styles.container}>
+                          <NotificationDisplay />
+                          <OfflineNotice />
+                          {!hideNavbar && <Navbar />}
+                          <Stack screenOptions={{ headerShown: false }} />
+                          <StatusBar hidden />
+                        </View>
+                      </NavbarContext.Provider>
+                    </ProfileProvider>
+                  </FirstTimeProvider>
+                </NotificationProvider>
+              </MusicProvider>
+            ) : (
+              <NotificationProvider>
+                <FirstTimeProvider>
+                  <ProfileProvider>
+                    <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
+                      <View style={styles.container}>
+                        <NotificationDisplay />
+                        <OfflineNotice />
+                        {!hideNavbar && <Navbar />}
+                        <Stack screenOptions={{ headerShown: false }} />
+                        <StatusBar hidden />
+                      </View>
+                    </NavbarContext.Provider>
+                  </ProfileProvider>
+                </FirstTimeProvider>
+              </NotificationProvider>
+            )}
+          </PresenceWrapper>
+        </AuthWrapper>
       </InactivityHandler>
-      
-    );
-  
+    </AnimatedSplashScreen>
+  );
 }
 
 function NotificationDisplay() {
   const { visible, message, partnerId, senderName, hideNotification } = useContext(NotificationContext);
-  //console.log('🔔 NotificationDisplay →', { visible, message, senderName });
   return (
     <InAppNotification
       visible={visible}
@@ -202,17 +276,9 @@ function NotificationDisplay() {
   );
 }
 
-
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  background: {
-    flex: 1,
-    justifyContent: "flex-start",
-    alignItems: "center",
-  },
+  container: { flex: 1 },
+  background: { flex: 1, justifyContent: "flex-start", alignItems: "center" },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   message: { fontSize: 32, textAlign: "center", padding: 20, color: "yellow" },
 });
