@@ -21,7 +21,7 @@ export default function EntranceAnimation() {
         source={require('../assets/images/entrance-animation.mp4')}
         style={StyleSheet.absoluteFill}
         shouldPlay
-        resizeMode='cover'
+        resizeMode="stretch"
         isLooping={false}
         onLoad={() => setReady(true)}
         onPlaybackStatusUpdate={onPlaybackStatusUpdate}
