@@ -1,283 +1,61 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+// mingles.tsx
+import React, { useState, useContext, useEffect } from "react";
 import {
   View,
   Text,
-  ActivityIndicator,
   ImageBackground,
   TouchableOpacity,
+  StyleSheet,
+  Dimensions,
   Image,
   Modal,
-  Animated,
-  Dimensions,
-  StyleSheet,
+  ActivityIndicator,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
-import { useRouter } from "expo-router";
-import { NavbarContext } from "./_layout";
-import { ProfileContext } from "../contexts/ProfileContext";
-import BottomNavbar from "../components/BottomNavbar";
-import { auth } from "../firebase";
 import { FontNames } from "../constants/fonts";
-import {
-  ScaledSheet,
-  moderateScale,
-  scale,
-  verticalScale,
-} from "react-native-size-matters";
+import BottomNavbar from "../components/BottomNavbar";
+import { MaterialIcons } from "@expo/vector-icons";
+import { ProfileContext } from "../contexts/ProfileContext";
+import { NavbarContext } from "../app/_layout";
+import PopUp from "../components/PopUp";
 
 const { width, height } = Dimensions.get("window");
-// Keep the dynamic width approach, but wrap in a scale() call
-const BUBBLE_WIDTH = scale(320);
+const BUBBLE_HEIGHT = height * 0.18;
 
-/* -------------------------------------------------------------------------- */
-/*                                BarMessages                                 */
-/* -------------------------------------------------------------------------- */
-function BarMessages() {
-  const messages = [
-    "Beep Boop Beep Mothafuckas!",
-    "Hello! I’m Mr. Mingles, how you doin?",
-    "Welcome to Dateish!",
-    "Yes. It’s another dating app.",
-    "Kinda…",
-    "We're not like other dating apps.",
-    'We don\'t have a fancy algorithm to match you with your "perfect match".',
-    "Here you have to talk to people to actually know if you're a good match.",
-    "Kinda old school… Go to a bar, talk to several people",
-    "And if you like someone, ask for their number!",
-    "Remember that shit??",
-    "Who will you see? Whoever is in the bar right now!",
-    "All genders and ages. Like REAL life.",
-    "I mean it’s still an app, but that’s the concept.",
-    "So first thing - go to the bathroom and make yourself a profile!",
-  ];
-
-  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
-  const [displayedText, setDisplayedText] = useState("");
-  const [isTyping, setIsTyping] = useState(true);
-  const [showMessages, setShowMessages] = useState(false);
-
-  const { setShowWcButton } = useContext(NavbarContext);
-
-  // Hide WC button on mount
-  useEffect(() => {
-    setShowWcButton(false);
-  }, [setShowWcButton]);
-
-  // Delay showing messages a bit
-  useEffect(() => {
-    const timer = setTimeout(() => setShowMessages(true), 1500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Animated pointer values
-  const speechPointerAnim = useRef(new Animated.Value(0)).current;
-  const wcPointerAnim = useRef(new Animated.Value(0)).current;
-
-  // Typewriter effect
-  useEffect(() => {
-    if (!showMessages) return;
-    const current = messages[currentMessageIndex];
-    setDisplayedText("");
-    setIsTyping(true);
-
-    let idx = 0;
-    const interval = setInterval(() => {
-      idx++;
-      if (idx > current.length) {
-        clearInterval(interval);
-        setIsTyping(false);
-      } else {
-        setDisplayedText(current.substring(0, idx));
-      }
-    }, 30);
-
-    return () => clearInterval(interval);
-  }, [currentMessageIndex, showMessages]);
-
-  // Animate pointer after first message
-  useEffect(() => {
-    if (showMessages && currentMessageIndex === 0 && !isTyping) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(speechPointerAnim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(speechPointerAnim, {
-            toValue: 0,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    }
-  }, [speechPointerAnim, currentMessageIndex, isTyping, showMessages]);
-
-  // Show WC pointer after the last message
-  useEffect(() => {
-    if (showMessages && currentMessageIndex === messages.length - 1 && !isTyping) {
-      setShowWcButton(true);
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(wcPointerAnim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(wcPointerAnim, {
-            toValue: 0,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    }
-  }, [
-    showMessages,
-    currentMessageIndex,
-    isTyping,
-    wcPointerAnim,
-    setShowWcButton,
-    messages.length,
-  ]);
-
-  // Press handler for continuing messages
-  const handlePress = () => {
-    if (!isTyping && currentMessageIndex < messages.length - 1) {
-      setCurrentMessageIndex(currentMessageIndex + 1);
-    }
-  };
-
-  if (!showMessages) {
-    return <View style={{ flex: 1 }} />;
-  }
-
-  return (
-    <View style={styles.bubbleOuterContainer}>
-      {/* The bubble (NOT tappable) */}
-      <View style={styles.bubbleContainer}>
-        <ImageBackground
-          source={require("../assets/images/speech-bubble.png")}
-          style={styles.speechBubbleBackground}
-          resizeMode="contain"
-        >
-          <View style={styles.textInsideBubble}>
-            <Text style={styles.dialogText}>{displayedText}</Text>
-          </View>
-        </ImageBackground>
-      </View>
-
-      {/* 
-        Square area for "Mr. Mingles" bounding box 
-        Tapping it continues the messages 
-      */}
-      <TouchableOpacity style={styles.mrMinglesTouchable} onPress={handlePress}>
-        {/* 
-          If you later add an actual Mr. Mingles image, 
-          put <Image .../> here 
-        */}
-      </TouchableOpacity>
-
-      {/* Speech pointer for first message */}
-      {currentMessageIndex === 0 && !isTyping && (
-        <Animated.View
-          style={[
-            styles.speechPointer,
-            {
-              opacity: speechPointerAnim,
-              transform: [
-                {
-                  translateX: speechPointerAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, moderateScale(-10)],
-                  }),
-                },
-                { rotate: "90deg" },
-              ],
-            },
-          ]}
-        >
-          <MaterialIcons name="pan-tool-alt" size={moderateScale(50)} color="#fff" />
-        </Animated.View>
-      )}
-
-      {/* WC pointer for last message */}
-      {currentMessageIndex === messages.length - 1 && !isTyping && (
-        <Animated.View
-          style={[
-            styles.wcPointer,
-            {
-              opacity: wcPointerAnim,
-              transform: [
-                {
-                  translateY: wcPointerAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, moderateScale(-10)],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <MaterialIcons name="pan-tool-alt" size={moderateScale(50)} color="#fff" />
-        </Animated.View>
-      )}
-    </View>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                          BarProfileComplete                                */
-/* -------------------------------------------------------------------------- */
-function BarProfileComplete() {
-  const [isTapState, setIsTapState] = useState(true);
+export default function MinglesScreen() {
+  const [fontsLoaded] = useFonts({
+    [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
+  });
   const { profile, saveProfile } = useContext(ProfileContext);
   const { setShowWcButton } = useContext(NavbarContext);
-  const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
-  
 
-  // Decide which text to show
-  const bubbleText = isTapState
-    ? "What would you like to drink?"
-    : "Go talk to some humans!";
+  const [showPopupShop, setShowPopupShop] = useState(false);
+  const [showPopupRules, setShowPopupRules] = useState(false);
+  const [showPopupTips, setShowPopupTips] = useState(false);
+  const [popupFlag, setPopupFlag] = useState<string | null>(null);
+
+  // new state for toggling the drink speech bubble
+  const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
 
   useEffect(() => {
     setShowWcButton(true);
   }, [setShowWcButton]);
 
-  // Default to water if no drink
-  useEffect(() => {
-    if (!profile.drink) {
-      saveProfile({ drink: "water" });
-    }
-  }, [profile, saveProfile]);
+  // Bubble messages
+  const messages = [
+    "What would you like to drink?",
+    "It's Happy Hour! Everything is half price!",
+    "Go talk to some humans!",
+  ];
+  const [idx, setIdx] = useState(0);
+  const prev = () => setIdx(i => Math.max(0, i - 1));
+  // mr mingles click cycles through messages, wrapping back to 0
+  const cycle = () => setIdx(i => (i + 1) % messages.length);
 
-  // When user taps "TAP," show the drink menu
+  // Drink‐menu modal state
   const [showDrinkMenu, setShowDrinkMenu] = useState(false);
-  const handleTapPress = () => setShowDrinkMenu(true);
   const [drinkLoading, setDrinkLoading] = useState(false);
-
-  // Drink selections
-  const handleDrinkSelect = async (drinkName: string) => {
-    setDrinkLoading(true);
-    try {
-      await saveProfile({ drink: drinkName });
-    } catch (error) {
-      console.error("Failed to update drink in profile:", error);
-    }
-    setShowDrinkMenu(false);
-    setDrinkLoading(false);
-    setIsTapState(false);
-  };
-
-  // Toggling bubble text on bubble press
-  const toggleBubbleText = () => {
-    setIsTapState((prev) => !prev);
-  };
-
-  const drinkMapping: { [key: string]: any } = {
+  const drinkMapping: Record<string, any> = {
     wine: require("../assets/images/icons/wine.png"),
     beer: require("../assets/images/icons/beer.png"),
     whiskey: require("../assets/images/icons/whiskey.png"),
@@ -287,8 +65,24 @@ function BarProfileComplete() {
     absinthe: require("../assets/images/icons/absinthe.png"),
     water: require("../assets/images/icons/water.png"),
   };
+  const handleDrinkSelect = async (drinkName: string) => {
+    setDrinkLoading(true);
+    try {
+      await saveProfile({ drink: drinkName });
+      setShowDrinkSpeech(false);
+    } catch (err) {
+      console.error(err);
+    }
+    setDrinkLoading(false);
+    setShowDrinkMenu(false);
+  };
 
-  const drinkTextMapping = {
+  // derive user's drink icon, size, and bubble text
+  const userDrink = (profile?.drink || "water").toLowerCase();
+  const drinkIcon = drinkMapping[userDrink];
+  const isSmall = ["vodka", "tequila"].includes(userDrink);
+  const drinkSize = isSmall ? width * 0.10 : width * 0.15;
+  const drinkTextMapping: Record<string, string> = {
     wine: "Where's the romance at?",
     beer: "Chill night... Sup?",
     whiskey: "I'm an adult.",
@@ -298,353 +92,358 @@ function BarProfileComplete() {
     absinthe: "Who are you?",
     water: "I don't need alcohol to have fun",
   };
+  const drinkText = drinkTextMapping[userDrink];
 
-
-  const drinkKey = profile.drink ? profile.drink.toLowerCase() : "water";
-  const drinkText = drinkTextMapping[drinkKey] || drinkTextMapping["water"];
-
-  const [fontsLoaded] = useFonts({
-    [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
-    [FontNames.MontserratBold]: require("../assets/fonts/Montserrat-Bold.ttf"),
-    [FontNames.MontserratBlack]: require("../assets/fonts/Montserrat-Black.ttf"),
-    [FontNames.MontserratExtraLight]: require("../assets/fonts/Montserrat-ExtraLight.ttf"),
-    [FontNames.MontserratExtraLightItalic]: require("../assets/fonts/Montserrat-ExtraLightItalic.ttf"),
-    [FontNames.MontSerratSemiBold]: require("../assets/fonts/Montserrat-SemiBold.ttf"),
-  });
-
-  if (!fontsLoaded) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
-    );
-  }
+  if (!fontsLoaded) return null;
 
   return (
     <>
-      {/* MAIN BUBBLE */}
-      <View style={styles.bubbleOuterContainer}>
-        {/* Tap anywhere on the bubble to toggle text */}
-        {bubbleText === "What would you like to drink?" ? (
-                <TouchableOpacity
-                style={styles.bubbleContainer}
-                onPress={handleTapPress}
-                activeOpacity={1}
-              >
-                <ImageBackground
-                  source={require("../assets/images/speech-bubble.png")}
-                  style={styles.speechBubbleBackground}
-                  resizeMode="contain"
-                >
-                  <View style={styles.textInsideBubble}>
-                    <Text style={[styles.dialogText, styles.drinkText]}>
-                      {bubbleText}
-                    </Text>
-                   
-                      <View style={styles.buttonRow}>
-                        <TouchableOpacity onPress={handleTapPress}>
-                          <Text style={styles.tapText}>TAP</Text>
-                        </TouchableOpacity>
-                      </View>
-                   
-                  </View>
-                </ImageBackground>
-              </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                style={styles.bubbleContainer}
-                onPress={toggleBubbleText}
-                activeOpacity={1}
-              >
-                <ImageBackground
-                  source={require("../assets/images/speech-bubble.png")}
-                  style={styles.speechBubbleBackground}
-                  resizeMode="contain"
-                >
-                  <View style={styles.textInsideBubble}>
-                    <Text style={[styles.dialogText, styles.drinkText]}>
-                      {bubbleText}
-                    </Text>
-                  </View>
-                </ImageBackground>
-              </TouchableOpacity>
-              )}
-              {/* Mr. Mingles bounding box for toggling text */}
-<TouchableOpacity style={styles.mrMinglesTouchable} onPress={toggleBubbleText}>
-  {/* Could add a Mr. Mingles image here if desired */}
-</TouchableOpacity>
-        {/* If user has a drink, show the icon below the bubble */}
-        {profile.drink && (
-          <TouchableOpacity style={styles.drinkIcon} onPress={() => setShowDrinkSpeech((prev) => !prev)}>
-            
-              <Image
-                source={drinkMapping[drinkKey]}
-                style={{width: "100%", height: "100%", position: "relative"}}
-                resizeMode="contain"
-              />
-              {showDrinkSpeech && (
-                <View style={styles.drinkSpeechBubble}>
-                  <Text style={styles.drinkSpeechBubbleText} >{drinkText}</Text>
-                </View>
-              )}
+      <View style={styles.container}>
+        {/* 1) BACKGROUND */}
+        <ImageBackground
+          source={require("../assets/images/mm-back.png")}
+          style={styles.background}
+          imageStyle={styles.backgroundImage}
+        />
 
+        {/* 2) MR. MINGLES – click to cycle messages */}
+        <TouchableOpacity
+          style={styles.minglesContainer}
+          onPress={cycle}
+          activeOpacity={0.8}
+        >
+          <Image
+            source={require("../assets/images/mr-mingles.png")}
+            style={styles.minglesImage}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+
+        {/* 3) BAR FRONT OVERLAY */}
+        <View style={styles.frontContainer}>
+          <Image
+            source={require("../assets/images/mm-front.png")}
+            style={styles.frontImage}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* 4) SPEECH BUBBLE */}
+        <View style={styles.bubbleContainer}>
+          <ImageBackground
+            source={require("../assets/images/speech-bubble.png")}
+            imageStyle={{ transform: [{ scaleX: -1 }] }}
+            style={styles.bubble}
+            resizeMode="stretch"
+          >
+            <TouchableOpacity onPress={prev} disabled={idx === 0} style={styles.arrow}>
+              <MaterialIcons
+                name="chevron-left"
+                size={32}
+                color={idx === 0 ? "rgba(255,255,255,0.3)" : "#fff"}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.bubbleContent}>
+              <Text style={styles.bubbleText}>{messages[idx]}</Text>
+              {idx === 0 && (
+                <TouchableOpacity style={styles.tapButton}>
+                  <Text style={styles.tapText}>- TAP -</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setIdx(i => Math.min(messages.length - 1, i + 1))}
+              disabled={idx === messages.length - 1}
+              style={styles.arrow}
+            >
+              <MaterialIcons
+                name="chevron-right"
+                size={32}
+                color={idx === messages.length - 1 ? "rgba(255,255,255,0.3)" : "#fff"}
+              />
+            </TouchableOpacity>
+          </ImageBackground>
+        </View>
+
+        {/* 5) DRINK MENU MODAL */}
+        <Modal visible={showDrinkMenu} transparent animationType="slide">
+          <View style={drinkModalStyles.modalOverlay}>
+            <View style={drinkModalStyles.modalContainer}>
+              <ImageBackground
+                source={require("../assets/images/drinks-menu.png")}
+                style={drinkModalStyles.menuBackground}
+                resizeMode="contain"
+              >
+                <TouchableOpacity
+                  style={drinkModalStyles.closeHotspot}
+                  onPress={() => setShowDrinkMenu(false)}
+                />
+                {Object.entries(drinkMapping).map(([name]) => (
+                  <TouchableOpacity
+                    key={name}
+                    style={drinkModalStyles[name]}
+                    onPress={() => handleDrinkSelect(name)}
+                  >
+                    <Image
+                      source={require("../assets/images/price-label.png")}
+                      style={drinkModalStyles.labelImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                ))}
+                {drinkLoading && (
+                  <View style={drinkModalStyles.loadingOverlay}>
+                    <ActivityIndicator size="large" color="#fff" />
+                  </View>
+                )}
+              </ImageBackground>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Hotspots */}
+        <TouchableOpacity
+          style={styles.overlayTouchable}
+          onPress={() => setShowDrinkMenu(true)}
+          activeOpacity={0.6}
+        />
+        <TouchableOpacity
+          style={styles.overlayTouchableShop}
+          onPress={() => {
+            setPopupFlag("shop");
+            setShowPopupShop(true);
+          }}
+          activeOpacity={0.6}
+        />
+        <TouchableOpacity
+          style={styles.overlayTouchableRules}
+          onPress={() => {
+            setPopupFlag("rules");
+            setShowPopupRules(true);
+          }}
+          activeOpacity={0.6}
+        />
+        <TouchableOpacity
+          style={styles.overlayTouchableTips}
+          onPress={() => {
+            setPopupFlag("tips");
+            setShowPopupTips(true);
+          }}
+          activeOpacity={0.6}
+        />
+
+        {/* 6) USER DRINK ICON + SPEECH – toggle on press, black background */}
+        {profile?.drink && (
+          <TouchableOpacity
+            style={[
+              styles.userDrinkIconContainer,
+              { top: isSmall ? height * 0.50 : height * 0.47 },
+            ]}
+            onPress={() => setShowDrinkSpeech(prev => !prev)}
+            activeOpacity={0.8}
+          >
+            {showDrinkSpeech && (
+              <View
+                style={[
+                  styles.drinkSpeechBubble,
+                  { bottom: drinkSize + 8 },
+                ]}
+              >
+                <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
+              </View>
+            )}
+            <Image
+              source={drinkIcon}
+              style={{ width: drinkSize, height: drinkSize }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         )}
+
+        {/* 7) BOTTOM NAVBAR */}
+        <View style={styles.navbarContainer}>
+          <BottomNavbar selectedTab="Mr. Mingles" />
+        </View>
       </View>
 
-      {/* DRINK MENU MODAL */}
-      <Modal animationType="slide" transparent={true} visible={showDrinkMenu}>
-        <View style={drinkModalStyles.modalOverlay}>
-          <View style={drinkModalStyles.modalContainer}>
-            <ImageBackground
-              source={require("../assets/images/drinks-menu.png")}
-              style={drinkModalStyles.menuBackground}
-              resizeMode="contain"
-            >
-              <TouchableOpacity
-                style={drinkModalStyles.closeHotspot}
-                onPress={() => setShowDrinkMenu(false)}
-              />
-              {[
-                { name: "wine", style: drinkModalStyles.wine },
-                { name: "beer", style: drinkModalStyles.beer },
-                { name: "whiskey", style: drinkModalStyles.whiskey },
-                { name: "martini", style: drinkModalStyles.martini },
-                { name: "vodka", style: drinkModalStyles.vodka },
-                { name: "tequila", style: drinkModalStyles.tequila },
-                { name: "absinthe", style: drinkModalStyles.absinthe },
-                { name: "water", style: drinkModalStyles.water },
-              ].map((label, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={[drinkModalStyles.labelContainer, label.style]}
-                  onPress={() => handleDrinkSelect(label.name)}
-                >
-                  <Image
-                    source={require("../assets/images/price-label.png")}
-                    style={drinkModalStyles.labelImage}
-                    resizeMode="contain"
-                  />
-                </TouchableOpacity>
-              ))}
-              {drinkLoading && (
-                <View style={drinkModalStyles.loadingOverlay}>
-                  <ActivityIndicator size="large" color="#fff" />
-                </View>
-              )}
-            </ImageBackground>
-          </View>
-        </View>
-      </Modal>
+      <PopUp
+        visible={showPopupShop}
+        flag={popupFlag || undefined}
+        title="Shop"
+        onClose={() => setShowPopupShop(false)}
+      />
+
+      <PopUp
+        visible={showPopupRules}
+        flag={popupFlag || undefined}
+        title="Bar Rules"
+        onClose={() => setShowPopupRules(false)}
+      >
+        {/* …bar rules content… */}
+      </PopUp>
+
+      <PopUp
+        visible={showPopupTips}
+        flag={popupFlag || undefined}
+        title="Tips"
+        onClose={() => setShowPopupTips(false)}
+      />
     </>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                 BarScreen                                  */
-/* -------------------------------------------------------------------------- */
-export default function BarScreen() {
-  const router = useRouter();
-  const user = auth.currentUser;
-  const { profile, profileComplete } = useContext(ProfileContext);
-
-  /*useEffect(() => {
-    if (!user) {
-      router.push("/welcome");
-    }
-  }, [user, router]);
-*/
-  if (!user || profile === null) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
-    );
-  }
-
-  return (
-    <ImageBackground
-      source={require("../assets/images/bar-background.png")}
-      style={styles.background}
-      resizeMode="cover"
-    >
-      {profileComplete ? <BarProfileComplete /> : <BarMessages />}
-
-      {profileComplete && (
-        <View style={styles.bottomNavbarContainer}>
-          <BottomNavbar selectedTab="Bar" />
-        </View>
-      )}
-    </ImageBackground>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                                 STYLES                                     */
-/* -------------------------------------------------------------------------- */
-const styles = ScaledSheet.create({
+const styles = StyleSheet.create({
+  container: { flex: 1 },
   background: {
-    flex: 1,
-    width: "100%",
-    height: "100%",
-  },
-  loadingContainer: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
   },
-  bottomNavbarContainer: {
+  backgroundImage: {
+    position: "absolute",
+    top: -70,
+    height: "100%",
+  },
+  minglesContainer: {
+    position: "absolute",
+    bottom: height * 0.1,
+    right: "8%",
+    width,
+    alignItems: "center",
+  },
+  minglesImage: {
+    width: width * 0.8,
+    height: height * 0.8,
+  },
+  frontContainer: {
+    position: "absolute",
+    bottom: 0,
+    width: "100%",
+    height: "80%",
+    alignItems: "center",
+  },
+  frontImage: {
+    width: "100%",
+    height: height * 0.7,
+  },
+  bubbleContainer: {
+    position: "absolute",
+    top: 20,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  bubble: {
+    width: width * 0.9,
+    height: BUBBLE_HEIGHT,
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  arrow: { width: 40, alignItems: "center" },
+  bubbleContent: { flex: 1, alignItems: "center" },
+  bubbleText: {
+    fontFamily: FontNames.MontserratRegular,
+    fontSize: 20,
+    color: "#fff",
+    textAlign: "center",
+  },
+  tapButton: {
+    marginTop: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  tapText: {
+    color: "#ffe3d0",
+    fontFamily: FontNames.MontserratRegular,
+    fontSize: 18,
+  },
+
+  overlayTouchable: {
+    position: "absolute",
+    bottom: "26%",
+    right: "27%",
+    width: 70,
+    height: 30,
+  },
+  overlayTouchableShop: {
+    position: "absolute",
+    bottom: "21.5%",
+    right: "27%",
+    width: 70,
+    height: 30,
+  },
+  overlayTouchableRules: {
+    position: "absolute",
+    bottom: "17%",
+    right: "30%",
+    width: 70,
+    height: 30,
+  },
+  overlayTouchableTips: {
+    position: "absolute",
+    bottom: "42%",
+    left: "3%",
+    width: 83,
+    height: 105,
+  },
+
+  userDrinkIconContainer: {
+    position: "absolute",
+    right: width * 0.31,
+    zIndex: 5,
+    alignItems: "center",
+  },
+  drinkSpeechBubble: {
+    position: "absolute",
+    backgroundColor: "rgba(0,0,0,0.8)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    maxWidth: width * 0.4,
+    alignItems: "center",
+  },
+  drinkSpeechBubbleText: {
+    color: "#fff",
+    fontFamily: FontNames.MontserratRegular,
+    fontSize: 14,
+    textAlign: "center",
+  },
+
+  navbarContainer: {
     position: "absolute",
     bottom: 0,
     width: "100%",
   },
-
-  /* -------------------- Bubble-based layout -------------------- */
-  bubbleOuterContainer: {
-    flex: 1,
-    justifyContent: "flex-start",
-    alignItems: "center",
-  },
-  bubbleContainer: {
-    width: BUBBLE_WIDTH,
-    height: moderateScale(180),
-    marginTop: moderateScale(20),
-  },
-  speechBubbleBackground: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    position: "relative",
-    paddingTop: 0,
-    bottom: moderateScale(-20),
-  },
-  textInsideBubble: {
-    backgroundColor: "transparent",
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(10),
-    alignItems: "center",
-    position: "relative",
-    bottom: moderateScale(15),
-  },
-  dialogText: {
-    color: "#fff",
-    fontSize: moderateScale(26),
-    lineHeight: moderateScale(26),
-    textAlign: "center",
-    fontFamily: FontNames.MontserratRegular,
-  },
-  drinkText: {
-    fontSize: moderateScale(26),
-  },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: moderateScale(15),
-  },
-  tapText: {
-    color: "#fff",
-    fontSize: moderateScale(20),
-    fontFamily: FontNames.MontserratExtraLight,
-  },
-  drinkIcon: {
-    width: scale(100),
-    height: scale(100),
-    position: "absolute",
-    top: "48%",
-    right: scale(175)
-  },
-  drinkSpeechBubble: {
-    position: "absolute",
-    // was bottom:70, right:0 => now relative
-    bottom: "110%", // place speech bubble above the icon
-    right: "5%",
-    backgroundColor: "rgba(0,0,0,0.8)",
-    padding: "5@ms",
-    borderRadius: "10@ms",
-    width: scale(100),
-  },
-  drinkSpeechBubbleText: {
-    color: "#fff",
-    fontSize: "14@ms", // moderateScale(14)
-    fontFamily: FontNames.MontserratRegular,
-    textAlign: "center"
-  },
-
-  /* 
-    Mr. Mingles bounding box for continuing messages 
-    (instead of tapping the entire bubble)
-  */
-  mrMinglesTouchable: {
-    position: "absolute",
-    top: "30%",
-    left: "45%",
-    width: "35%",
-    height: "25%",
-    zIndex: 999,
-  },
-
-  // Pointers
-  speechPointer: {
-    position: "absolute",
-    top: "40%",
-    right: "55%",
-  },
-  wcPointer: {
-    position: "absolute",
-    top: "1%",
-    left: "1%",
-  },
+  // …pop-up styles, rules, etc.
 });
 
-/* ---------------- Drink Modal Styles ---------------- */
-const drinkModalStyles = ScaledSheet.create({
+const drinkModalStyles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.8)",
     justifyContent: "center",
     alignItems: "center",
   },
-  modalContainer: {
-    width: "90%",
-    height: "80%",
-    backgroundColor: "transparent",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  closeHotspot: {
-    position: "absolute",
-    top: moderateScale(50),
-    right: 0,
-    width: moderateScale(80),
-    height: moderateScale(80),
-  },
-  menuBackground: {
-    width: "100%",
-    height: "100%",
-  },
-  labelContainer: {
-    position: "absolute",
-  },
-  wine: { top: "42.3%", left: "28%" },
-  beer: { top: "54.8%", left: "28%" },
-  whiskey: { top: "67%", left: "28%" },
-  martini: { top: "82%", left: "28%" },
-  vodka: { top: "42.3%", left: "75%" },
-  tequila: { top: "54.8%", left: "75%" },
-  absinthe: { top: "66.8%", left: "75%" },
-  water: { top: "82%", left: "75%" },
-  labelImage: {
-    width: moderateScale(55),
-    height: moderateScale(55),
-  },
+  modalContainer: { width: "90%", height: "80%", backgroundColor: "transparent" },
+  menuBackground: { width: "100%", height: "100%" },
+  closeHotspot: { position: "absolute", top: 40, right: 0, width: 80, height: 80 },
+  labelImage: { width: 55, height: 55 },
+  wine:    { position: "absolute", top: "42%", left: "28%" },
+  beer:    { position: "absolute", top: "55%", left: "28%" },
+  whiskey: { position: "absolute", top: "67%", left: "28%" },
+  martini: { position: "absolute", top: "82%", left: "28%" },
+  vodka:   { position: "absolute", top: "42%", left: "75%" },
+  tequila: { position: "absolute", top: "55%", left: "75%" },
+  absinthe:{ position: "absolute", top: "67%", left: "75%" },
+  water:   { position: "absolute", top: "82%", left: "75%" },
   loadingOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)"
-  }
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
 });

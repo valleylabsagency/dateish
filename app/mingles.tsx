@@ -34,11 +34,14 @@ export default function MinglesScreen() {
   const [showPopupTips, setShowPopupTips] = useState(false);
   const [popupFlag, setPopupFlag] = useState<string | null>(null);
 
+  // toggles the drink‐speech bubble
+  const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
+
   useEffect(() => {
     setShowWcButton(true);
   }, [setShowWcButton]);
 
-  // Bubble messages
+  // ─── Bubble messages ─────────────────────────
   const messages = [
     "What would you like to drink?",
     "It's Happy Hour! Everything is half price!",
@@ -46,9 +49,10 @@ export default function MinglesScreen() {
   ];
   const [idx, setIdx] = useState(0);
   const prev = () => setIdx(i => Math.max(0, i - 1));
-  const next = () => setIdx(i => Math.min(messages.length - 1, i + 1));
+  // cycles forward, wrapping to zero
+  const cycle = () => setIdx(i => (i + 1) % messages.length);
 
-  // Drink‐menu modal state
+  // ─── Drink menu modal ────────────────────────
   const [showDrinkMenu, setShowDrinkMenu] = useState(false);
   const [drinkLoading, setDrinkLoading] = useState(false);
   const drinkMapping: Record<string, any> = {
@@ -65,6 +69,7 @@ export default function MinglesScreen() {
     setDrinkLoading(true);
     try {
       await saveProfile({ drink: drinkName });
+      setShowDrinkSpeech(false);
     } catch (err) {
       console.error(err);
     }
@@ -72,200 +77,220 @@ export default function MinglesScreen() {
     setShowDrinkMenu(false);
   };
 
+  // ─── Derive drink icon + text ───────────────
+  const userDrink = (profile?.drink || "water").toLowerCase();
+  const drinkIcon = drinkMapping[userDrink];
+  const isSmall = ["vodka", "tequila"].includes(userDrink);
+  const drinkSize = isSmall ? width * 0.10 : width * 0.15;
+  const drinkTextMapping: Record<string, string> = {
+    wine: "Where's the romance at?",
+    beer: "Chill night... Sup?",
+    whiskey: "I'm an adult.",
+    martini: "I'm smart and beautiful!",
+    vodka: "Get the party started!",
+    tequila: "Gonna get fucked tonight",
+    absinthe: "Who are you?",
+    water: "I don't need alcohol to have fun",
+  };
+  const drinkText = drinkTextMapping[userDrink];
+
   if (!fontsLoaded) return null;
 
   return (
     <>
-    <View style={styles.container}>
-      {/* 1) BACKGROUND */}
-      <ImageBackground
-        source={require("../assets/images/mm-back.png")}
-        style={styles.background}
-        imageStyle={styles.backgroundImage}
-      />
-
-      {/* 2) MR. MINGLES BEHIND THE BAR FRONT */}
-      <View style={styles.minglesContainer}>
-        <Image
-          source={require("../assets/images/mr-mingles.png")}
-          style={styles.minglesImage}
-          resizeMode="contain"
-        />
-      </View>
-
-      {/* 3) BAR FRONT OVERLAY */}
-      <View style={styles.frontContainer}>
-        <Image
-          source={require("../assets/images/mm-front.png")}
-          style={styles.frontImage}
-          resizeMode="contain"
-        />
-      </View>
-
-      {/* 4) FLIPPED SPEECH BUBBLE */}
-      <View style={styles.bubbleContainer}>
+      <View style={styles.container}>
+        {/* 1) BACKGROUND */}
         <ImageBackground
-          source={require("../assets/images/speech-bubble.png")}
-          imageStyle={{ transform: [{ scaleX: -1 }] }}
-          style={styles.bubble}
-          resizeMode="stretch"
+          source={require("../assets/images/mm-back.png")}
+          style={styles.background}
+          imageStyle={styles.backgroundImage}
+        />
+
+        {/* 2) MR. MINGLES – clickable, cycles messages */}
+        <TouchableOpacity
+          style={styles.minglesContainer}
+          onPress={cycle}
+          activeOpacity={0.8}
         >
-          <TouchableOpacity onPress={prev} disabled={idx === 0} style={styles.arrow}>
-            <MaterialIcons
-              name="chevron-left"
-              size={32}
-              color={idx === 0 ? "rgba(255,255,255,0.3)" : "#fff"}
-            />
-          </TouchableOpacity>
+          <Image
+            source={require("../assets/images/mr-mingles.png")}
+            style={styles.minglesImage}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
 
-          <View style={styles.bubbleContent}>
-            <Text style={styles.bubbleText}>{messages[idx]}</Text>
-            {idx === 0 && (
-              <TouchableOpacity
-                style={styles.tapButton}
-          
-              >
-                <Text style={styles.tapText}>- TAP -</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <TouchableOpacity
-            onPress={next}
-            disabled={idx === messages.length - 1}
-            style={styles.arrow}
-          >
-            <MaterialIcons
-              name="chevron-right"
-              size={32}
-              color={idx === messages.length - 1 ? "rgba(255,255,255,0.3)" : "#fff"}
-            />
-          </TouchableOpacity>
-        </ImageBackground>
-      </View>
-
-      {/* 5) DRINK MENU MODAL */}
-      <Modal visible={showDrinkMenu} transparent animationType="slide">
-        <View style={drinkModalStyles.modalOverlay}>
-          <View style={drinkModalStyles.modalContainer}>
-            <ImageBackground
-              source={require("../assets/images/drinks-menu.png")}
-              style={drinkModalStyles.menuBackground}
-              resizeMode="contain"
-            >
-              <TouchableOpacity
-                style={drinkModalStyles.closeHotspot}
-                onPress={() => setShowDrinkMenu(false)}
-              />
-              {Object.entries(drinkMapping).map(([name]) => (
-                <TouchableOpacity
-                  key={name}
-                  style={drinkModalStyles[name]}
-                  onPress={() => handleDrinkSelect(name)}
-                >
-                  <Image
-                    source={require("../assets/images/price-label.png")}
-                    style={drinkModalStyles.labelImage}
-                    resizeMode="contain"
-                  />
-                </TouchableOpacity>
-              ))}
-              {drinkLoading && (
-                <View style={drinkModalStyles.loadingOverlay}>
-                  <ActivityIndicator size="large" color="#fff" />
-                </View>
-              )}
-            </ImageBackground>
-          </View>
+        {/* 3) BAR FRONT OVERLAY (no pointer events) */}
+        <View style={styles.frontContainer} pointerEvents="none">
+          <Image
+            source={require("../assets/images/mm-front.png")}
+            style={styles.frontImage}
+            resizeMode="contain"
+          />
         </View>
-      </Modal>
 
-      {/* ADJUSTABLE HOTSPOT Drinks */}
-      <TouchableOpacity
-        style={styles.overlayTouchable}
-        onPress={() => setShowDrinkMenu(true)}
-        activeOpacity={0.6}
-      />
+        {/* 4) SPEECH BUBBLE */}
+        <View style={styles.bubbleContainer}>
+          <ImageBackground
+            source={require("../assets/images/speech-bubble.png")}
+            imageStyle={{ transform: [{ scaleX: -1 }] }}
+            style={styles.bubble}
+            resizeMode="stretch"
+          >
+            <TouchableOpacity onPress={prev} disabled={idx === 0} style={styles.arrow}>
+              <MaterialIcons
+                name="chevron-left"
+                size={32}
+                color={idx === 0 ? "rgba(255,255,255,0.3)" : "#fff"}
+              />
+            </TouchableOpacity>
 
-      {/* ADJUSTABLE HOTSPOT Shop */}
-      <TouchableOpacity
-        style={styles.overlayTouchableShop}
-        onPress={() => {
-          setPopupFlag("shop");
-          setShowPopupShop(true);
-        }}
-        activeOpacity={0.6}
-      />
-      <TouchableOpacity
-        style={styles.overlayTouchableRules}
-        onPress={() => {
-          setPopupFlag("rules");
-          setShowPopupRules(true);
-        }}
-        activeOpacity={0.6}
-      />
-      <TouchableOpacity
-        style={styles.overlayTouchableTips}
-        onPress={() => {
-          setPopupFlag("tips");
-          setShowPopupTips(true);
-        }}
-        activeOpacity={0.6}
-      />
+            <View style={styles.bubbleContent}>
+              <Text style={styles.bubbleText}>{messages[idx]}</Text>
+              {idx === 0 && (
+                <TouchableOpacity style={styles.tapButton}>
+                  <Text style={styles.tapText}>- TAP -</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
-      {/* 7) BOTTOM NAVBAR */}
-      <View style={styles.navbarContainer}>
-        <BottomNavbar selectedTab="Mr. Mingles" />
+            <TouchableOpacity
+              onPress={() => setIdx(i => Math.min(messages.length - 1, i + 1))}
+              disabled={idx === messages.length - 1}
+              style={styles.arrow}
+            >
+              <MaterialIcons
+                name="chevron-right"
+                size={32}
+                color={idx === messages.length - 1 ? "rgba(255,255,255,0.3)" : "#fff"}
+              />
+            </TouchableOpacity>
+          </ImageBackground>
+        </View>
+
+        {/* 5) DRINK MENU MODAL */}
+        <Modal visible={showDrinkMenu} transparent animationType="slide">
+          <View style={drinkModalStyles.modalOverlay}>
+            <View style={drinkModalStyles.modalContainer}>
+              <ImageBackground
+                source={require("../assets/images/drinks-menu.png")}
+                style={drinkModalStyles.menuBackground}
+                resizeMode="contain"
+              >
+                <TouchableOpacity
+                  style={drinkModalStyles.closeHotspot}
+                  onPress={() => setShowDrinkMenu(false)}
+                />
+                {Object.entries(drinkMapping).map(([name]) => (
+                  <TouchableOpacity
+                    key={name}
+                    style={drinkModalStyles[name]}
+                    onPress={() => handleDrinkSelect(name)}
+                  >
+                    <Image
+                      source={require("../assets/images/price-label.png")}
+                      style={drinkModalStyles.labelImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                ))}
+                {drinkLoading && (
+                  <View style={drinkModalStyles.loadingOverlay}>
+                    <ActivityIndicator size="large" color="#fff" />
+                  </View>
+                )}
+              </ImageBackground>
+            </View>
+          </View>
+        </Modal>
+
+        {/* hotspots for drink/shop/rules/tips */}
+        <TouchableOpacity
+          style={styles.overlayTouchable}
+          onPress={() => setShowDrinkMenu(true)}
+          activeOpacity={0.6}
+        />
+        <TouchableOpacity
+          style={styles.overlayTouchableShop}
+          onPress={() => {
+            setPopupFlag("shop");
+            setShowPopupShop(true);
+          }}
+          activeOpacity={0.6}
+        />
+        <TouchableOpacity
+          style={styles.overlayTouchableRules}
+          onPress={() => {
+            setPopupFlag("rules");
+            setShowPopupRules(true);
+          }}
+          activeOpacity={0.6}
+        />
+        <TouchableOpacity
+          style={styles.overlayTouchableTips}
+          onPress={() => {
+            setPopupFlag("tips");
+            setShowPopupTips(true);
+          }}
+          activeOpacity={0.6}
+        />
+
+        {/* 6) USER DRINK ICON + SPEECH */}
+        {profile?.drink && (
+          <TouchableOpacity
+            style={[
+              styles.userDrinkIconContainer,
+              { top: isSmall ? height * 0.50 : height * 0.47 },
+            ]}
+            onPress={() => setShowDrinkSpeech(s => !s)}
+            activeOpacity={0.8}
+          >
+            {showDrinkSpeech && (
+              <View
+                style={[
+                  styles.drinkSpeechBubble,
+                  { bottom: drinkSize + 8 },
+                ]}
+              >
+                <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
+              </View>
+            )}
+            <Image
+              source={drinkIcon}
+              style={{ width: drinkSize, height: drinkSize }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* 7) BOTTOM NAV */}
+        <View style={styles.navbarContainer}>
+          <BottomNavbar selectedTab="Mr. Mingles" />
+        </View>
       </View>
-    </View>
-    <PopUp
-      visible={showPopupShop}
-      flag={popupFlag || undefined}
-      title="Shop"
-      onClose={() => setShowPopupShop(false)}
-    />
-           
-    
-    <PopUp
-    visible={showPopupRules}
-    flag={popupFlag || undefined}
-    title="Bar Rules"
-    onClose={() => setShowPopupRules(false)}
-  >
-  <View style={styles.rulesContainer}>
-    <View style={styles.hoursContainer}>
-      <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
-      <Text style={styles.hours}>17:00–05:00</Text>
-    </View>
 
-    <View style={styles.hoursContainer}>
-      <Text style={styles.hoursText}>Happy Hour:{"\n"}</Text>
-      <Text style={styles.hours}>17:00–21:00</Text>
-    </View> 
+      <PopUp
+        visible={showPopupShop}
+        flag={popupFlag || undefined}
+        title="Shop"
+        onClose={() => setShowPopupShop(false)}
+      />
 
-    <View style={styles.hoursContainer}>
-      <View style={styles.vipContainer}>
-      <Text style={styles.vipText}>VIP</Text>
-      <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
-      </View>
-     
-      <Text style={styles.hours}>All Day Erry Day</Text>
-    </View>
+      <PopUp
+        visible={showPopupRules}
+        flag={popupFlag || undefined}
+        title="Bar Rules"
+        onClose={() => setShowPopupRules(false)}
+      >
+        {/* … */}
+      </PopUp>
 
-    <Text style={styles.ruleText}>No Nude Pics</Text>
-    <Text style={[styles.hoursText, {marginBottom: 50}]}>No Links Allowed</Text>
-    <Text style={styles.ruleText}>Age 21 and Up</Text>
-  </View>
-</PopUp>
-         <PopUp
-           visible={showPopupTips}
-           flag={popupFlag || undefined}
-           title="Tips"
-           onClose={() => setShowPopupTips(false)}
-         />
-           
-    
-       </>
+      <PopUp
+        visible={showPopupTips}
+        flag={popupFlag || undefined}
+        title="Tips"
+        onClose={() => setShowPopupTips(false)}
+      />
+    </>
   );
 }
 
@@ -281,31 +306,29 @@ const styles = StyleSheet.create({
     top: -70,
     height: "100%",
   },
-
   minglesContainer: {
     position: "absolute",
     bottom: height * 0.1,
     right: "8%",
-    width: width,
+    width,
     alignItems: "center",
   },
   minglesImage: {
     width: width * 0.8,
     height: height * 0.8,
   },
-
   frontContainer: {
     position: "absolute",
-    bottom: "0%",
+    bottom: 0,
     width: "100%",
     height: "80%",
     alignItems: "center",
+    // pointerEvents none above
   },
   frontImage: {
     width: "100%",
-    height: height * 0.70,
+    height: height * 0.7,
   },
-
   bubbleContainer: {
     position: "absolute",
     top: 20,
@@ -321,10 +344,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   arrow: { width: 40, alignItems: "center" },
-  bubbleContent: { flex: 1, alignItems: "center" },
+  bubbleContent: { flex: 1, alignItems: "center", position: "relative", bottom: "10%" },
   bubbleText: {
-    position: "relative",
-    bottom: 10,
     fontFamily: FontNames.MontserratRegular,
     fontSize: 20,
     color: "#fff",
@@ -335,98 +356,67 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 8,
     borderRadius: 8,
-    position: "relative",
-    bottom: 10,
   },
   tapText: {
     color: "#ffe3d0",
     fontFamily: FontNames.MontserratRegular,
     fontSize: 18,
   },
-
-  /* ←—— Tweak these to move/resize your hotspot: ——→ */
   overlayTouchable: {
     position: "absolute",
-    bottom: "26%",                   
-    right: "27%",                    
-    width: 70,                     
-    height: 30,                 
+    bottom: "26%",
+    right: "27%",
+    width: 70,
+    height: 30,
   },
   overlayTouchableShop: {
     position: "absolute",
-    bottom: "21.5%",                  
-    right: "27%",                     
-    width: 70,                     
-    height: 30,   
-  },
-
-  overlayTouchableRules: {
-    position: "absolute",
-    bottom: "17%",                   
-    right: "30%",                    
-    width: 70,                    
+    bottom: "21.5%",
+    right: "27%",
+    width: 70,
     height: 30,
   },
-
+  overlayTouchableRules: {
+    position: "absolute",
+    bottom: "17%",
+    right: "30%",
+    width: 70,
+    height: 30,
+  },
   overlayTouchableTips: {
     position: "absolute",
-    bottom: "42%",                   
-    left: "3%",                    
-    width: 83,                    
-    height: 105
+    bottom: "42%",
+    left: "3%",
+    width: 83,
+    height: 105,
   },
-
+  userDrinkIconContainer: {
+    position: "absolute",
+    right: width * 0.31,
+    zIndex: 5,
+    alignItems: "center",
+  },
+  drinkSpeechBubble: {
+    position: "absolute",
+    backgroundColor: "rgba(0,0,0,0.8)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    width: 200,
+    alignItems: "center",
+  },
+  drinkSpeechBubbleText: {
+    color: "#fff",
+    fontFamily: FontNames.MontserratRegular,
+    fontSize: 14,
+    textAlign: "center",
+  },
   navbarContainer: {
     position: "absolute",
     bottom: 0,
     width: "100%",
   },
-  rulesContainer: {
-    marginTop: 8,
-    margin: "auto"
-    // if your content might overflow, you could wrap this View
-    // in a ScrollView instead
-  },
-  hoursContainer: {
-    alignItems: "center",
-    marginBottom: 8
-  },
-  hoursText: {
-    fontSize: 24,
-    color: "#d8bfd8",
-    fontFamily: FontNames.MontserratRegular,
-    textAlign: "center",
-    marginBottom: -25
-  },
-  hours: {
-    fontSize: 26,
-    color: "#ffe3d0",
-    fontFamily: FontNames.MontserratExtraLightItalic,
-    textAlign: "center",
-    marginBottom: 20
-  },
-  vipContainer: {
-    display: "flex",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  vipText: {
-    color: "red",          // highlight VIP in red
-    fontSize: 26,
-    fontFamily: FontNames.MontserratBold,
-    marginRight: 6,
-    marginBottom: 5
-  },
-  ruleText: {
-    fontSize: 26,
-    color: "#e78bbb",
-    textAlign: "center",
-    marginBottom: 50
-  }
 });
-
-// === DRINK MODAL STYLES (same as bar.tsx) ===
 const drinkModalStyles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
@@ -452,5 +442,4 @@ const drinkModalStyles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.5)",
   },
-  
 });

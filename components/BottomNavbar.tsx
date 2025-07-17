@@ -58,7 +58,7 @@ export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
 
 const ICON_SIZE                = 40;
 const BAR_ICON_SIZE            = 52;
-const BAR_ICON_SELECTED_SIZE   = 90;   // <-- bump this if you want your bar icon even bigger
+const BAR_ICON_SELECTED_SIZE   = 70;   // <-- bump this if you want your bar icon even bigger
 const BORDER_WIDTH             = 2;
 const BAR_LIFT                 = -20;  // <-- how far to lift the Bar tab above the navbar
 const PINK                      = '#e98dbd';
@@ -94,12 +94,12 @@ const styles = StyleSheet.create({
     marginTop: BAR_LIFT,
     height: '125%',
     paddingTop: 15,
-    flex: 1.7,
+    flex: 1.3,
     zIndex: 1
   },
 
   barSelectedLabel: {
-    fontSize: 18,
+    fontSize: 15,
     marginTop: 5
   },
 
