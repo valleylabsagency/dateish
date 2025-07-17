@@ -20,9 +20,10 @@ import { collection, getDocs } from "firebase/firestore";
 import { getDatabase, ref, onValue } from "firebase/database";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
+import { scale } from "react-native-size-matters";
 
 const { width, height } = Dimensions.get("window");
+const BUBBLE_HEIGHT = height * 0.18;           // height for the speech bubble
 // Spacing for the avatars
 const START_OFFSET_RATIO = 0.085;
 const SPACING_RATIO      = 0.2;
@@ -44,19 +45,17 @@ export default function Bar2Screen() {
   // NEW: whether we've tapped "Start Chatting"
   const [started, setStarted] = useState(false);
 
+  // load persisted "started" flag
   useEffect(() => {
     (async () => {
       try {
         const saved = await AsyncStorage.getItem("bar2Started");
-        if (saved === "true") {
-          setStarted(true);
-        }
+        if (saved === "true") setStarted(true);
       } catch (e) {
         console.error("Load start-chat flag:", e);
       }
     })();
   }, []);
-  
 
   // 1) fetch all other users
   useEffect(() => {
@@ -111,9 +110,20 @@ export default function Bar2Screen() {
       source={require("../assets/images/bar-back.png")}
       style={styles.background}
     >
-      {/* ─── WELCOME MODE: Mr. Mingles + button ────────────────────────── */}
+      {/* ─── WELCOME MODE: Mr. Mingles + speech bubble + button ───────── */}
       {!started && (
         <>
+          {/* Speech bubble (blank for now) */}
+          <View style={styles.bubbleContainer}>
+            <ImageBackground
+              source={require("../assets/images/speech-bubble.png")}
+              style={styles.bubble}
+              resizeMode="stretch"
+            >
+              {/* intentionally left blank */}
+            </ImageBackground>
+          </View>
+
           <View style={styles.minglesContainer}>
             <Image
               source={require("../assets/images/mr-mingles.png")}
@@ -128,11 +138,9 @@ export default function Bar2Screen() {
               try {
                 await AsyncStorage.setItem("bar2Started", "true");
               } catch (e) {
-                console.error("Save start-chat flag:", e)
+                console.error("Save start-chat flag:", e);
               }
-            }
-
-            }
+            }}
           >
             <Text style={styles.startButtonText}>Start Chatting</Text>
           </TouchableOpacity>
@@ -247,6 +255,20 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
     alignItems: "center",
   },
+  // ─── BUBBLE ───────────────────────────────────
+  bubbleContainer: {
+    position: "absolute",
+    bottom: height * 0.72,    // sits just above Mr. Mingles
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 1,
+  },
+  bubble: {
+    width: width * 0.9,
+    height: BUBBLE_HEIGHT,
+  },
+
   // ─── NEW: Mr. Mingles ─────────────────────────
   minglesContainer: {
     position: "absolute",
@@ -259,7 +281,6 @@ const styles = StyleSheet.create({
   minglesImage: {
     width: width * 0.8,
     height: height * 0.8,
-    zIndex: 1
   },
   startButton: {
     position: "absolute",
@@ -270,27 +291,24 @@ const styles = StyleSheet.create({
     borderColor: "#460b2a",
     width: "80%",
     height: 70,
-    textAlign: "center",
-    //paddingHorizontal: 24,
-   // paddingVertical: 12,
     borderRadius: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.7,
     shadowRadius: 6,
-  // boost Android elevation if you want it stronger:
     elevation: 8,
-    zIndex: 10
+    zIndex: 10,
+    paddingTop: 10
   },
   startButtonText: {
     fontSize: 32,
     fontFamily: FontNames.MontserratRegular,
     textTransform: "uppercase",
     color: "#ffe3d0",
-    margin: "auto",
+    textAlign: "center",
   },
 
-  // ─── ONLINE ROW (only when started) ─────────
+  // ─── ONLINE ROW ──────────────────────────────
   onlineRow: {
     position: "absolute",
     top: "62%",
@@ -308,12 +326,12 @@ const styles = StyleSheet.create({
     bottom: "-5%",
     width: "100%",
     alignItems: "center",
-    zIndex: 2
+    zIndex: 2,
   },
   barFront: {
     width: "100%",
     height: 730,
-    zIndex: 2
+    zIndex: 2,
   },
 
   // ─── NAVBAR ──────────────────────────────────
@@ -322,7 +340,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: "100%",
     zIndex: 20,
-    elevation: 20
+    elevation: 20,
   },
 
   // ─── PROFILE MODAL ───────────────────────────
@@ -403,3 +421,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+export { Bar2Screen };

@@ -185,7 +185,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const hideNavbar = [
-    "/profile",
+    "/bathroom",
+    "/settings",
     "/entrance",
     "/welcome",
     "/chat",

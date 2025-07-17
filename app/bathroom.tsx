@@ -242,6 +242,7 @@ export default function BathroomScreen() {
       resizeMode="stretch"
       imageStyle={{ aspectRatio: BG_ASPECT_RATIO }}
     >
+       <ProfileNavbar onBack={handleSubmit} />
       <View style={styles.formContainer}>
         <TextInput
           style={styles.input}
@@ -252,7 +253,7 @@ export default function BathroomScreen() {
         />
 
         <TextInput
-          style={styles.input}
+          style={[styles.input, {marginTop: "3%"}]}
           placeholder="Age"
           placeholderTextColor="#999"
           value={age}
@@ -382,7 +383,7 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     position: "absolute",
-    top: verticalScale(110),
+    top: verticalScale(130),
     alignSelf: "center",
     width: "90%",
   },
@@ -396,7 +397,7 @@ const styles = StyleSheet.create({
   },
   locationContainer: {
     alignItems: "center",
-    marginVertical: verticalScale(5),
+    marginVertical: verticalScale(7),
   },
   editButton: {
     paddingHorizontal: scale(8),

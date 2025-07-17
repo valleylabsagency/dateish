@@ -9,6 +9,8 @@ import {
   Dimensions,
 } from "react-native";
 import PopUp from "../components/PopUp";
+import ProfileNavbar from "../components/ProfileNavbar";
+import { useRouter } from "expo-router";
 
 const { width, height } = Dimensions.get("window");
 
@@ -16,35 +18,35 @@ const ICONS = [
   {
     key: "contact-us",
     source: require("../assets/images/icons/contact-us.png"),
-    position: { top: "24%", left: "50%" },
+    position: { top: "26%", left: "50%" },
     wrapperSize: { width: 70, height: 70 },
     iconSize: { width: 150, height: 150 },
   },
   {
     key: "FAQ",
     source: require("../assets/images/icons/FAQ.png"),
-    position: { top: "33%", right: "40%" },
+    position: { top: "35%", right: "40%" },
     wrapperSize: { width: 60, height: 60 },
     iconSize: { width: 80, height: 80 },
   },
   {
     key: "my-account",
     source: require("../assets/images/icons/my-account.png"),
-    position: { top: height * 0.15, left: "30%" },
+    position: { top: height * 0.19, left: "30%" },
     wrapperSize: { width: 80, height: 80 },
     iconSize: { width: 150, height: 150 },
   },
   {
     key: "privacy-policy",
     source: require("../assets/images/icons/privacy-policy.png"),
-    position: { top: height * 0.35, right: "15%" },
+    position: { top: height * 0.4, right: "15%" },
     wrapperSize: { width: 65, height: 65 },
     iconSize: { width: 85, height: 85 },
   },
   {
     key: "terms-conditions",
     source: require("../assets/images/icons/terms-conditions.png"),
-    position: { bottom: "50%", left: width * 0.2 },
+    position: { bottom: "48%", left: width * 0.2 },
     wrapperSize: { width: 75, height: 75 },
     iconSize: { width: 80, height: 80 },
   },
@@ -62,6 +64,7 @@ const TITLE_MAP: Record<string, string> = {
 export default function SettingsScreen() {
   const [popupVisible, setPopupVisible] = useState(false);
   const [popupFlag, setPopupFlag] = useState<string | null>(null);
+  const router = useRouter();
 
   return (
     <>
@@ -69,8 +72,10 @@ export default function SettingsScreen() {
         <ImageBackground
           source={require("../assets/images/settings-background.png")}
           style={styles.background}
-          resizeMode="cover"
+          resizeMode="stretch"
+          imageStyle={{ transform: [{ translateY: height * 0.03 }] }}
         >
+                <ProfileNavbar onBack={() => router.back()} />
           {ICONS.map(({ key, source, position, wrapperSize, iconSize }) => (
             <TouchableOpacity
               key={key}
