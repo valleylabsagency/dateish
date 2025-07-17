@@ -212,25 +212,27 @@ const listStyles = StyleSheet.create({
     alignItems: "center",
   },
   conversationContainer: {
-    width: "100%",
+    width: "95%",
     position: "relative",
     marginBottom: 20,
+    marginLeft: "4%",
   },
   disabledConversation: {
-    width: "100%",
+    width: "95%",
     opacity: 0.5,
     position: "relative",
     marginBottom: 20,
+    marginLeft: "4%",
   },
   trashOnline: {
     position: "absolute",
-    top: 20,
-    right: 10,
+    top: "40%",
+    right: "7%",
   },
   trashOffline: {
     position: "absolute",
-    top: 20,
-    right: 10,
+    top: "40%",
+    right: "7%",
   },
   bottomNavbar: {
     position: "absolute",

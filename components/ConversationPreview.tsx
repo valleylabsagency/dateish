@@ -89,7 +89,7 @@ const conversationStyles = StyleSheet.create({
     borderWidth: 2,
     width: "95%",
     height: 180,
-    borderRadius: 10,
+    borderRadius: 25,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 10,
@@ -112,6 +112,8 @@ const conversationStyles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     alignSelf: "flex-end",
+    marginBottom: 8,
+    marginRight: 8
   },
 
 });
