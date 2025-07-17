@@ -26,8 +26,12 @@ import { ProfileContext } from "../contexts/ProfileContext";
 import { scale, verticalScale, moderateScale } from "react-native-size-matters";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, storage } from "../firebase";
+import { logout } from "../services/authservice";
 import { FontNames } from "../constants/fonts";
 import PopUp from "../components/PopUp";
+import { MusicContext } from "../contexts/MusicContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 
 
 // resolve the asset to get its intrinsic size
@@ -48,9 +52,9 @@ export default function BathroomScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [descriptionError, setDescriptionError] = useState("");
   const [locationLoading, setLocationLoading] = useState(false);
-   const [showChitChats, setShowChitChats] = useState(false);
-   const [popupFlag, setPopupFlag] = useState<string | null>(null);
-
+  const [showChitChats, setShowChitChats] = useState(false);
+  const [popupFlag, setPopupFlag] = useState<string | null>(null);
+  const { isPlaying, toggleMusic } = useContext(MusicContext);
   // editing-about modal
   const [editingAbout, setEditingAbout] = useState(false);
   const [modalTypedText, setModalTypedText] = useState("");
@@ -173,6 +177,22 @@ export default function BathroomScreen() {
       console.error(e);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    if (isPlaying) {
+      toggleMusic();
+    }
+    try {
+      await logout();
+      await AsyncStorage.removeItem("userProfile");
+      await AsyncStorage.removeItem("bar2Started");
+      setTimeout(() => {
+        router.push("/entrance");
+      }, 100)
+    } catch (error) {
+      console.error("Logout error:", error);
     }
   };
 
@@ -324,6 +344,15 @@ export default function BathroomScreen() {
 
       {renderAboutEditor()}
 
+      {profileComplete && (
+        <View style={styles.logoutContainer}>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>LOG OUT</Text>
+          </TouchableOpacity>
+        </View>
+              )}
+
+
       {isSaving && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#fff" />
@@ -430,6 +459,25 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  logoutContainer: {
+    position: "absolute",
+    // was bottom: 40 => verticalScale(40)
+    bottom: verticalScale(60),
+    width: "100%",
+    alignItems: "center",
+  },
+  logoutButton: {
+    backgroundColor: "#D9534F",
+    paddingVertical: verticalScale(15),
+    paddingHorizontal: scale(50),
+    borderRadius: 30,
+    elevation: 5,
+  },
+  logoutButtonText: {
+    color: "#fff",
+    fontSize: scale(16), 
+    fontFamily: FontNames.MontserratBold,
   },
 });
 

@@ -19,6 +19,8 @@ import { firestore, auth } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { getDatabase, ref, onValue } from "firebase/database";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 
 const { width, height } = Dimensions.get("window");
 // Spacing for the avatars
@@ -41,6 +43,20 @@ export default function Bar2Screen() {
 
   // NEW: whether we've tapped "Start Chatting"
   const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem("bar2Started");
+        if (saved === "true") {
+          setStarted(true);
+        }
+      } catch (e) {
+        console.error("Load start-chat flag:", e);
+      }
+    })();
+  }, []);
+  
 
   // 1) fetch all other users
   useEffect(() => {
@@ -107,7 +123,16 @@ export default function Bar2Screen() {
           </View>
           <TouchableOpacity
             style={styles.startButton}
-            onPress={() => setStarted(true)}
+            onPress={async () => {
+              setStarted(true);
+              try {
+                await AsyncStorage.setItem("bar2Started", "true");
+              } catch (e) {
+                console.error("Save start-chat flag:", e)
+              }
+            }
+
+            }
           >
             <Text style={styles.startButtonText}>Start Chatting</Text>
           </TouchableOpacity>
