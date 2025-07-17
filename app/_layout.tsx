@@ -130,7 +130,9 @@ function AnimatedSplashScreen({ children }: { children: React.ReactNode }) {
       {isAppReady && children}
       {!isSplashAnimationComplete && (
         <Animated.View
-          pointerEvents="none"
+          pointerEvents="box-only"
+          onStartShouldSetResponder={() => true}
+          onResponderTerminationRequest={() => false}
           style={[
             StyleSheet.absoluteFill,
             { opacity: animation },
