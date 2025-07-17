@@ -10,6 +10,7 @@ import {
   Animated
 } from "react-native";
 import { MusicContext } from "../contexts/MusicContext";
+import PopUp from "../components/PopUp";
 
 interface ProfileNavbarProps {
   onBack: () => void;
@@ -26,6 +27,8 @@ export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
 
   // We track whether lines are actually visible on screen at all
   const [linesVisible, setLinesVisible] = useState(false);
+   const [showPopup, setShowPopup] = useState(false);
+    const [popupFlag, setPopupFlag] = useState<string | null>(null);
 
   useEffect(() => {
     if (isPlaying) {
@@ -68,6 +71,7 @@ export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
   }, [isPlaying]);
 
   return (
+    <>
     <View style={profileNavbarStyles.navbar}>
       <TouchableOpacity onPress={onBack}>
         <Image
@@ -79,10 +83,15 @@ export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
 
       <View style={profileNavbarStyles.navSpacer} />
 
-      <View style={profileNavbarStyles.moneysBar}>
+      <TouchableOpacity 
+        style={profileNavbarStyles.moneysBar}
+        onPress={() => {
+          setPopupFlag("moneys");
+          setShowPopup(true);
+        }}>
               <Text style={profileNavbarStyles.moneysAmount}>10</Text>
               <Image style={profileNavbarStyles.moneysImage} source={require("../assets/images/moneys.png")} />
-            </View>
+            </TouchableOpacity>
 
       {/* Speaker icon area */}
       {soundLoading ? (
@@ -110,6 +119,14 @@ export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
         </TouchableOpacity>
       )}
     </View>
+    <PopUp
+           visible={showPopup}
+           flag={popupFlag || undefined}
+           onClose={() => setShowPopup(false)}
+         >
+           
+       </PopUp>
+       </>
   );
 }
 
