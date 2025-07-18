@@ -31,6 +31,7 @@ import { FontNames } from "../constants/fonts";
 import PopUp from "../components/PopUp";
 import { MusicContext } from "../contexts/MusicContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 
 
 
@@ -64,6 +65,16 @@ export default function BathroomScreen() {
   // Mr. Mingles warning modal
   const [modalVisible, setModalVisible] = useState(false);
   const rollAnim = useRef(new Animated.Value(500)).current;
+  const [chats, setChats] = useState<SavedChat[]>([])
+
+function handleSave(type: ChatType, content: string) {
+  setChats((prev) => [...prev, { type, content }])
+}
+
+function handleDelete(idx: number) {
+  setChats((prev) => prev.filter((_, i) => i !== idx))
+}
+
 
   // pre-fill from context
   useEffect(() => {
@@ -341,6 +352,14 @@ export default function BathroomScreen() {
       <TouchableOpacity
         style={styles.hitboxChats}
         onPress={() => setShowChitChats(true)}
+      />
+
+      <ChitChats
+        visible={showChitChats}
+        onClose={() => setShowChitChats(false)}
+        existingChats={chats}
+        onSave={handleSave}
+        onDelete={handleDelete}
       />
 
       {renderAboutEditor()}
