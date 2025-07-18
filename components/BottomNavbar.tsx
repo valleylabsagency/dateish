@@ -56,7 +56,7 @@ export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
   );
 }
 
-const ICON_SIZE                = 40;
+const ICON_SIZE                = 35;
 const BAR_ICON_SIZE            = 52;
 const BAR_ICON_SELECTED_SIZE   = 70;   // <-- bump this if you want your bar icon even bigger
 const BORDER_WIDTH             = 2;
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     backgroundColor: DARK_BG,
     borderWidth: BORDER_WIDTH,
     borderColor: PINK,
-    borderRadius: 25,
+    borderRadius: 20,
     height: "100%"
   },
 
@@ -94,7 +94,8 @@ const styles = StyleSheet.create({
     marginTop: BAR_LIFT,
     height: '125%',
     paddingTop: 15,
-    flex: 1.3,
+    flex: 1.3, 
+    borderRadius: 25,
     zIndex: 1
   },
 

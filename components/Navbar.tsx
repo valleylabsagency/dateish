@@ -9,16 +9,19 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
-  Platform
+  Platform,
+  Dimensions
 } from "react-native";
 import { useRouter } from "expo-router";
 import { NavbarContext } from "../app/_layout";
 import { MusicContext } from "../contexts/MusicContext";
 import PopUp from "../components/PopUp";
+const { width, height } = Dimensions.get("window");
 
 export default function Navbar() {
   const router = useRouter();
   const { showWcButton } = useContext(NavbarContext);
+
 
   // Access the music context so we can toggle music or show loading
   const { isPlaying, soundLoading, toggleMusic } = useContext(MusicContext);
@@ -177,18 +180,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 8,
     height: "55%",
-    width: "30%",
-    paddingHorizontal: 10,
-    marginRight: 20,
+    width: width * 0.26,
+    paddingHorizontal: "2%",
+    marginRight: "5%",
     backgroundColor: "#d8bfd8"
   },
   moneysAmount: {
     color: "#460b2a",
     fontSize: 30,
-    letterSpacing: 3,
+    letterSpacing: 0,
+    position: "relative",
+    bottom: height * 0.004,
+    right: width * 0.01
   },
   moneysImage: {
-    width: "65%",
+    width: "60%",
     height: "80%"
   },
   speakerWrapper: {

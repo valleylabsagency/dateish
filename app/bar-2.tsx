@@ -167,7 +167,7 @@ export default function Bar2Screen() {
                   height: AVATAR_SIZE,
                   borderRadius: AVATAR_SIZE / 2,
                   overflow: "hidden",
-                  marginRight: spacingPx,
+                  marginRight: spacingPx - 20,
                   borderWidth: 2,
                   borderColor: "white",
                 }}
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   // ─── BUBBLE ───────────────────────────────────
   bubbleContainer: {
     position: "absolute",
-    bottom: height * 0.72,    // sits just above Mr. Mingles
+    bottom: height * 0.71,    // sits just above Mr. Mingles
     left: 0,
     right: 0,
     alignItems: "center",
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#6e1944",
     borderWidth: 4,
     borderColor: "#460b2a",
-    width: "80%",
+    width: "90%",
     height: 70,
     borderRadius: 20,
     shadowColor: "#000",
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 8,
     zIndex: 10,
-    paddingTop: 10
+    paddingTop: 10,
   },
   startButtonText: {
     fontSize: 32,
@@ -311,7 +311,8 @@ const styles = StyleSheet.create({
   // ─── ONLINE ROW ──────────────────────────────
   onlineRow: {
     position: "absolute",
-    top: "62%",
+    top: height * 0.55,
+    right: 5,
     width: "100%",
     zIndex: 5,
   },
@@ -330,7 +331,7 @@ const styles = StyleSheet.create({
   },
   barFront: {
     width: "100%",
-    height: 730,
+    height: height * 0.78,
     zIndex: 2,
   },
 
