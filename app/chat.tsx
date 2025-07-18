@@ -1,3 +1,4 @@
+// ChatScreen.tsx
 import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   View,
@@ -12,7 +13,8 @@ import {
   Modal,
   ActivityIndicator,
   Animated,
-  Keyboard
+  Keyboard,
+  Dimensions,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
@@ -23,7 +25,7 @@ import BottomNavbar from "../components/BottomNavbar";
 import ProfileNavbar from "../components/ProfileNavbar";
 import { auth, firestore } from "../firebase";
 import { NotificationContext } from "../contexts/NotificationContext";
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused } from "@react-navigation/native";
 import {
   collection,
   query,
@@ -35,7 +37,7 @@ import {
   doc,
   setDoc,
   updateDoc,
-  arrayUnion
+  arrayUnion,
 } from "firebase/firestore";
 import { drinkMapping } from "./utils/drinkMapping";
 // 1) Import size-matters
@@ -46,81 +48,54 @@ import {
   verticalScale,
 } from "react-native-size-matters";
 
+const { width, height } = Dimensions.get("window");
+
 export default function ChatScreen() {
-  const [displayedText, setDisplayedText] = useState("");
   const router = useRouter();
   const { partner } = useLocalSearchParams();
   const partnerId = partner;
   const currentUserId = auth.currentUser?.uid;
+  const isFocused = useIsFocused();
+
+  const [messages, setMessages] = useState<any[]>([]);
+  const [inputMessage, setInputMessage] = useState("");
+  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [typingModalVisible, setTypingModalVisible] = useState(false);
+  const [showPartnerModal, setShowPartnerModal] = useState(false);
+  const [showModalDrinkSpeech, setShowModalDrinkSpeech] = useState(false);
   const [showCurrentUserDrinkSpeech, setShowCurrentUserDrinkSpeech] = useState(false);
   const [showPartnerDrinkSpeech, setShowPartnerDrinkSpeech] = useState(false);
+  const [partnerProfile, setPartnerProfile] = useState<any>(null);
+  const rollAnim = useRef(new Animated.Value(500)).current;
+  const [mingModalVisible, setMingModalVisible] = useState(false);
+  const [mingDisplayedText, setMingDisplayedText] = useState("");
+  const fullMingText = "Wait for them to answer. Don't be a creep!";
+
+  const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput | null>(null);
-  const isFocused = useIsFocused();
+
+  const { profile } = useContext(ProfileContext);
+  const { setCurrentChatId } = useContext(NotificationContext);
 
   const chatId =
     currentUserId && partnerId
       ? [currentUserId, partnerId].sort().join("_")
       : null;
 
-  const [partnerProfile, setPartnerProfile] = useState(null);
-
-  const truncateDescription = (text: string, limit: number = 35) => {
-    if (text.length > limit) {
-      return text.slice(0, limit) + "...";
-    }
-    return text;
-  };
-
+  // Fetch partner profile
   useEffect(() => {
-    const fetchPartnerProfile = async () => {
-      if (partnerId) {
-        try {
-          const partnerDocRef = doc(firestore, "users", partnerId);
-          const partnerDocSnap = await getDoc(partnerDocRef);
-          if (partnerDocSnap.exists()) {
-            setPartnerProfile({ id: partnerDocSnap.id, ...partnerDocSnap.data() });
-          } else {
-            console.log("No partner profile found for uid:", partnerId);
-          }
-        } catch (error) {
-          console.error("Error fetching partner profile:", error);
-        }
+    if (!partnerId) return;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(firestore, "users", partnerId));
+        if (snap.exists()) setPartnerProfile({ id: snap.id, ...snap.data() });
+      } catch (error) {
+        console.error("Error fetching partner profile:", error);
       }
-    };
-    fetchPartnerProfile();
+    })();
   }, [partnerId]);
 
-  const { profile } = useContext(ProfileContext);
-  const currentUserImage = profile?.photoUri
-    ? { uri: profile.photoUri }
-    : require("../assets/images/tyler.jpeg");
-
-  const [fontsLoaded] = useFonts({
-    [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
-  });
-
-  const [messages, setMessages] = useState([]);
-  const [inputMessage, setInputMessage] = useState("");
-  const [loadingMessages, setLoadingMessages] = useState(true);
-  const [showPartnerModal, setShowPartnerModal] = useState(false);
-  const [showModalDrinkSpeech, setShowModalDrinkSpeech] = useState(false);
-  const [mingModalVisible, setMingModalVisible] = useState(false);
-  const [typingModalVisible, setTypingModalVisible] = useState(false);
-  const rollAnim = useRef(new Animated.Value(500)).current;
-  const [mingDisplayedText, setMingDisplayedText] = useState("");
-  const fullMingText = "Wait for them to answer. Don't be a creep!";
-  const { setCurrentChatId } = useContext(NotificationContext);
-
-  useEffect(() => {
-    if (isFocused && chatId) {
-      setCurrentChatId(chatId);
-    } else {
-      setCurrentChatId(null);
-    }
-  }, [isFocused, chatId]);
-
-  const scrollViewRef = useRef<ScrollView>(null);
-
+  // Subscribe to messages
   useEffect(() => {
     if (!chatId) return;
     const messagesRef = collection(firestore, "chats", chatId, "messages");
@@ -143,14 +118,21 @@ export default function ChatScreen() {
     return () => unsubscribe();
   }, [chatId]);
 
+  // Scroll to bottom on new messages
   useEffect(() => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
+  // Update current chat ID for notifications
   useEffect(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: false });
-  }, []);
+    if (isFocused && chatId) {
+      setCurrentChatId(chatId);
+    } else {
+      setCurrentChatId(null);
+    }
+  }, [isFocused, chatId]);
 
+  // Mingle modal animation
   useEffect(() => {
     Animated.timing(rollAnim, {
       toValue: mingModalVisible ? 0 : 500,
@@ -159,6 +141,7 @@ export default function ChatScreen() {
     }).start();
   }, [mingModalVisible]);
 
+  // Typewriter effect for mingle text
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
     if (mingModalVisible) {
@@ -167,9 +150,7 @@ export default function ChatScreen() {
       intervalId = setInterval(() => {
         index++;
         setMingDisplayedText(fullMingText.substring(0, index));
-        if (index === fullMingText.length) {
-          clearInterval(intervalId);
-        }
+        if (index === fullMingText.length) clearInterval(intervalId);
       }, 30);
     } else {
       setMingDisplayedText("");
@@ -199,7 +180,7 @@ export default function ChatScreen() {
           visibleFor: [currentUserId, partnerId],
           updatedAt: serverTimestamp(),
           lastMessage: inputMessage,
-          partnerName: partnerProfile ? partnerProfile.name : "",
+          partnerName: partnerProfile?.name || "",
           partnerPhotoUri:
             partnerProfile && partnerProfile.drink
               ? drinkMapping[partnerProfile.drink.toLowerCase()]
@@ -210,7 +191,7 @@ export default function ChatScreen() {
           updatedAt: serverTimestamp(),
           lastMessage: inputMessage,
           lastMessageSender: currentUserId,
-          visibleFor: arrayUnion(currentUserId, partnerId)
+          visibleFor: arrayUnion(currentUserId, partnerId),
         });
       }
 
@@ -226,19 +207,12 @@ export default function ChatScreen() {
     }
   };
 
-  // Drink icon setup with dynamic sizing for water, tequila, or vodka
+  // Drink icon setup for current user
   const currentUserDrink = profile?.drink ? profile.drink : "water";
   const currentUserDrinkIcon = drinkMapping[currentUserDrink.toLowerCase()];
-  const partnerDrink = partnerProfile?.drink ? partnerProfile.drink : "water";
-  const partnerDrinkIcon = drinkMapping[partnerDrink.toLowerCase()];
-
-  const userHasWater = currentUserDrink.toLowerCase() === "water";
-  const partnerHasWater = partnerDrink.toLowerCase() === "water";
-
   const smallDrinkNames = ["tequila", "vodka"];
   const isCurrentUserSmallDrink = smallDrinkNames.includes(currentUserDrink.toLowerCase());
-  const isPartnerSmallDrink = smallDrinkNames.includes(partnerDrink.toLowerCase());
-
+  const userHasWater = currentUserDrink.toLowerCase() === "water";
   const currentUserDrinkWidth = userHasWater
     ? moderateScale(30)
     : isCurrentUserSmallDrink
@@ -250,6 +224,11 @@ export default function ChatScreen() {
     ? moderateScale(30)
     : moderateScale(65);
 
+  // Drink icon setup for partner
+  const partnerDrink = partnerProfile?.drink ? partnerProfile.drink : "water";
+  const partnerDrinkIcon = drinkMapping[partnerDrink.toLowerCase()];
+  const isPartnerSmallDrink = smallDrinkNames.includes(partnerDrink.toLowerCase());
+  const partnerHasWater = partnerDrink.toLowerCase() === "water";
   const partnerDrinkWidth = partnerHasWater
     ? moderateScale(30)
     : isPartnerSmallDrink
@@ -261,7 +240,7 @@ export default function ChatScreen() {
     ? moderateScale(50)
     : moderateScale(65);
 
-  const partnerDrinkTextMapping: Record<string, string> = {
+  const drinkTextMapping: Record<string, string> = {
     wine: "Where's the romance at?",
     beer: "Chill night... Sup?",
     whiskey: "I'm an adult.",
@@ -271,8 +250,12 @@ export default function ChatScreen() {
     absinthe: "Who are you?",
     water: "I don't need alcohol to have fun",
   };
-  const partnerDrinkText = partnerDrinkTextMapping[partnerDrink.toLowerCase()];
-  const currentUserDrinkText = partnerDrinkTextMapping[currentUserDrink.toLowerCase()];
+  const partnerDrinkText = drinkTextMapping[partnerDrink.toLowerCase()];
+  const currentUserDrinkText = drinkTextMapping[currentUserDrink.toLowerCase()];
+
+  const [fontsLoaded] = useFonts({
+    [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
+  });
 
   if (!fontsLoaded) {
     return (
@@ -281,6 +264,10 @@ export default function ChatScreen() {
       </View>
     );
   }
+
+  const currentUserImage = profile?.photoUri
+    ? { uri: profile.photoUri }
+    : require("../assets/images/tyler.jpeg");
 
   return (
     <ImageBackground
@@ -320,10 +307,10 @@ export default function ChatScreen() {
                   <Text style={styles.chatText}>{msg.text}</Text>
                   {msg.createdAt?.seconds && (
                     <Text style={styles.timestamp}>
-                      {new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {new Date(msg.createdAt.seconds * 1000).toLocaleTimeString(
+                        [],
+                        { hour: "2-digit", minute: "2-digit" }
+                      )}
                     </Text>
                   )}
                 </View>
@@ -337,7 +324,6 @@ export default function ChatScreen() {
             <TextInput
               ref={inputRef}
               style={styles.textInput}
-              onPress={() => setTypingModalVisible(true)}
               placeholder="Type your message..."
               placeholderTextColor="#999"
               returnKeyType="send"
@@ -351,11 +337,8 @@ export default function ChatScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      <Modal
-        visible={typingModalVisible}
-        animationType="fade"
-        transparent
-      >
+      {/* Typing Modal */}
+      <Modal visible={typingModalVisible} animationType="fade" transparent>
         <View style={typingModalStyles.container}>
           <View style={typingModalStyles.inputBox}>
             <TextInput
@@ -382,7 +365,9 @@ export default function ChatScreen() {
 
       <View style={styles.bottomProfiles}>
         <View style={styles.profileWithDrink}>
-          <TouchableOpacity onPress={() => router.push("/profile?self=true&from=chat")}>
+          <TouchableOpacity
+            onPress={() => router.push("/profile?self=true&from=chat")}
+          >
             <Image source={currentUserImage} style={styles.currentUserImage} />
           </TouchableOpacity>
           <TouchableOpacity
@@ -392,10 +377,12 @@ export default function ChatScreen() {
                 width: currentUserDrinkWidth,
                 height: currentUserDrinkHeight,
                 left: "100%",
-                top: isCurrentUserSmallDrink ? moderateScale(25) : 0
+                top: isCurrentUserSmallDrink ? moderateScale(25) : 0,
               },
             ]}
-            onPress={() => setShowCurrentUserDrinkSpeech(!showCurrentUserDrinkSpeech)}
+            onPress={() =>
+              setShowCurrentUserDrinkSpeech(!showCurrentUserDrinkSpeech)
+            }
           >
             <Image
               source={currentUserDrinkIcon}
@@ -403,7 +390,9 @@ export default function ChatScreen() {
             />
             {showCurrentUserDrinkSpeech && (
               <View style={styles.myDrinkSpeechBubble}>
-                <Text style={styles.bottomDrinkSpeechBubbleText}>{currentUserDrinkText}</Text>
+                <Text style={styles.bottomDrinkSpeechBubbleText}>
+                  {currentUserDrinkText}
+                </Text>
               </View>
             )}
           </TouchableOpacity>
@@ -411,7 +400,10 @@ export default function ChatScreen() {
         <View style={styles.profileWithDrink}>
           <TouchableOpacity onPress={() => setShowPartnerModal(true)}>
             {partnerProfile?.photoUri ? (
-              <Image source={{ uri: partnerProfile.photoUri }} style={styles.partnerImage} />
+              <Image
+                source={{ uri: partnerProfile.photoUri }}
+                style={styles.partnerImage}
+              />
             ) : (
               <View style={styles.partnerIconContainer}>
                 <MaterialIcons name="person" size={scale(80)} color="grey" />
@@ -425,10 +417,12 @@ export default function ChatScreen() {
                 width: partnerDrinkWidth,
                 height: partnerDrinkHeight,
                 right: "100%",
-                top: isPartnerSmallDrink ? moderateScale(25) : 0
+                top: isPartnerSmallDrink ? moderateScale(25) : 0,
               },
             ]}
-            onPress={() => setShowPartnerDrinkSpeech(!showPartnerDrinkSpeech)}
+            onPress={() =>
+              setShowPartnerDrinkSpeech(!showPartnerDrinkSpeech)
+            }
             hitSlop={{ top: 15, bottom: 60, left: 20, right: 20 }}
           >
             <Image
@@ -437,87 +431,89 @@ export default function ChatScreen() {
             />
             {showPartnerDrinkSpeech && (
               <View style={styles.bottomDrinkSpeechBubble}>
-                <Text style={styles.bottomDrinkSpeechBubbleText}>{partnerDrinkText}</Text>
+                <Text style={styles.bottomDrinkSpeechBubbleText}>
+                  {partnerDrinkText}
+                </Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* Partner Profile Modal (from Bar2Screen) */}
       <Modal
         visible={showPartnerModal}
-        animationType="slide"
         transparent
+        animationType="slide"
         onRequestClose={() => setShowPartnerModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
             <TouchableOpacity
-              style={styles.modalCloseButton}
               onPress={() => setShowPartnerModal(false)}
+              style={styles.closeButton}
             >
-              <Text style={styles.modalCloseButtonText}>X</Text>
+              <Image
+                style={{ width: 20, height: 20 }}
+                source={require("../assets/images/x.png")}
+              />
             </TouchableOpacity>
-            <View style={styles.profileCard}>
-              <View style={styles.modalImageContainer}>
-                {partnerProfile?.photoUri ? (
-                  <Image
-                    source={{ uri: partnerProfile.photoUri }}
-                    style={styles.modalProfileImage}
-                  />
-                ) : (
-                  <View style={styles.partnerIconContainer}>
-                    <MaterialIcons name="person" size={scale(80)} color="grey" />
-                  </View>
-                )}
-              </View>
 
-              <View style={styles.modalDrinkContainer}>
+            {partnerProfile && (
+              <>
+                <Image
+                  source={{ uri: partnerProfile.photoUri }}
+                  style={styles.modalImage}
+                />
+
+                {/* Drink icon + speech bubble */}
                 <TouchableOpacity
-                  onPress={() => setShowModalDrinkSpeech(!showModalDrinkSpeech)}
                   style={[
-                    styles.modalDrinkIcon,
+                    styles.drinkIcon,
                     {
                       width: partnerDrinkWidth,
                       height: partnerDrinkHeight,
                     },
                   ]}
+                  onPress={() =>
+                    setShowModalDrinkSpeech(!showModalDrinkSpeech)
+                  }
                 >
                   <Image
                     source={partnerDrinkIcon}
-                    style={{ width: "100%", height: "100%", position: "relative" }}
+                    style={{ width: "100%", height: "100%", position: "absolute", top: height * 0.25, left: width * 0.55 }}
                   />
+                  {showModalDrinkSpeech && (
+                    <View style={styles.drinkSpeechBubble}>
+                      <Text style={styles.drinkSpeechBubbleText}>
+                        {partnerDrinkText}
+                      </Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
-                {showModalDrinkSpeech && (
-                  <View style={styles.modalDrinkSpeechBubble}>
-                    <Text style={styles.modalDrinkSpeechBubbleText}>
-                      {partnerDrinkText}
-                    </Text>
-                  </View>
-                )}
-              </View>
 
-              <View style={styles.modalInfoContainer}>
-                <Text style={styles.nameText}>
-                  {partnerProfile ? partnerProfile.name : "Partner"},{" "}
-                  {partnerProfile ? partnerProfile.age : ""}
-                </Text>
-                <Text style={styles.locationText}>
-                  {partnerProfile ? partnerProfile.location : ""}
-                </Text>
-                <Text style={styles.descriptionText}>
-                  {partnerProfile ? truncateDescription(partnerProfile.about) : ""}
-                </Text>
-              </View>
-            </View>
+                <View style={styles.modalText}>
+                  <Text style={styles.modalName}>
+                    {partnerProfile.name}, {partnerProfile.age}
+                  </Text>
+                  <Text style={styles.modalLocation}>
+                    {partnerProfile.location}
+                  </Text>
+                  <Text style={styles.modalDescription}>
+                    {partnerProfile.about}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
 
+      {/* Mingles Modal */}
       <Modal
+        visible={mingModalVisible}
         animationType="slide"
         transparent
-        visible={mingModalVisible}
         onRequestClose={() => setMingModalVisible(false)}
       >
         <View style={styles.mingModalOverlay}>
@@ -549,7 +545,7 @@ export default function ChatScreen() {
   );
 }
 
-// Keep the separate typingModalStyles, but also convert numeric values there.
+// Typing Modal Styles
 const typingModalStyles = ScaledSheet.create({
   container: {
     flex: 1,
@@ -588,6 +584,7 @@ const typingModalStyles = ScaledSheet.create({
   },
 });
 
+// Styles
 const styles = ScaledSheet.create({
   background: {
     flex: 1,
@@ -744,99 +741,78 @@ const styles = ScaledSheet.create({
     bottom: 0,
     width: "100%",
   },
+
+  /* Bar2Screen Modal Styles */
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    marginBottom: verticalScale(220),
+    height,
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
-    position: "relative",
   },
-  modalContainer: {
-    width: "90%",
-    height: "500@vs",
-    paddingVertical: "20@ms",
-    paddingHorizontal: "8@ms",
-    alignItems: "center",
-    position: "relative",
-    bottom: "10%",
-  },
-  modalCloseButton: {
-    position: "absolute",
-    top: "5%",
-    right: "10%",
-    zIndex: 10,
-  },
-  modalCloseButtonText: {
-    fontSize: "24@ms",
-    color: "#fff",
-  },
-  profileCard: {
-    backgroundColor: "rgba(69,26,31,0.8)",
-    borderColor: "#371015",
+  modalContent: {
+    width: "85%",
+    height: height * 0.65,
     borderWidth: "8@ms",
-    borderRadius: "20@ms",
+    borderColor: "#460b2a",
+    backgroundColor: "#592540",
+    position: "relative",
+    borderRadius: "16@ms",
+    paddingVertical: "50@ms",
     paddingHorizontal: "20@ms",
-    paddingVertical: "30@ms",
-    height: "470@vs",
-    alignItems: "center",
+    alignItems: "flex-start",
   },
-  modalImageContainer: {
-    marginBottom: "10@ms",
-  },
-  modalProfileImage: {
-    width: "250@ms",
-    height: "250@ms",
-    borderRadius: "130@ms",
-  },
-  modalDrinkContainer: {
-    height: scale(30),
-    alignItems: "center",
-    marginVertical: "10@ms",
-  },
-  modalDrinkIcon: {
+  closeButton: {
     position: "absolute",
-    left: "30%",
-    bottom: "100%",
+    top: "12@ms",
+    right: "12@ms",
   },
-  modalDrinkSpeechBubble: {
+  modalImage: {
+    width: "180@ms",
+    height: "180@ms",
+    borderRadius: "90@ms",
+    marginBottom: "16@ms",
+    alignSelf: "center",
+  },
+  drinkSpeechBubble: {
     position: "absolute",
-    bottom: "340%",
-    left: "20%",
-    width: scale(100),
+    bottom: "-160%",
+    left: "560%",
     backgroundColor: "rgba(0,0,0,0.8)",
     padding: "5@ms",
     borderRadius: "10@ms",
+    width: scale(100),
   },
-  modalDrinkSpeechBubbleText: {
+  drinkSpeechBubbleText: {
     color: "#fff",
     fontSize: "14@ms",
+    fontFamily: FontNames.MontserratRegular,
     textAlign: "center",
-    fontFamily: FontNames.MontserratRegular,
   },
-  modalInfoContainer: {
+  modalText: {
+    marginTop: "16@ms",
     alignItems: "flex-start",
-    marginTop: "10@ms",
   },
-  nameText: {
-    color: "red",
-    fontSize: "32@ms",
-    fontWeight: "bold",
-    marginBottom: "5@ms",
+  modalName: {
+    color: "#e2a350",
+    fontSize: "38@ms",
+    fontFamily: FontNames.MontserratBold,
+  },
+  modalLocation: {
+    color: "white",
+    fontSize: "20@ms",
+    marginVertical: "8@ms",
     fontFamily: FontNames.MontserratRegular,
+    alignSelf: "flex-start",
   },
-  locationText: {
-    color: "orange",
-    fontSize: "22@ms",
-    marginBottom: "10@ms",
-    fontFamily: FontNames.MontserratRegular,
+  modalDescription: {
+    color: "#ffe3d0",
+    fontSize: "16@ms",
+    alignSelf: "flex-start",
   },
-  descriptionText: {
-    color: "beige",
-    fontSize: "23@ms",
-    textAlign: "left",
-    width: "300@ms",
-    fontFamily: FontNames.MontserratRegular,
-  },
+ 
+  /* Mingles Modal Styles */
   mingModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.8)",

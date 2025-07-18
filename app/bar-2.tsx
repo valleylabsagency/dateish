@@ -24,10 +24,33 @@ import { scale } from "react-native-size-matters";
 
 const { width, height } = Dimensions.get("window");
 const BUBBLE_HEIGHT = height * 0.18;           // height for the speech bubble
-// Spacing for the avatars
 const START_OFFSET_RATIO = 0.085;
 const SPACING_RATIO      = 0.2;
 const AVATAR_SIZE        = 100;
+
+// Mapping of drink types to icons
+const drinkMapping: Record<string, any> = {
+  wine: require("../assets/images/icons/wine.png"),
+  beer: require("../assets/images/icons/beer.png"),
+  whiskey: require("../assets/images/icons/whiskey.png"),
+  martini: require("../assets/images/icons/martini.png"),
+  vodka: require("../assets/images/icons/vodka.png"),
+  tequila: require("../assets/images/icons/tequila.png"),
+  absinthe: require("../assets/images/icons/absinthe.png"),
+  water: require("../assets/images/icons/water.png"),
+};
+
+// Text prompts for each drink
+const drinkTextMapping: Record<string, string> = {
+  wine: "Where's the romance at?",
+  beer: "Chill night... Sup?",
+  whiskey: "I'm an adult.",
+  martini: "I'm smart and beautiful!",
+  vodka: "Get the party started!",
+  tequila: "Gonna get fucked tonight",
+  absinthe: "Who are you?",
+  water: "I don't need alcohol to have fun",
+};
 
 export default function Bar2Screen() {
   const router = useRouter();
@@ -38,12 +61,10 @@ export default function Bar2Screen() {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [onlineStatus, setOnlineStatus] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
-
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
-
-  // NEW: whether we've tapped "Start Chatting"
   const [started, setStarted] = useState(false);
+  const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
 
   // load persisted "started" flag
   useEffect(() => {
@@ -90,6 +111,17 @@ export default function Bar2Screen() {
 
   const onlineProfiles = profiles.filter(p => onlineStatus[p.id]);
 
+  // Prepare drink data for selected profile
+  const profileDrink = typeof selectedProfile?.drink === "string"
+    ? selectedProfile.drink.toLowerCase()
+    : "water";
+  const drinkIcon = drinkMapping[profileDrink] || drinkMapping["water"];
+  const isWater = profileDrink === "water";
+  const drinkWidth = isWater ? scale(35) : scale(50);
+  const drinkHeight = isWater ? scale(75) : scale(70);
+  const drinkPosition = isWater ? "60%" : "58%";
+  const drinkText = drinkTextMapping[profileDrink] || drinkTextMapping["water"];
+
   if (!fontsLoaded || loading) {
     return (
       <ImageBackground
@@ -113,7 +145,6 @@ export default function Bar2Screen() {
       {/* ─── WELCOME MODE: Mr. Mingles + speech bubble + button ───────── */}
       {!started && (
         <>
-          {/* Speech bubble (blank for now) */}
           <View style={styles.bubbleContainer}>
             <ImageBackground
               source={require("../assets/images/speech-bubble.png")}
@@ -174,6 +205,7 @@ export default function Bar2Screen() {
                 onPress={() => {
                   setSelectedProfile(p);
                   setModalVisible(true);
+                  setShowDrinkSpeech(false);
                 }}
               >
                 <Image source={{ uri: p.photoUri }} style={styles.avatarImage} />
@@ -210,7 +242,7 @@ export default function Bar2Screen() {
               onPress={() => setModalVisible(false)}
               style={styles.closeButton}
             >
-              <Text style={styles.closeText}>X</Text>
+              <Image style={{ width: 20, height: 20 }} source={require("../assets/images/x.png")} />
             </TouchableOpacity>
 
             {selectedProfile && (
@@ -219,6 +251,26 @@ export default function Bar2Screen() {
                   source={{ uri: selectedProfile.photoUri }}
                   style={styles.modalImage}
                 />
+
+                {/* Drink icon + speech bubble */}
+                <TouchableOpacity
+                  style={[
+                    styles.drinkIcon,
+                    { width: drinkWidth, height: drinkHeight},
+                  ]}
+                  onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}
+                >
+                  <Image
+                    source={drinkIcon}
+                    style={{ width: "100%", height: "100%", position: "relative" }}
+                  />
+                  {showDrinkSpeech && (
+                    <View style={styles.drinkSpeechBubble}>
+                      <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
                 <View style={styles.modalText}>
                   <Text style={styles.modalName}>
                     {selectedProfile.name}, {selectedProfile.age}
@@ -258,7 +310,7 @@ const styles = StyleSheet.create({
   // ─── BUBBLE ───────────────────────────────────
   bubbleContainer: {
     position: "absolute",
-    bottom: height * 0.71,    // sits just above Mr. Mingles
+    bottom: height * 0.71,
     left: 0,
     right: 0,
     alignItems: "center",
@@ -269,7 +321,7 @@ const styles = StyleSheet.create({
     height: BUBBLE_HEIGHT,
   },
 
-  // ─── NEW: Mr. Mingles ─────────────────────────
+  // ─── Mr. Mingles ──────────────────────────────
   minglesContainer: {
     position: "absolute",
     bottom: height * 0.06,
@@ -282,6 +334,7 @@ const styles = StyleSheet.create({
     width: width * 0.8,
     height: height * 0.8,
   },
+
   startButton: {
     position: "absolute",
     bottom: height * 0.17,
@@ -354,10 +407,11 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "85%",
-    height: "70%",
+    height: height * 0.65,
     borderWidth: 8,
     borderColor: "#460b2a",
     backgroundColor: "#592540",
+    position: "relative",
     borderRadius: 16,
     padding: 20,
     alignItems: "flex-start",
@@ -367,10 +421,6 @@ const styles = StyleSheet.create({
     top: 12,
     right: 12,
   },
-  closeText: {
-    color: "#fff",
-    fontSize: 18,
-  },
   modalImage: {
     width: 180,
     height: 180,
@@ -378,8 +428,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     alignSelf: "center",
   },
+  modalText: {
+    marginTop: 16,
+    alignItems: "flex-start",
+  },
   modalName: {
-    color: "white",
+    color: "#e2a350",
     fontSize: 38,
     fontFamily: FontNames.MontserratBold,
   },
@@ -398,7 +452,8 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   modalChatButton: {
-    marginTop: "20%",
+   position: "absolute",
+   bottom: "5%",
     backgroundColor: "#592540",
     borderTopWidth: 5,
     borderLeftWidth: 5,
@@ -420,6 +475,28 @@ const styles = StyleSheet.create({
     fontSize: 25,
     fontFamily: FontNames.MontserratRegular,
     fontWeight: "600",
+  },
+
+  // ─── DRINK ICON + SPEECH BUBBLE ─────────────
+  drinkIcon: {
+    position: "absolute",
+    top: 160,
+    right: "15%"
+  },
+  drinkSpeechBubble: {
+    position: "absolute",
+    bottom: "110%",
+    left: "-20%",
+    backgroundColor: "rgba(0,0,0,0.8)",
+    padding: 5,
+    borderRadius: 10,
+    width: scale(100),
+  },
+  drinkSpeechBubbleText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: FontNames.MontserratRegular,
+    textAlign: "center",
   },
 });
 
