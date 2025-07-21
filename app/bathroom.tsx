@@ -25,7 +25,8 @@ import ProfileNavbar from "../components/ProfileNavbar";
 import { ProfileContext } from "../contexts/ProfileContext";
 import { scale, verticalScale, moderateScale } from "react-native-size-matters";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { auth, storage } from "../firebase";
+import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { auth, storage, firestore } from "../firebase";
 import { logout } from "../services/authservice";
 import { FontNames } from "../constants/fonts";
 import PopUp from "../components/PopUp";
@@ -56,6 +57,8 @@ export default function BathroomScreen() {
   const [showChitChats, setShowChitChats] = useState(false);
   const [popupFlag, setPopupFlag] = useState<string | null>(null);
   const { isPlaying, toggleMusic } = useContext(MusicContext);
+  const [mustAnswer, setMustAnswer] = useState(false)
+
   // editing-about modal
   const [editingAbout, setEditingAbout] = useState(false);
   const [modalTypedText, setModalTypedText] = useState("");
@@ -67,13 +70,73 @@ export default function BathroomScreen() {
   const rollAnim = useRef(new Animated.Value(500)).current;
   const [chats, setChats] = useState<SavedChat[]>([])
 
-function handleSave(type: ChatType, content: string) {
-  setChats((prev) => [...prev, { type, content }])
-}
 
-function handleDelete(idx: number) {
-  setChats((prev) => prev.filter((_, i) => i !== idx))
-}
+  const userDocRef = auth.currentUser
+  ? doc(firestore, 'users', auth.currentUser.uid)
+  : null
+
+  useEffect(() => {
+    if (!userDocRef) return
+  
+    // subscribe to changes in the user document
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+      if (!docSnap.exists()) return
+  
+      const data = docSnap.data()
+      // hydrate your chats array
+      if (Array.isArray(data.chitchats)) {
+        setChats(data.chitchats as SavedChat[])
+      }
+      // hydrate the toggle
+      if (typeof data.chitchatsRequired === 'boolean') {
+        setMustAnswer(data.chitchatsRequired)
+      }
+    })
+  
+    // clean up listener on unmount
+    return () => unsubscribe()
+  }, [userDocRef])
+
+
+  async function handleSave(type: ChatType, content: string) {
+    const newChats = [...chats, { type, content }]
+    setChats(newChats)
+  
+    if (userDocRef) {
+      try {
+        await updateDoc(userDocRef, { chitchats: newChats })
+      } catch (e) {
+        console.error('Failed to save chitchats:', e)
+      }
+    }
+  
+    setShowChitChats(false)
+  }
+  
+  async function handleDelete(idx: number) {
+    const newChats = chats.filter((_, i) => i !== idx)
+    setChats(newChats)
+  
+    if (userDocRef) {
+      try {
+        await updateDoc(userDocRef, { chitchats: newChats })
+      } catch (e) {
+        console.error('Failed to delete chitchat:', e)
+      }
+    }
+  }
+
+  async function toggleRequired(val: boolean) {
+    setMustAnswer(val)
+    if (!userDocRef) return
+    try {
+      await updateDoc(userDocRef, { chitchatsRequired: val })
+    } catch (e) {
+      console.error('Failed to update chitchatsRequired:', e)
+    }
+  }
+  
+  
 
 
   // pre-fill from context
@@ -360,6 +423,8 @@ function handleDelete(idx: number) {
         existingChats={chats}
         onSave={handleSave}
         onDelete={handleDelete}
+        required={mustAnswer}
+        onRequiredChange={toggleRequired}
       />
 
       {renderAboutEditor()}

@@ -52,7 +52,11 @@ const { width, height } = Dimensions.get("window");
 
 export default function ChatScreen() {
   const router = useRouter();
-  const { partner } = useLocalSearchParams();
+  const { partner, initial } = useLocalSearchParams<{
+    partner: string;
+    initial?: string;
+  }>();
+  
   const partnerId = partner;
   const currentUserId = auth.currentUser?.uid;
   const isFocused = useIsFocused();
@@ -81,6 +85,38 @@ export default function ChatScreen() {
     currentUserId && partnerId
       ? [currentUserId, partnerId].sort().join("_")
       : null;
+
+      // ────────────────────────────────────────────────────────────────────
+//  🌟  INITIAL CHIT‑CHAT SEED
+// If we got an `initial` param, decode & parse it, then
+// setMessages to [ prompt, response ] before firestore kicks in.
+useEffect(() => {
+  if (!initial) return;
+  try {
+    const { prompt, response } = JSON.parse(
+      decodeURIComponent(initial)
+    ) as { prompt: string; response: string };
+
+    setMessages([
+      {
+        id: "cc-prompt",
+        text: prompt,
+        sender: partnerId,                // show as “incoming”
+        createdAt: { seconds: Date.now() / 1000 },
+      },
+      {
+        id: "cc-reply",
+        text: response,
+        sender: currentUserId,            // show as “outgoing”
+        createdAt: { seconds: Date.now() / 1000 },
+      },
+    ]);
+  } catch (e) {
+    console.warn("Invalid initial chit‑chat payload:", e);
+  }
+}, [initial, partnerId, currentUserId]);
+// ────────────────────────────────────────────────────────────────────
+
 
   // Fetch partner profile
   useEffect(() => {

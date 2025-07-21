@@ -11,6 +11,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  TextInput
 } from "react-native";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
@@ -21,6 +22,7 @@ import { getDatabase, ref, onValue } from "firebase/database";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { scale } from "react-native-size-matters";
+import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 
 const { width, height } = Dimensions.get("window");
 const BUBBLE_HEIGHT = height * 0.18;           // height for the speech bubble
@@ -65,6 +67,23 @@ export default function Bar2Screen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [started, setStarted] = useState(false);
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
+
+  //chitchats modal
+  const [chitChatModalVisible, setChitChatModalVisible] = useState(false);
+  const [ccStep, setCcStep] = useState<'choose'|'show'>('choose');
+  const [selectedCc, setSelectedCc] = useState<SavedChat|null>(null);
+  const [replyText, setReplyText] = useState('');
+
+  // mapping ChatType → human label
+const chatLabelMap: Record<ChatType, string> = {
+  'what-happened':     'What Happened Next?',
+  'if-you-were-me':     'If You Were Me',
+  'complete-poem':      'Complete a Poem',
+  'unpopular-opinion':  'Unpopular Opinion',
+  'dont-usually-ask':   'I Don’t Usually Ask That',
+  'emoji-story':        'Emoji To Story',
+}
+
 
   // load persisted "started" flag
   useEffect(() => {
@@ -136,6 +155,8 @@ export default function Bar2Screen() {
 
   const startOffsetPx = width * START_OFFSET_RATIO;
   const spacingPx     = width * SPACING_RATIO;
+  
+  const profileChats: SavedChat[] = selectedProfile?.chitchats ?? [];
 
   return (
     <ImageBackground
@@ -283,20 +304,134 @@ export default function Bar2Screen() {
                   </Text>
                 </View>
 
+                <View style={styles.bottomButtons}>
                 <TouchableOpacity
-                  style={styles.modalChatButton}
+                  style={[
+                    styles.modalChatButton,
+                    selectedProfile.chitchatsRequired && styles.disabledButton,
+                  ]}
                   onPress={() => {
-                    setModalVisible(false);
-                    router.push(`/chat?partner=${selectedProfile.id}`);
+                    if (!selectedProfile.chitchatsRequired)
+                      router.push(`/chat?partner=${selectedProfile.id}`)
                   }}
+                  disabled={selectedProfile.chitchatsRequired}
                 >
                   <Text style={styles.modalChatButtonText}>Chat</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalChatButton}
+                  onPress={() => setChitChatModalVisible(true)}
+                >
+                  <Text style={styles.modalChatButtonText}>Chit Chat</Text>
+                </TouchableOpacity>
+                </View>
+
+                
               </>
             )}
           </View>
         </View>
       </Modal>
+      {selectedProfile && (
+        <Modal visible={chitChatModalVisible} transparent animationType="fade">
+          <View style={styles.overlay}>
+            <View style={styles.ccContainer}>
+              {profileChats.length === 0 ? (
+                /* NO CHITS */
+                <View style={styles.noChatsContainer}>
+                  <Text style={styles.noChatsText}>No Chit Chats found</Text>
+                </View>
+              ) : profileChats.length > 1 && ccStep === 'choose' ? (
+                /* MULTIPLE: pick one */
+                profileChats.map((cc, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={styles.listItem}
+                    onPress={() => {
+                      setSelectedCc(cc)
+                      setCcStep('show')
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.listText,
+                        idx % 2 === 1 ? styles.pinkText : styles.whiteText,
+                      ]}
+                    >
+                      {chatLabelMap[cc.type]}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                /* ONE OR SELECTED: show & reply */
+                <View>
+                  {(() => {
+                    const cc =
+                      profileChats.length === 1
+                        ? profileChats[0]
+                        : selectedCc!
+                    return (
+                      <>
+                        <Text style={styles.ccLabel}>
+                          {chatLabelMap[cc.type]}
+                        </Text>
+                        <Text style={styles.ccContent}>{cc.content}</Text>
+                        <TextInput
+                          style={styles.replyInput}
+                          value={replyText}
+                          onChangeText={setReplyText}
+                          placeholder="Write your reply…"
+                          placeholderTextColor="#7A4C6E"
+                          multiline
+                        />
+                         <TouchableOpacity
+                            style={styles.replyButton}
+                            onPress={() => {
+                              // build a payload containing both the prompt & the response
+                              const payload = {
+                                prompt: cc.content,
+                                response: replyText.trim(),
+                              }
+                              const encoded = encodeURIComponent(JSON.stringify(payload))
+
+                              // navigate into chat with both pieces attached
+                              router.push(
+                                `/chat?partner=${selectedProfile.id}&initial=${encoded}`
+                              )
+
+                              // reset modal state
+                              setChitChatModalVisible(false)
+                              setCcStep('choose')
+                              setSelectedCc(null)
+                              setReplyText('')
+                            }}
+                          >
+                            <Text style={styles.replyButtonText}>Send</Text>
+                          </TouchableOpacity>
+                      </>
+                    )
+                  })()}
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={styles.ccCloseButton}
+                onPress={() => {
+                  setChitChatModalVisible(false)
+                  setCcStep('choose')
+                  setSelectedCc(null)
+                  setReplyText('')
+                }}
+              >
+                <Text style={styles.closeText}>X</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      
+
     </ImageBackground>
   );
 }
@@ -451,17 +586,24 @@ const styles = StyleSheet.create({
     textAlign: "left",
     alignSelf: "flex-start",
   },
+  bottomButtons: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
+    marginTop: "25%"
+  },
   modalChatButton: {
-   position: "absolute",
-   bottom: "5%",
     backgroundColor: "#592540",
     borderTopWidth: 5,
     borderLeftWidth: 5,
     borderRightWidth: 5,
     borderBottomWidth: 15,
     borderColor: "#460b2a",
-    paddingVertical: 10,
-    paddingHorizontal: 30,
+    paddingVertical: 5,
+    paddingHorizontal: 20,
+    marginHorizontal: 10,
     borderRadius: 25,
     alignSelf: "center",
     shadowColor: "#460b2a",
@@ -475,6 +617,92 @@ const styles = StyleSheet.create({
     fontSize: 25,
     fontFamily: FontNames.MontserratRegular,
     fontWeight: "600",
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+
+  // -- CHIT CHATS MODAL --
+
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ccContainer: {
+    width: '90%',
+    backgroundColor: '#5E2A48',
+    borderRadius: 20,
+    padding: 20,
+    position: 'relative',
+  },
+  listItem: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  listText: {
+    fontSize: 20,
+    fontWeight: '500',
+  },
+  whiteText: {
+    color: '#F5E1C4',
+  },
+  pinkText: {
+    color: '#E6B8C7',
+  },
+  ccLabel: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#E6B8C7',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  ccContent: {
+    fontSize: 16,
+    color: '#F5E1C4',
+    marginBottom: 20,
+  },
+  replyInput: {
+    width: '100%',
+    minHeight: 80,
+    borderColor: '#40122E',
+    borderWidth: 6,
+    borderRadius: 12,
+    padding: 12,
+    color: '#F5E1C4',
+    backgroundColor: '#6E2A48',
+    marginBottom: 20,
+  },
+  replyButton: {
+    backgroundColor: '#70214A',
+    borderRadius: 25,
+    paddingVertical: 10,
+    paddingHorizontal: 32,
+    alignSelf: 'center',
+  },
+  replyButtonText: {
+    color: '#F5E1C4',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  ccCloseButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  closeText: {
+    color: '#F5E1C4',
+    fontSize: 24,
+  },
+  noChatsContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  noChatsText: {
+    color: '#F5E1C4',
+    fontSize: 18,
+    fontWeight: '600',
   },
 
   // ─── DRINK ICON + SPEECH BUBBLE ─────────────

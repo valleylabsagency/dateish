@@ -32,6 +32,8 @@ interface ChitChatsProps {
   existingChats: SavedChat[]
   onSave: (type: ChatType, content: string) => void
   onDelete: (index: number) => void
+  required: boolean
+  onRequiredChange: (val: boolean) => void
 }
 
 const chatMeta: Record<ChatType, { label: string; description: string; placeholder: string; example: string }> = {
@@ -91,6 +93,8 @@ export default function ChitChats({
   existingChats,
   onSave,
   onDelete,
+  required,
+  onRequiredChange
 }: ChitChatsProps) {
   const [step, setStep] = useState<'first' | 'selectType' | 'form'>('first')
   const [mustAnswer, setMustAnswer] = useState(false)
@@ -175,10 +179,10 @@ export default function ChitChats({
                   Ppl have to answer Chit Chats
                 </Text>
                 <Switch
-                  value={mustAnswer}
-                  onValueChange={setMustAnswer}
-                  trackColor={{ false: '#E0D0DE', true: '#862A46' }}
-                  thumbColor={mustAnswer ? '#511A31' : '#FFFFFF'}
+                 value={required}
+                 onValueChange={onRequiredChange}
+                 trackColor={{ false: '#E0D0DE', true: '#862A46' }}
+                 thumbColor={required ? '#511A31' : '#FFFFFF'}
                 />
               </View>
             </>
