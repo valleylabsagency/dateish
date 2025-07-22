@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Stack, usePathname, useLocalSearchParams } from "expo-router";
 import Navbar from "../components/Navbar";
+import { NavbarContext } from '../contexts/NavbarContext';
 import { ProfileProvider } from "../contexts/ProfileContext";
 import { FirstTimeProvider } from "../contexts/FirstTimeContext";
 import { MusicProvider, MusicContext } from "@/contexts/MusicContext";
@@ -35,11 +36,6 @@ import { collection, query, where, onSnapshot, orderBy } from "firebase/firestor
 
 // Prevent native splash from auto-hiding
 SplashScreen.preventAutoHideAsync().catch(() => {});
-
-export const NavbarContext = createContext({
-  showWcButton: false,
-  setShowWcButton: (value: boolean) => {},
-});
 
 function useDisableBackButton() {
   useEffect(() => {

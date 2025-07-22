@@ -13,7 +13,7 @@ import {
   Dimensions
 } from "react-native";
 import { useRouter } from "expo-router";
-import { NavbarContext } from "../app/_layout";
+import { NavbarContext } from "../contexts/NavbarContext";
 import { MusicContext } from "../contexts/MusicContext";
 import PopUp from "../components/PopUp";
 const { width, height } = Dimensions.get("window");
