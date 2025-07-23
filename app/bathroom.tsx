@@ -448,12 +448,7 @@ export default function BathroomScreen() {
         <BottomNavbar selectedTab="bathroom" />
       </View>
     </ImageBackground>
-    <PopUp
-       visible={showChitChats}
-       flag={popupFlag || undefined}
-       title="Chit Chats"
-       onClose={() => setShowChitChats(false)}
-    />
+    
   </>
   );
 }

@@ -158,6 +158,24 @@ const chatLabelMap: Record<ChatType, string> = {
   
   const profileChats: SavedChat[] = selectedProfile?.chitchats ?? [];
 
+   // compute our flags
+   const hasChitChats = profileChats.length > 0;
+   const showChatButton =
+     // always show Chat if there are no chit‑chats,
+     // or if chit‑chats exist but are not required
+     !hasChitChats || (hasChitChats && !selectedProfile.chitchatsRequired);
+   const showChitChatButton =
+     // show Chit Chat only if there are chit‑chats
+     hasChitChats;
+ 
+   // choose layout: center if only one button, else space‑around
+   const buttonContainerStyle = [
+     styles.bottomButtons,
+     (showChatButton !== showChitChatButton) // XOR: exactly one button?
+       ? { justifyContent: "center" }
+       : { justifyContent: "space-around" },
+   ];
+
   return (
     <ImageBackground
       source={require("../assets/images/bar-back.png")}
@@ -304,27 +322,26 @@ const chatLabelMap: Record<ChatType, string> = {
                   </Text>
                 </View>
 
-                <View style={styles.bottomButtons}>
-                <TouchableOpacity
-                  style={[
-                    styles.modalChatButton,
-                    selectedProfile.chitchatsRequired && styles.disabledButton,
-                  ]}
-                  onPress={() => {
-                    if (!selectedProfile.chitchatsRequired)
-                      router.push(`/chat?partner=${selectedProfile.id}`)
-                  }}
-                  disabled={selectedProfile.chitchatsRequired}
-                >
-                  <Text style={styles.modalChatButtonText}>Chat</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.modalChatButton}
-                  onPress={() => setChitChatModalVisible(true)}
-                >
-                  <Text style={styles.modalChatButtonText}>Chit Chat</Text>
-                </TouchableOpacity>
+                <View style={buttonContainerStyle}>
+                  {showChatButton && (
+                    <TouchableOpacity
+                      style={styles.modalChatButton}
+                      onPress={() => router.push(`/chat?partner=${selectedProfile.id}`)}
+                    >
+                      <Text style={styles.modalChatButtonText}>Chat</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {showChitChatButton && (
+                    <TouchableOpacity
+                      style={styles.modalChatButton}
+                      onPress={() => setChitChatModalVisible(true)}
+                    >
+                      <Text style={styles.modalChatButtonText}>Chit Chat</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
+
 
                 
               </>
@@ -499,8 +516,8 @@ const styles = StyleSheet.create({
   // ─── ONLINE ROW ──────────────────────────────
   onlineRow: {
     position: "absolute",
-    top: height * 0.55,
-    right: 5,
+    top: "60%",
+    right: 0,
     width: "100%",
     zIndex: 5,
   },
@@ -519,7 +536,7 @@ const styles = StyleSheet.create({
   },
   barFront: {
     width: "100%",
-    height: height * 0.78,
+    height: 750,
     zIndex: 2,
   },
 

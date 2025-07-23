@@ -35,7 +35,7 @@ import { auth, firestore } from "../firebase";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 
 // Prevent native splash from auto-hiding
-SplashScreen.preventAutoHideAsync().catch(() => {});
+//SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function useDisableBackButton() {
   useEffect(() => {
@@ -216,7 +216,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AnimatedSplashScreen>
+  
       <InactivityHandler>
         <AuthWrapper>
           <PresenceWrapper>
@@ -258,9 +258,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </PresenceWrapper>
         </AuthWrapper>
       </InactivityHandler>
-    </AnimatedSplashScreen>
+   
   );
 }
+
+// Add back Animated Splash Screen ^^^
 
 function NotificationDisplay() {
   const { visible, message, partnerId, senderName, hideNotification } = useContext(NotificationContext);

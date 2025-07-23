@@ -43,7 +43,7 @@ export default function EntranceScreen() {
   const hasStartedRef = useRef(false);
 
   const [fontsLoaded] = useFonts({
-    ArcadePixel:               require("../assets/fonts/ArcadePixel-Regular.otf"),
+    [FontNames.ArcadePixelRegular]:       require("../assets/fonts/ArcadePixel-Regular.otf"),
     [FontNames.MontserratBold]:    require("../assets/fonts/Montserrat-Bold.ttf"),
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
   });
@@ -78,7 +78,7 @@ export default function EntranceScreen() {
       if (firstTime) await signUp(username, password);
       else          await login(username, password);
       setShowAuth(false);
-      router.replace('/entranceAnimation')
+      router.replace('/bar-2') //replace with entrance animation
     } catch {
       setAuthError(true);
     } finally {
@@ -158,6 +158,12 @@ export default function EntranceScreen() {
             resizeMode="contain"
           />
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setShowAuth(true)}
+          style={styles.pressable}
+          activeOpacity={0.8}
+        />
+
       </ImageBackground>
 
       {/* — Auth sheet on top, transparent so you can still see the entrance behind it — */}
@@ -239,14 +245,15 @@ export default function EntranceScreen() {
 const styles = StyleSheet.create({
   container:    { flex: 1 },
   loading:      { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", justifyContent: "center", alignItems: "center" },
-  background:   { width, height, alignItems: "center" },
+  background:   { width, height: "100%", alignItems: "center" },
   entranceSign: { position: "absolute", top: "-15%", width: width * 0.55, height: height * 0.55 },
   bannerContainer:  { position: "absolute", top: height * 0.23, width: width * 0.8, height: height * 0.07 },
   bannerBackground: { flex: 1, justifyContent: "center" },
   bannerMask:       { position: "absolute", top: height * 0.012, bottom: 0, overflow: "hidden" },
-  bannerText:       { fontFamily: "ArcadePixel", fontSize: 32, lineHeight: 32, color: "red", fontWeight: "bold" },
-  doorTouchable:    { position: "absolute", top: height * 0.49, width: width * 0.9, height: height * 0.2, alignSelf: "center" },
+  bannerText:       { fontFamily: FontNames.ArcadePixelRegular, fontSize: 32, lineHeight: 32, color: "red", fontWeight: "bold" },
+  doorTouchable:    { position: "absolute", top: "50%", width: width * 0.9, height: height * 0.2, alignSelf: "center" },
   doorSign:         { width: "100%", height: "100%" },
+  pressable: { height: height * 0.69, width: width * 0.7, position: "absolute", top: height * 0.31}
 });
 
 const authStyles = StyleSheet.create({

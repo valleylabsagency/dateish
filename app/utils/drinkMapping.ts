@@ -10,3 +10,6 @@ export const drinkMapping = {
   water: require("../../assets/images/icons/water.png"),
 
 }
+
+
+export default drinkMapping;

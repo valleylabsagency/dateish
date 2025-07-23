@@ -7,5 +7,6 @@ export const FontNames = {
     MontserratRegular: 'Montserrat-Regular',
     MontSerratSemiBold: 'Montserrat-SemiBold',
     MVBoli: 'MVBoli',
+    ArcadePixelRegular: 'ArcadePixel-Regular'
   };
   

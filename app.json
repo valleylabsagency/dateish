@@ -8,11 +8,17 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "assets/fonts/*"
+    ],
     "splash": {
       "image": "./assets/images/Logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff",
       "hideExponentSplashScreen": false
+    },
+    "androidNavigationBar": {
+      "visible": "sticky-immersive"
     },
     "ios": {
       "supportsTablet": true,
@@ -31,7 +37,8 @@
       "expo-router",
       "expo-video",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true
