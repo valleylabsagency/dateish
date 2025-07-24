@@ -1,5 +1,5 @@
 // app/settings.tsx
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   ImageBackground,
@@ -7,10 +7,16 @@ import {
   Image,
   StyleSheet,
   Dimensions,
+  Text
 } from "react-native";
 import PopUp from "../components/PopUp";
 import ProfileNavbar from "../components/ProfileNavbar";
 import { useRouter } from "expo-router";
+import { scale, verticalScale, moderateScale } from "react-native-size-matters";
+import { MusicContext } from "../contexts/MusicContext";
+import { logout } from "../services/authservice";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { FontNames } from "../constants/fonts";
 
 const { width, height } = Dimensions.get("window");
 
@@ -64,7 +70,25 @@ const TITLE_MAP: Record<string, string> = {
 export default function SettingsScreen() {
   const [popupVisible, setPopupVisible] = useState(false);
   const [popupFlag, setPopupFlag] = useState<string | null>(null);
+  const { isPlaying, toggleMusic } = useContext(MusicContext);
   const router = useRouter();
+
+   const handleLogout = async () => {
+      if (isPlaying) {
+        toggleMusic();
+      }
+      try {
+        await logout();
+        await AsyncStorage.removeItem("userProfile");
+        await AsyncStorage.removeItem("bar2Started");
+        setTimeout(() => {
+          router.push("/entrance");
+        }, 100)
+      } catch (error) {
+        console.error("Logout error:", error);
+      }
+    };
+  
 
   return (
     <>
@@ -105,6 +129,11 @@ export default function SettingsScreen() {
         title={popupFlag ? TITLE_MAP[popupFlag] : undefined}
         onClose={() => setPopupVisible(false)}
       />
+      <View style={styles.logoutContainer}>
+                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                  <Text style={styles.logoutButtonText}>LOG OUT</Text>
+                </TouchableOpacity>
+              </View>
     </>
   );
 }
@@ -124,4 +153,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  logoutContainer: {
+      position: "absolute",
+      // was bottom: 40 => verticalScale(40)
+      bottom: verticalScale(60),
+      width: "100%",
+      alignItems: "center",
+    },
+    logoutButton: {
+      backgroundColor: "#D9534F",
+      paddingVertical: verticalScale(15),
+      paddingHorizontal: scale(50),
+      borderRadius: 30,
+      elevation: 5,
+    },
+    logoutButtonText: {
+      color: "#fff",
+      fontSize: scale(16), 
+      fontFamily: FontNames.MontserratBold,
+    },
 });

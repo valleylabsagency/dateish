@@ -60,7 +60,7 @@ const ICON_SIZE                = 35;
 const BAR_ICON_SIZE            = 52;
 const BAR_ICON_SELECTED_SIZE   = 70;   // <-- bump this if you want your bar icon even bigger
 const BORDER_WIDTH             = 2;
-const BAR_LIFT                 = -20;  // <-- how far to lift the Bar tab above the navbar
+const BAR_LIFT                 = -10;  // <-- how far to lift the Bar tab above the navbar
 const PINK                      = '#e98dbd';
 const DARK_BG                   = '#460b2a';
 
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   // ONLY the Bar tab (when selected) also gets lifted & slightly taller:
   barSelectedTab: {
     marginTop: BAR_LIFT,
-    height: '125%',
+    height: '115%',
     paddingTop: 15,
     flex: 1.3, 
     borderRadius: 25,

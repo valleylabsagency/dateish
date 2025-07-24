@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   Text,
   StyleSheet,
-  Dimensions
+  Dimensions,
+  Image
 } from 'react-native';
+import closeIcon from '../assets/images/x.png'
 
 interface PopUpProps {
   visible: boolean;
@@ -39,8 +41,8 @@ export default function PopUp({
       <View style={styles.overlay}>
         <View style={styles.container}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeText}>×</Text>
-          </TouchableOpacity>
+                      <Image source={closeIcon} style={styles.closeIcon} />
+                    </TouchableOpacity>
 
           {title && <Text style={styles.title}>{title}</Text>}
 
@@ -73,13 +75,14 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: 'absolute',
-    top: 0,
+    top: 20,
     right: 12,
     zIndex: 10,
   },
-  closeText: {
-    fontSize: 42,
-    color: '#ffe3d0',
+  closeIcon: {
+    width: 24,
+    height: 24,
+    tintColor: '#F5E1C4',
   },
   title: {
     fontSize: 46,

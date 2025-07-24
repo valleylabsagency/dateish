@@ -7,18 +7,22 @@ import {
   Image,
   ActivityIndicator,
   Platform,
-  Animated
+  Animated,
+  Dimensions
 } from "react-native";
 import { MusicContext } from "../contexts/MusicContext";
 import PopUp from "../components/PopUp";
 
+
 interface ProfileNavbarProps {
   onBack: () => void;
 }
+const { width, height } = Dimensions.get("window");
 
 export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
   // Access the music context so we can toggle music or show loading
   const { isPlaying, soundLoading, toggleMusic } = useContext(MusicContext);
+  
 
   // We'll animate the speaker-lines bigger/smaller for 5s whenever music toggles on
   // but we do NOT hide them in between loops. Instead we let them remain at the last scale value
@@ -153,20 +157,25 @@ const profileNavbarStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 8,
-    height: "55%",
-    width: "30%",
-    paddingHorizontal: 10,
-    marginRight: 20,
-    backgroundColor: "#d8bfd8"
+    height: 35,
+    width: width * 0.26,
+    paddingHorizontal: "2%",
+    paddingVertical: 0,
+    marginRight: "5%",
+    backgroundColor: "#d8bfd8",
+    position: "relative"
   },
   moneysAmount: {
     color: "#460b2a",
     fontSize: 30,
-    letterSpacing: 3,
+    letterSpacing: 0,
+    position: "relative",
+    bottom: height * 0.004,
+    right: width * 0.01
   },
   moneysImage: {
-    width: "65%",
-    height: "80%"
+    width: 65,
+    height: "95%"
   },
   speakerWrapper: {
     width: 50,

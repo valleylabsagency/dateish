@@ -16,8 +16,9 @@ import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
 import { MaterialIcons } from "@expo/vector-icons";
 import { ProfileContext } from "../contexts/ProfileContext";
-import { NavbarContext } from "../app/_layout";
+import { NavbarContext } from '../contexts/NavbarContext';
 import PopUp from "../components/PopUp";
+import { verticalScale } from "react-native-size-matters";
 
 const { width, height } = Dimensions.get("window");
 const BUBBLE_HEIGHT = height * 0.18;
@@ -107,17 +108,19 @@ export default function MinglesScreen() {
         />
 
         {/* 2) MR. MINGLES – clickable, cycles messages */}
-        <TouchableOpacity
-          style={styles.minglesContainer}
-          onPress={cycle}
-          activeOpacity={0.8}
-        >
-          <Image
-            source={require("../assets/images/mr-mingles.png")}
-            style={styles.minglesImage}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
+        <View style={styles.minglesContainer}>
+          <TouchableOpacity
+           onPress={cycle}
+           activeOpacity={0.8}
+          >
+            <Image
+              source={require("../assets/images/mr-mingles.png")}
+              style={styles.minglesImage}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+         
+        </View>
 
         {/* 3) BAR FRONT OVERLAY (no pointer events) */}
         <View style={styles.frontContainer} pointerEvents="none">
@@ -147,7 +150,7 @@ export default function MinglesScreen() {
             <View style={styles.bubbleContent}>
               <Text style={styles.bubbleText}>{messages[idx]}</Text>
               {idx === 0 && (
-                <TouchableOpacity style={styles.tapButton}>
+                <TouchableOpacity onPress={() => setShowDrinkMenu(true)} style={styles.tapButton}>
                   <Text style={styles.tapText}>- TAP -</Text>
                 </TouchableOpacity>
               )}
@@ -331,9 +334,8 @@ const styles = StyleSheet.create({
   },
   minglesContainer: {
     position: "absolute",
-    bottom: height * 0.1,
-    right: "8%",
-    width,
+    top: verticalScale(40),
+    right: "18%",
     alignItems: "center",
   },
   minglesImage: {
@@ -350,7 +352,7 @@ const styles = StyleSheet.create({
   },
   frontImage: {
     width: "100%",
-    height: height * 0.7,
+    height: 700
   },
   bubbleContainer: {
     position: "absolute",
@@ -381,7 +383,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   tapText: {
-    color: "#ffe3d0",
+    color: "white",
     fontFamily: FontNames.MontserratRegular,
     fontSize: 18,
   },

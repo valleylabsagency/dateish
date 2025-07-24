@@ -20,6 +20,7 @@ import { useRouter } from "expo-router";
 import { FirstTimeContext } from "../contexts/FirstTimeContext";
 import { signUp, login } from "../services/authservice";
 import { FontNames } from "../constants/fonts";
+import closeIcon from '../assets/images/x.png'
 
 const { width, height } = Dimensions.get("window");
 const MESSAGE = "Happy Hour daily! ";
@@ -184,7 +185,7 @@ export default function EntranceScreen() {
              style={authStyles.closeButton}
              onPress={() => setShowAuth(false)}
            >
-             <Text style={authStyles.closeButtonText}>×</Text>
+             <Image source={closeIcon} style={styles.closeIcon} />
            </TouchableOpacity>
             <View style={authStyles.sheet}>
               <Text style={authStyles.title}>
@@ -253,7 +254,12 @@ const styles = StyleSheet.create({
   bannerText:       { fontFamily: FontNames.ArcadePixelRegular, fontSize: 32, lineHeight: 32, color: "red", fontWeight: "bold" },
   doorTouchable:    { position: "absolute", top: "50%", width: width * 0.9, height: height * 0.2, alignSelf: "center" },
   doorSign:         { width: "100%", height: "100%" },
-  pressable: { height: height * 0.69, width: width * 0.7, position: "absolute", top: height * 0.31}
+  pressable: { height: height * 0.69, width: width * 0.7, position: "absolute", top: height * 0.31},
+  closeIcon: {
+    width: 24,
+    height: 24,
+    tintColor: 'black',
+  },
 });
 
 const authStyles = StyleSheet.create({
@@ -276,6 +282,7 @@ const authStyles = StyleSheet.create({
     right: "12%",
     zIndex: 10,
   },
+  
   closeButtonText: {
     fontSize: 32,
     color: "#000",

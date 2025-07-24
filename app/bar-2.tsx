@@ -23,6 +23,7 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { scale } from "react-native-size-matters";
 import ChitChats, { ChatType, SavedChat } from "./ChitChats";
+import closeIcon from '../assets/images/x.png'
 
 const { width, height } = Dimensions.get("window");
 const BUBBLE_HEIGHT = height * 0.18;           // height for the speech bubble
@@ -85,8 +86,8 @@ const chatLabelMap: Record<ChatType, string> = {
 }
 
 
-  // load persisted "started" flag
-  useEffect(() => {
+  // load persisted "started" flag 
+ /* useEffect(() => {
     (async () => {
       try {
         const saved = await AsyncStorage.getItem("bar2Started");
@@ -95,7 +96,7 @@ const chatLabelMap: Record<ChatType, string> = {
         console.error("Load start-chat flag:", e);
       }
     })();
-  }, []);
+  }, []); */
 
   // 1) fetch all other users
   useEffect(() => {
@@ -440,7 +441,7 @@ const chatLabelMap: Record<ChatType, string> = {
                   setReplyText('')
                 }}
               >
-                <Text style={styles.closeText}>X</Text>
+                 <Image source={closeIcon} style={styles.closeIcon} />
               </TouchableOpacity>
             </View>
           </View>
@@ -462,7 +463,7 @@ const styles = StyleSheet.create({
   // ─── BUBBLE ───────────────────────────────────
   bubbleContainer: {
     position: "absolute",
-    bottom: height * 0.71,
+    top: "3%",
     left: 0,
     right: 0,
     alignItems: "center",
@@ -476,8 +477,9 @@ const styles = StyleSheet.create({
   // ─── Mr. Mingles ──────────────────────────────
   minglesContainer: {
     position: "absolute",
-    bottom: height * 0.06,
+    top: "8%",
     left: width * 0.08,
+    height: "100%",
     width: "100%",
     alignItems: "center",
     zIndex: 1,
@@ -572,6 +574,11 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 12,
     right: 12,
+  },
+  closeIcon: {
+    width: 24,
+    height: 24,
+    tintColor: '#F5E1C4',
   },
   modalImage: {
     width: 180,

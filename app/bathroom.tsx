@@ -27,12 +27,9 @@ import { scale, verticalScale, moderateScale } from "react-native-size-matters";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { auth, storage, firestore } from "../firebase";
-import { logout } from "../services/authservice";
 import { FontNames } from "../constants/fonts";
-import PopUp from "../components/PopUp";
-import { MusicContext } from "../contexts/MusicContext";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import ChitChats, { ChatType, SavedChat } from "./ChitChats";
+import closeIcon from '../assets/images/x.png'
 
 
 
@@ -56,7 +53,6 @@ export default function BathroomScreen() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [showChitChats, setShowChitChats] = useState(false);
   const [popupFlag, setPopupFlag] = useState<string | null>(null);
-  const { isPlaying, toggleMusic } = useContext(MusicContext);
   const [mustAnswer, setMustAnswer] = useState(false)
 
   // editing-about modal
@@ -254,22 +250,7 @@ export default function BathroomScreen() {
     }
   };
 
-  const handleLogout = async () => {
-    if (isPlaying) {
-      toggleMusic();
-    }
-    try {
-      await logout();
-      await AsyncStorage.removeItem("userProfile");
-      await AsyncStorage.removeItem("bar2Started");
-      setTimeout(() => {
-        router.push("/entrance");
-      }, 100)
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
-  };
-
+ 
   const renderAboutEditor = () => (
     <Modal animationType="fade" transparent visible={editingAbout}>
       <KeyboardAvoidingView
@@ -314,7 +295,7 @@ export default function BathroomScreen() {
       source={bathroomImg}
       style={styles.background}
       resizeMode="stretch"
-      imageStyle={{ aspectRatio: BG_ASPECT_RATIO }}
+      imageStyle={{ marginTop: moderateScale(30) }}
     >
        <ProfileNavbar onBack={handleSubmit} />
       <View style={styles.formContainer}>
@@ -327,7 +308,7 @@ export default function BathroomScreen() {
         />
 
         <TextInput
-          style={[styles.input, {marginTop: "3%"}]}
+          style={styles.input}
           placeholder="Age"
           placeholderTextColor="#999"
           value={age}
@@ -391,7 +372,7 @@ export default function BathroomScreen() {
             style={modalStyles.closeButton}
             onPress={() => setModalVisible(false)}
           >
-            <Text style={modalStyles.closeButtonText}>X</Text>
+             <Image source={closeIcon} style={styles.closeIcon} />
           </TouchableOpacity>
           <View style={modalStyles.modalContainer}>
             <Text style={modalStyles.modalText}>{modalTypedText}</Text>
@@ -429,24 +410,12 @@ export default function BathroomScreen() {
 
       {renderAboutEditor()}
 
-      {profileComplete && (
-        <View style={styles.logoutContainer}>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutButtonText}>LOG OUT</Text>
-          </TouchableOpacity>
-        </View>
-              )}
-
-
       {isSaving && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#fff" />
         </View>
       )}
 
-      <View style={styles.bottomNavbarContainer}>
-        <BottomNavbar selectedTab="bathroom" />
-      </View>
     </ImageBackground>
     
   </>
@@ -462,27 +431,33 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     position: "absolute",
-    top: verticalScale(130),
+    top: verticalScale(155),
     alignSelf: "center",
     width: "90%",
+  },
+  closeIcon: {
+    width: 24,
+    height: 24,
+    tintColor: '#F5E1C4',
   },
   input: {
     width: "100%",
     fontSize: scale(18),
     textAlign: "center",
+    textAlignVertical: "center",
     color: "#908db3",
     fontFamily: FontNames.MontserratBold,
-    height: verticalScale(20),
+    paddingVertical: verticalScale(2)
   },
   locationContainer: {
     alignItems: "center",
-    marginVertical: verticalScale(7),
+    paddingBottom: verticalScale(4)
   },
   editButton: {
     paddingHorizontal: scale(8),
     paddingVertical: verticalScale(4),
     borderRadius: 20,
-    marginTop: verticalScale(5),
+    
     borderWidth: 1,
     borderColor: "black",
   },
@@ -539,25 +514,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
-  },
-  logoutContainer: {
-    position: "absolute",
-    // was bottom: 40 => verticalScale(40)
-    bottom: verticalScale(60),
-    width: "100%",
-    alignItems: "center",
-  },
-  logoutButton: {
-    backgroundColor: "#D9534F",
-    paddingVertical: verticalScale(15),
-    paddingHorizontal: scale(50),
-    borderRadius: 30,
-    elevation: 5,
-  },
-  logoutButtonText: {
-    color: "#fff",
-    fontSize: scale(16), 
-    fontFamily: FontNames.MontserratBold,
   },
 });
 
@@ -631,6 +587,7 @@ const modalStyles = StyleSheet.create({
     fontSize: moderateScale(35),
     fontFamily: FontNames.MontserratExtraLight,
   },
+  
   modalContainer: {
     width: "90%",
     height: verticalScale(400),

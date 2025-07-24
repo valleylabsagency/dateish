@@ -179,11 +179,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 8,
-    height: "55%",
+    height: 35,
     width: width * 0.26,
     paddingHorizontal: "2%",
+    paddingVertical: 0,
     marginRight: "5%",
-    backgroundColor: "#d8bfd8"
+    backgroundColor: "#d8bfd8",
+    position: "relative"
   },
   moneysAmount: {
     color: "#460b2a",
@@ -194,8 +196,8 @@ const styles = StyleSheet.create({
     right: width * 0.01
   },
   moneysImage: {
-    width: "60%",
-    height: "80%"
+    width: 65,
+    height: "95%"
   },
   speakerWrapper: {
     width: 50,
