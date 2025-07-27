@@ -294,6 +294,6 @@ function NotificationDisplay() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   background: { flex: 1, justifyContent: "flex-start", alignItems: "center" },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "black" },
   message: { fontSize: 32, textAlign: "center", padding: 20, color: "yellow" },
 });
