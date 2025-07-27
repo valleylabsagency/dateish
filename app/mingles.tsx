@@ -49,7 +49,7 @@ export default function MinglesScreen() {
     "Go talk to some humans!",
   ];
   const [idx, setIdx] = useState(0);
-  const prev = () => setIdx(i => Math.max(0, i - 1));
+  const back = () => setIdx(i => (i - 1 + messages.length) % messages.length);
   // cycles forward, wrapping to zero
   const cycle = () => setIdx(i => (i + 1) % messages.length);
 
@@ -82,7 +82,7 @@ export default function MinglesScreen() {
   const userDrink = (profile?.drink || "water").toLowerCase();
   const drinkIcon = drinkMapping[userDrink];
   const isSmall = ["vodka", "tequila"].includes(userDrink);
-  const drinkSize = isSmall ? width * 0.10 : width * 0.15;
+  const drinkSize = isSmall ? width * 0.10 : width * 0.25;
   const drinkTextMapping: Record<string, string> = {
     wine: "Where's the romance at?",
     beer: "Chill night... Sup?",
@@ -112,6 +112,7 @@ export default function MinglesScreen() {
           <TouchableOpacity
            onPress={cycle}
            activeOpacity={0.8}
+           style={styles.minglesImageTouchable}
           >
             <Image
               source={require("../assets/images/mr-mingles.png")}
@@ -124,11 +125,23 @@ export default function MinglesScreen() {
 
         {/* 3) BAR FRONT OVERLAY (no pointer events) */}
         <View style={styles.frontContainer} pointerEvents="none">
-          <Image
-            source={require("../assets/images/mm-front.png")}
-            style={styles.frontImage}
-            resizeMode="contain"
-          />
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {}}
+            style={{
+              width: "100%",
+              height: 700,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Image
+              source={require("../assets/images/mm-front.png")}
+              style={styles.frontImage}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+          
         </View>
 
         {/* 4) SPEECH BUBBLE */}
@@ -139,11 +152,11 @@ export default function MinglesScreen() {
             style={styles.bubble}
             resizeMode="stretch"
           >
-            <TouchableOpacity onPress={prev} disabled={idx === 0} style={styles.arrow}>
+            <TouchableOpacity onPress={back} style={styles.arrow}>
               <MaterialIcons
                 name="chevron-left"
                 size={32}
-                color={idx === 0 ? "rgba(255,255,255,0.3)" : "#fff"}
+                color={"#fff"}
               />
             </TouchableOpacity>
 
@@ -157,14 +170,13 @@ export default function MinglesScreen() {
             </View>
 
             <TouchableOpacity
-              onPress={() => setIdx(i => Math.min(messages.length - 1, i + 1))}
-              disabled={idx === messages.length - 1}
+              onPress={cycle}
               style={styles.arrow}
             >
               <MaterialIcons
                 name="chevron-right"
                 size={32}
-                color={idx === messages.length - 1 ? "rgba(255,255,255,0.3)" : "#fff"}
+                color={"#fff"}
               />
             </TouchableOpacity>
           </ImageBackground>
@@ -242,7 +254,7 @@ export default function MinglesScreen() {
           <TouchableOpacity
             style={[
               styles.userDrinkIconContainer,
-              { top: isSmall ? height * 0.50 : height * 0.47 },
+              { top: isSmall ? height * 0.59 : height * 0.525 },
             ]}
             onPress={() => setShowDrinkSpeech(s => !s)}
             activeOpacity={0.8}
@@ -334,9 +346,15 @@ const styles = StyleSheet.create({
   },
   minglesContainer: {
     position: "absolute",
-    top: verticalScale(40),
-    right: "18%",
+    top: verticalScale(190),
+    right: "24%",
     alignItems: "center",
+  },
+  minglesImageTouchable: {
+    width: "70%",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "38%"
   },
   minglesImage: {
     width: width * 0.8,
@@ -360,16 +378,26 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: "center",
+    justifyContent: "center"
   },
   bubble: {
     width: width * 0.9,
     height: BUBBLE_HEIGHT,
     flexDirection: "row",
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     alignItems: "center",
+    justifyContent: "space-between"
   },
-  arrow: { width: 40, alignItems: "center" },
-  bubbleContent: { flex: 1, alignItems: "center", position: "relative", bottom: "10%" },
+  arrow: { width: 40, alignItems: "center", justifyContent: "center" },
+  bubbleContent: {
+    position: "absolute",
+    top: 0, 
+    bottom: 0,
+    left: 40,
+    right: 40,
+    justifyContent: "center",
+    alignItems: "center"
+  },
   bubbleText: {
     fontFamily: FontNames.MontserratRegular,
     fontSize: 20,
@@ -377,7 +405,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   tapButton: {
-    marginTop: 12,
     paddingHorizontal: 24,
     paddingVertical: 8,
     borderRadius: 8,
@@ -389,24 +416,27 @@ const styles = StyleSheet.create({
   },
   overlayTouchable: {
     position: "absolute",
-    bottom: "26%",
+    bottom: "24%",
     right: "27%",
     width: 70,
     height: 30,
+    zIndex: 550
   },
   overlayTouchableShop: {
     position: "absolute",
-    bottom: "21.5%",
+    bottom: "19.5%",
     right: "27%",
     width: 70,
     height: 30,
+    zIndex: 550
   },
   overlayTouchableRules: {
     position: "absolute",
-    bottom: "17%",
+    bottom: "15%",
     right: "30%",
     width: 70,
     height: 30,
+    zIndex: 550
   },
   overlayTouchableTips: {
     position: "absolute",

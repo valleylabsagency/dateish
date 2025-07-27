@@ -239,7 +239,6 @@ export default function MinglesScreen() {
           <TouchableOpacity
             style={[
               styles.userDrinkIconContainer,
-              { top: isSmall ? height * 0.50 : height * 0.47 },
             ]}
             onPress={() => setShowDrinkSpeech(prev => !prev)}
             activeOpacity={0.8}
@@ -256,7 +255,7 @@ export default function MinglesScreen() {
             )}
             <Image
               source={drinkIcon}
-              style={{ width: drinkSize, height: drinkSize }}
+              style={[{ width: drinkSize, height: drinkSize, top: isSmall ? height * 0.40 : height * 0.6 }, styles.userDrinkIcon ]}
               resizeMode="contain"
             />
           </TouchableOpacity>
@@ -419,6 +418,9 @@ const styles = StyleSheet.create({
     right: width * 0.31,
     zIndex: 5,
     alignItems: "center",
+  },
+  userDrinkIcon: {
+    position: "absolute"
   },
   drinkSpeechBubble: {
     position: "absolute",

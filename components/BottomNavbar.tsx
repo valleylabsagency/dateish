@@ -23,6 +23,7 @@ export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
       {tabs.map(tab => {
         const isSelected = currentPath === tab.route;
         const isBar      = tab.label === 'Bar';
+        const isStage = tab.label === 'Events';
 
         return (
           <TouchableOpacity
@@ -43,6 +44,7 @@ export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
                   isSelected          && styles.selectedIcon,
                   isBar               && styles.barIcon,
                   isBar && isSelected && styles.barSelectedIcon,
+                  isStage && styles.stageIcon
                 ]}
               />
             </View>
@@ -124,6 +126,10 @@ const styles = StyleSheet.create({
   barIcon: {
     width: BAR_ICON_SIZE,
     height: BAR_ICON_SIZE,
+  },
+  stageIcon: {
+    width: 55,
+    height: 55
   },
   // Bar’s extra‐large selected size:
   barSelectedIcon: {

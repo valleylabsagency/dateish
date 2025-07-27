@@ -98,7 +98,7 @@ const conversationStyles = StyleSheet.create({
   previewImage: { width: 130, height: 130, borderRadius: 65 },
   previewTextContainer: { flex: 1, marginHorizontal: 10 },
   previewName: {
-    color: "#fff",
+    color: "#e2a350",
     fontSize: 24,
     fontFamily: FontNames.MontserratRegular,
   },
