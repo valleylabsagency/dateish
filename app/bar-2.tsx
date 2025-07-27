@@ -1,5 +1,5 @@
 // bar-2.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,9 @@ import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 import closeIcon from '../assets/images/x.png';
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
+import { Video } from 'expo-av';
+
+const steamboat = require('../assets/videos/steamboatwillie.mp4');
 
 const { width, height } = Dimensions.get("window");
 const BUBBLE_HEIGHT = height * 0.18;           // height for the speech bubble
@@ -82,6 +85,14 @@ export default function Bar2Screen() {
   const [ccStep, setCcStep] = useState<'choose'|'show'>('choose');
   const [selectedCc, setSelectedCc] = useState<SavedChat|null>(null);
   const [replyText, setReplyText] = useState('');
+
+  const videoRef = useRef<Video>(null);
+
+  useEffect(() => {
+    if (started && videoRef.current) {
+      videoRef.current.playAsync().catch(console.warn)
+    }
+  }, [started])
 
   // mapping ChatType → human label
 const chatLabelMap: Record<ChatType, string> = {
@@ -233,6 +244,18 @@ const chatLabelMap: Record<ChatType, string> = {
 
       {/* ─── CHAT MODE: avatars appear after "Start Chatting" ─────────── */}
       {started && onlineProfiles.length > 0 && (
+        <>
+        <Video
+          ref={videoRef}
+          source={steamboat}
+          style={styles.tvScreen}
+          resizeMode="cover"
+          isLooping
+          useNativeControls={false}
+          onLoad={() => console.log('✅ Steamboat loaded')}
+          onError={e => console.log('❌ Video error:', e)}
+            
+          />
         <View style={styles.onlineRow}>
           <ScrollView
             horizontal
@@ -266,6 +289,7 @@ const chatLabelMap: Record<ChatType, string> = {
             ))}
           </ScrollView>
         </View>
+        </>
       )}
 
       {/* ─── BACK BAR LAYERS ───────────────────────── */}
@@ -472,6 +496,14 @@ const styles = StyleSheet.create({
     flex: 1,
     resizeMode: "cover",
     alignItems: "center",
+  },
+  tvScreen: {
+    position: 'absolute',
+    top: height * 0.155,    // slide down to match the TV’s vertical position
+    left: width * 0.53,    // slide right to line up with the TV’s left edge
+    width: width * 0.28,    // match the TV screen’s width
+    height: width * 0.22,   // match its aspect ratio
+    zIndex: 3,             // above the bar-front but below your modals/nav
   },
   // ─── BUBBLE ───────────────────────────────────
   bubbleContainer: {
