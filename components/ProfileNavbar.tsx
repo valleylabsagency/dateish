@@ -5,19 +5,27 @@ import {
   Text,
   StyleSheet,
   Image,
-  ActivityIndicator,
   Platform,
   Animated,
   Dimensions
 } from "react-native";
 import { MusicContext } from "../contexts/MusicContext";
 import PopUp from "../components/PopUp";
+import LottieView from 'lottie-react-native';
+import animationData from '../assets/videos/mm-dancing.json';
 
 
 interface ProfileNavbarProps {
   onBack: () => void;
 }
 const { width, height } = Dimensions.get("window");
+
+const withoutBg = {
+  ...animationData,
+  layers: animationData.layers.filter(
+    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+  ),
+}
 
 export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
   // Access the music context so we can toggle music or show loading
@@ -99,7 +107,12 @@ export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
 
       {/* Speaker icon area */}
       {soundLoading ? (
-        <ActivityIndicator color="#fff" style={{ width: 50, height: 50 }} />
+        <LottieView
+                source={withoutBg}
+                autoPlay
+                loop
+                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+               />
       ) : (
         <TouchableOpacity onPress={toggleMusic} style={profileNavbarStyles.speakerWrapper}>
           {/* speaker-no-lines is always there */}

@@ -3,7 +3,6 @@ import {
   View,
   ImageBackground,
   ScrollView,
-  ActivityIndicator,
   TouchableOpacity,
   Text,
   Modal,                // ADDED
@@ -13,6 +12,8 @@ import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import { useRouter } from "expo-router";
 import { auth, firestore } from "../firebase";
+import LottieView from 'lottie-react-native';
+import animationData from '../assets/videos/mm-dancing.json';
 import { 
   collection, 
   query, 
@@ -33,6 +34,13 @@ import {
   verticalScale,
 } from "react-native-size-matters";
 import { getDatabase, ref, onValue } from "firebase/database";
+
+const withoutBg = {
+  ...animationData,
+  layers: animationData.layers.filter(
+    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+  ),
+}
 
 
 export default function ChatsScreen() {
@@ -135,7 +143,12 @@ export default function ChatsScreen() {
   if (!fontsLoaded || loading) {
     return (
       <View style={chatsStyles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fff" />
+       <LottieView
+               source={withoutBg}
+               autoPlay
+               loop
+               style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+              />
       </View>
     );
   }

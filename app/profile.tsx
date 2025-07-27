@@ -7,7 +7,6 @@ import {
   ImageBackground,
   StyleSheet,
   Image,
-  ActivityIndicator,
   Modal,
   Animated,
   KeyboardAvoidingView,
@@ -25,6 +24,8 @@ import { ProfileContext } from "../contexts/ProfileContext";
 import ProfileNavbar from "@/components/ProfileNavbar";
 import { logout } from "../services/authservice";
 import { MusicContext } from "../contexts/MusicContext";
+import LottieView from 'lottie-react-native';
+import animationData from '../assets/videos/mm-dancing.json';
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 // NEW IMPORTS FOR FIREBASE STORAGE
@@ -40,6 +41,13 @@ import { scale, verticalScale, moderateScale } from "react-native-size-matters";
 const baseFont = scale(16);    // ~ an old 4-5% of screen width for a typical device
 const mediumFont = scale(22);  // ~ an old 6% 
 const largeFont = scale(35);   // ~ an old 10% 
+
+const withoutBg = {
+  ...animationData,
+  layers: animationData.layers.filter(
+    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+  ),
+}
 
 export default function ProfileScreen() {
   const { profile, saveProfile, setProfileComplete, profileComplete } = useContext(ProfileContext);
@@ -268,7 +276,12 @@ export default function ProfileScreen() {
   if (!fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
+        <LottieView
+                source={withoutBg}
+                autoPlay
+                loop
+                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+               />
       </View>
     );
   }
@@ -300,7 +313,12 @@ export default function ProfileScreen() {
           />
           <View style={styles.locationContainer}>
             {locationLoading ? (
-              <ActivityIndicator size="small" color="#000"/>
+              <LottieView
+                      source={withoutBg}
+                      autoPlay
+                      loop
+                      style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+                     />
             ) : (
               <TextInput
               style={styles.input}
@@ -383,7 +401,12 @@ export default function ProfileScreen() {
 
         {isSaving && (
           <View style={styles.loadingOverlay}>
-            <ActivityIndicator size={"large"} color="#fff" />
+            <LottieView
+                    source={withoutBg}
+                    autoPlay
+                    loop
+                    style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+                   />
           </View>
         )}
       </>

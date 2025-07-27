@@ -9,7 +9,6 @@ import {
   Dimensions,
   Image,
   Modal,
-  ActivityIndicator,
 } from "react-native";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
@@ -19,9 +18,19 @@ import { ProfileContext } from "../contexts/ProfileContext";
 import { NavbarContext } from '../contexts/NavbarContext';
 import PopUp from "../components/PopUp";
 import { verticalScale } from "react-native-size-matters";
+import LottieView from 'lottie-react-native';
+import animationData from '../assets/videos/mm-dancing.json';
 
 const { width, height } = Dimensions.get("window");
 const BUBBLE_HEIGHT = height * 0.18;
+
+const withoutBg = {
+  ...animationData,
+  layers: animationData.layers.filter(
+    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+  ),
+}
+
 
 export default function MinglesScreen() {
   const [fontsLoaded] = useFonts({
@@ -210,7 +219,12 @@ export default function MinglesScreen() {
                 ))}
                 {drinkLoading && (
                   <View style={drinkModalStyles.loadingOverlay}>
-                    <ActivityIndicator size="large" color="#fff" />
+                    <LottieView
+                            source={withoutBg}
+                            autoPlay
+                            loop
+                            style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+                           />
                   </View>
                 )}
               </ImageBackground>

@@ -4,7 +4,6 @@ import {
   View,
   ImageBackground,
   ScrollView,
-  ActivityIndicator,
   TouchableOpacity,
   Text,
   Modal,
@@ -29,6 +28,16 @@ import ConversationPreview from "../components/ConversationPreview";
 import { MaterialIcons } from "@expo/vector-icons";
 import ChatScreen from "./chat";
 import { FontNames } from "../constants/fonts";
+import LottieView from 'lottie-react-native';
+import animationData from '../assets/videos/mm-dancing.json';
+
+
+const withoutBg = {
+  ...animationData,
+  layers: animationData.layers.filter(
+    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+  ),
+}
 
 export default function InboxScreen() {
   const router = useRouter();
@@ -125,7 +134,12 @@ export default function InboxScreen() {
   if (!fontsLoaded || (loadingConvs && !isChatMode)) {
     return (
       <View style={modalStyles.loadingContainer}>
-        <ActivityIndicator size="large" color="gold" />
+        <LottieView
+                source={withoutBg}
+                autoPlay
+                loop
+                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+               />
       </View>
     );
   }

@@ -11,7 +11,6 @@ import {
   Dimensions,
   Animated,
   Easing,
-  ActivityIndicator,
   Modal,
 } from "react-native";
 import { Video } from "expo-av";
@@ -20,10 +19,20 @@ import { useRouter } from "expo-router";
 import { FirstTimeContext } from "../contexts/FirstTimeContext";
 import { signUp, login } from "../services/authservice";
 import { FontNames } from "../constants/fonts";
-import closeIcon from '../assets/images/x.png'
+import closeIcon from '../assets/images/x.png';
+import LottieView from 'lottie-react-native';
+import animationData from '../assets/videos/mm-dancing.json';
 
 const { width, height } = Dimensions.get("window");
 const MESSAGE = "Happy Hour daily! ";
+
+const withoutBg = {
+  ...animationData,
+  layers: animationData.layers.filter(
+    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+  ),
+}
+
 
 export default function EntranceScreen() {
   const router = useRouter();
@@ -104,7 +113,12 @@ export default function EntranceScreen() {
   if (!fontsLoaded) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#fff" />
+        <LottieView
+                source={withoutBg}
+                autoPlay
+                loop
+                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+               />
       </View>
     );
   }
@@ -216,7 +230,12 @@ export default function EntranceScreen() {
                 disabled={loadingAuth}
               >
                 {loadingAuth
-                  ? <ActivityIndicator color="#fff" />
+                  ? <LottieView
+                          source={withoutBg}
+                          autoPlay
+                          loop
+                          style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+                         />
                   : <Text style={authStyles.buttonText}>GO IN!</Text>
                 }
               </TouchableOpacity>
@@ -233,7 +252,12 @@ export default function EntranceScreen() {
             </View>
             {loadingAuth && (
               <View style={authStyles.loadingOverlay}>
-                <ActivityIndicator size="large" color="#fff" />
+                <LottieView
+                        source={withoutBg}
+                        autoPlay
+                        loop
+                        style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+                       />
               </View>
             )}
           </ImageBackground>

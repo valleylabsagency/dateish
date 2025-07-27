@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  ActivityIndicator,
   Dimensions,
   TextInput
 } from "react-native";
@@ -23,13 +22,22 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { scale } from "react-native-size-matters";
 import ChitChats, { ChatType, SavedChat } from "./ChitChats";
-import closeIcon from '../assets/images/x.png'
+import closeIcon from '../assets/images/x.png';
+import LottieView from 'lottie-react-native';
+import animationData from '../assets/videos/mm-dancing.json';
 
 const { width, height } = Dimensions.get("window");
 const BUBBLE_HEIGHT = height * 0.18;           // height for the speech bubble
 const START_OFFSET_RATIO = 0.085;
 const SPACING_RATIO      = 0.2;
 const AVATAR_SIZE        = 100;
+
+const withoutBg = {
+  ...animationData,
+  layers: animationData.layers.filter(
+    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+  ),
+}
 
 // Mapping of drink types to icons
 const drinkMapping: Record<string, any> = {
@@ -149,7 +157,12 @@ const chatLabelMap: Record<ChatType, string> = {
         style={styles.background}
         blurRadius={4}
       >
-        <ActivityIndicator size="large" color="gold" />
+       <LottieView
+        source={withoutBg}
+        autoPlay
+        loop
+        style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+       />
       </ImageBackground>
     );
   }

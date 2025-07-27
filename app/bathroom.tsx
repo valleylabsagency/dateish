@@ -8,7 +8,6 @@ import {
   ImageBackground,
   Image,
   StyleSheet,
-  ActivityIndicator,
   Modal,
   Animated,
   KeyboardAvoidingView,
@@ -30,13 +29,21 @@ import { auth, storage, firestore } from "../firebase";
 import { FontNames } from "../constants/fonts";
 import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 import closeIcon from '../assets/images/x.png'
-
+import LottieView from 'lottie-react-native';
+import animationData from '../assets/videos/mm-dancing.json';
 
 
 // resolve the asset to get its intrinsic size
 const bathroomImg = require("../assets/images/bathroom.png");
 const { width: imgW, height: imgH } = Image.resolveAssetSource(bathroomImg);
 const BG_ASPECT_RATIO = imgW / imgH;
+
+const withoutBg = {
+  ...animationData,
+  layers: animationData.layers.filter(
+    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+  ),
+}
 
 export default function BathroomScreen() {
   const router = useRouter();
@@ -318,7 +325,12 @@ export default function BathroomScreen() {
 
         <View style={styles.locationContainer}>
           {locationLoading ? (
-            <ActivityIndicator size="small" color="#000" />
+            <LottieView
+                    source={withoutBg}
+                    autoPlay
+                    loop
+                    style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+                   />
           ) : (
             <TextInput
               style={styles.input}
@@ -412,7 +424,12 @@ export default function BathroomScreen() {
 
       {isSaving && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#fff" />
+          <LottieView
+                  source={withoutBg}
+                  autoPlay
+                  loop
+                  style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+                 />
         </View>
       )}
 

@@ -7,7 +7,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   Animated,
   Platform,
   Dimensions
@@ -16,7 +15,16 @@ import { useRouter } from "expo-router";
 import { NavbarContext } from "../contexts/NavbarContext";
 import { MusicContext } from "../contexts/MusicContext";
 import PopUp from "../components/PopUp";
+import LottieView from 'lottie-react-native';
+import animationData from '../assets/videos/mm-dancing.json';
+
 const { width, height } = Dimensions.get("window");
+const withoutBg = {
+  ...animationData,
+  layers: animationData.layers.filter(
+    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+  ),
+}
 
 export default function Navbar() {
   const router = useRouter();
@@ -116,7 +124,12 @@ export default function Navbar() {
       {/* Speaker icon area */}
       {soundLoading ? (
         // If audio is loading, show a spinner
-        <ActivityIndicator style={styles.navIcon} color="#fff" />
+        <LottieView
+                source={withoutBg}
+                autoPlay
+                loop
+                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+               />
       ) : (
         <TouchableOpacity onPress={toggleMusic} style={styles.speakerWrapper}>
           {/* speaker-no-lines is always there */}

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
   ImageBackground,
-  ActivityIndicator,
   I18nManager,
   BackHandler,
   Animated,
@@ -29,6 +28,8 @@ import { StatusBar } from "expo-status-bar";
 import * as NavigationBar from "expo-navigation-bar";
 import InAppNotification from "../components/InAppNotification";
 import OfflineNotice from "../components/OfflineNotice";
+import LottieView from 'lottie-react-native';
+import animationData from '../assets/videos/mm-dancing.json';
 
 // Firebase imports for global notifications
 import { auth, firestore } from "../firebase";
@@ -36,6 +37,13 @@ import { collection, query, where, onSnapshot, orderBy } from "firebase/firestor
 
 // Prevent native splash from auto-hiding
 //SplashScreen.preventAutoHideAsync().catch(() => {});
+
+const withoutBg = {
+  ...animationData,
+  layers: animationData.layers.filter(
+    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+  ),
+}
 
 function useDisableBackButton() {
   useEffect(() => {
@@ -195,7 +203,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   if (demoAllowed === null) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" />
+        <LottieView
+                source={withoutBg}
+                autoPlay
+                loop
+                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+               />
       </View>
     );
   }

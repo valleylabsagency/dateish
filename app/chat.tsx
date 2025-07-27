@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
-  ActivityIndicator,
   Animated,
   Keyboard,
   Dimensions,
@@ -26,6 +25,9 @@ import ProfileNavbar from "../components/ProfileNavbar";
 import { auth, firestore } from "../firebase";
 import { NotificationContext } from "../contexts/NotificationContext";
 import { useIsFocused } from "@react-navigation/native";
+import LottieView from 'lottie-react-native';
+import animationData from '../assets/videos/mm-dancing.json';
+
 import {
   collection,
   query,
@@ -49,6 +51,13 @@ import {
 } from "react-native-size-matters";
 
 const { width, height } = Dimensions.get("window");
+
+const withoutBg = {
+  ...animationData,
+  layers: animationData.layers.filter(
+    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+  ),
+}
 
 export default function ChatScreen() {
   const router = useRouter();
@@ -296,7 +305,12 @@ useEffect(() => {
   if (!fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fff" />
+        <LottieView
+                source={withoutBg}
+                autoPlay
+                loop
+                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+               />
       </View>
     );
   }
@@ -328,7 +342,12 @@ useEffect(() => {
             }
           >
             {loadingMessages ? (
-              <ActivityIndicator size="large" color="#fff" />
+              <LottieView
+                      source={withoutBg}
+                      autoPlay
+                      loop
+                      style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+                     />
             ) : (
               messages.map((msg, index) => (
                 <View

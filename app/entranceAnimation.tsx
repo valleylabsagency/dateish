@@ -1,7 +1,17 @@
 import React, { useRef, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Video } from 'expo-av';
 import { useRouter } from 'expo-router';
+import LottieView from 'lottie-react-native';
+import animationData from '../assets/videos/mm-dancing.json';
+
+
+const withoutBg = {
+  ...animationData,
+  layers: animationData.layers.filter(
+    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+  ),
+}
 
 export default function EntranceAnimation() {
   const router = useRouter();
@@ -28,7 +38,12 @@ export default function EntranceAnimation() {
       />
       {!ready && (
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color="#fff" />
+           <LottieView
+                  source={withoutBg}
+                  autoPlay
+                  loop
+                  style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+                 />
         </View>
       )}
     </View>
