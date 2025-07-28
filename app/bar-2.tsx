@@ -16,7 +16,6 @@ import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
 import { firestore, auth } from "../firebase";
-import { collection, getDocs } from "firebase/firestore";
 import { getDatabase, ref, onValue } from "firebase/database";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -26,6 +25,10 @@ import closeIcon from '../assets/images/x.png';
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 import { Video } from 'expo-av';
+import { 
+  doc, setDoc, updateDoc, collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, arrayUnion 
+} from "firebase/firestore";
+import { Alert } from "react-native";
 
 const steamboat = require('../assets/videos/steamboatwillie.mp4');
 
@@ -41,6 +44,9 @@ const withoutBg = {
     layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
   ),
 }
+
+
+
 
 // Mapping of drink types to icons
 const drinkMapping: Record<string, any> = {
@@ -72,6 +78,16 @@ export default function Bar2Screen() {
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
   });
 
+  const [bgFrame, setBgFrame] = useState<{ x:number, y:number, w:number, h:number } | null>(null);
+  const TV = bgFrame && {
+    x: bgFrame.x + bgFrame.w * 0.525,    // left edge at 53% of the bg’s width
+    y: bgFrame.y + bgFrame.h * 0.163,    // top edge at 15% of the bg’s height
+    w: bgFrame.w * 0.28,                // width = 28% of bg width
+    h: bgFrame.h * 0.11,                // height = 10% of bg height
+  };
+  
+
+
   const [profiles, setProfiles] = useState<any[]>([]);
   const [onlineStatus, setOnlineStatus] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -79,6 +95,12 @@ export default function Bar2Screen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [started, setStarted] = useState(false);
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
+
+  //new chats
+  const [firstMessageModalVisible, setFirstMessageModalVisible] = useState(false);
+  const [firstMessageText, setFirstMessageText] = useState("");
+  const [sendingFirstMessage, setSendingFirstMessage] = useState(false);
+
 
   //chitchats modal
   const [chitChatModalVisible, setChitChatModalVisible] = useState(false);
@@ -201,11 +223,91 @@ const chatLabelMap: Record<ChatType, string> = {
        : { justifyContent: "space-around" },
    ];
 
+   const handleChatPress = async () => {
+    const currentUserId = auth.currentUser?.uid!;
+    const partnerId = selectedProfile.id;
+    const chatId = [currentUserId, partnerId].sort().join("_");
+  
+    // look for any existing message
+    const msgsSnap = await getDocs(
+      query(
+        collection(firestore, "chats", chatId, "messages"),
+        limit(1)
+      )
+    );
+  
+    if (msgsSnap.empty) {
+      // no messages yet → pop up your “first message” modal
+      setFirstMessageModalVisible(true);
+    } else {
+      // already chatted → go straight to chat screen
+      router.push(`/chat?partner=${partnerId}`);
+    }
+  };
+
+  const sendFirstMessage = async () => {
+    if (!firstMessageText.trim()) return;
+    setSendingFirstMessage(true);
+  
+    try {
+      const currentUserId = auth.currentUser!.uid;
+      const partnerId = selectedProfile.id;
+      const chatId = [currentUserId, partnerId].sort().join("_");
+      const chatDocRef = doc(firestore, "chats", chatId);
+  
+      // create or update chat doc
+      const chatSnap = await getDoc(chatDocRef);
+      if (!chatSnap.exists()) {
+        await setDoc(chatDocRef, {
+          users: [currentUserId, partnerId],
+          visibleFor: [currentUserId, partnerId],
+          updatedAt: serverTimestamp(),
+          lastMessage: firstMessageText,
+        });
+      } else {
+        await updateDoc(chatDocRef, {
+          updatedAt: serverTimestamp(),
+          lastMessage: firstMessageText,
+          lastMessageSender: currentUserId,
+          visibleFor: arrayUnion(currentUserId, partnerId),
+        });
+      }
+  
+      // add the actual message
+      await addDoc(
+        collection(firestore, "chats", chatId, "messages"),
+        {
+          text: firstMessageText,
+          sender: currentUserId,
+          createdAt: serverTimestamp(),
+        }
+      );
+  
+      Alert.alert("Sent!", "Your message was delivered.");
+      setFirstMessageText("");
+      setFirstMessageModalVisible(false);
+      //router.push(`/chat?partner=${partnerId}`);
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Could not send message. Please try again.");
+    } finally {
+      setSendingFirstMessage(false);
+    }
+  };
+  
+  
+
   return (
+    <>
     <ImageBackground
       source={require("../assets/images/bar-back.png")}
       style={styles.background}
-    >
+      resizeMode="contain"
+      onLayout={e => {
+        const { x, y, width: w, height: h } = e.nativeEvent.layout;
+        setBgFrame({ x, y, w, h });
+      }}
+ >
       {/* ─── WELCOME MODE: Mr. Mingles + speech bubble + button ───────── */}
       {!started && (
         <>
@@ -245,69 +347,80 @@ const chatLabelMap: Record<ChatType, string> = {
       {/* ─── CHAT MODE: avatars appear after "Start Chatting" ─────────── */}
       {started && onlineProfiles.length > 0 && (
         <>
-        <Video
-          ref={videoRef}
-          source={steamboat}
-          style={styles.tvScreen}
-          resizeMode="cover"
-          isLooping
-          useNativeControls={false}
-          onLoad={() => console.log('✅ Steamboat loaded')}
-          onError={e => console.log('❌ Video error:', e)}
-            
-          />
-        <View style={styles.onlineRow}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingLeft: startOffsetPx,
-              paddingRight: startOffsetPx,
-              alignItems: "center",
+          
+          <View
+            style={{
+              position: "absolute",
+              top:    TV.y,
+              left:   TV.x,
+              width:  TV.w,
+              height: TV.h,
+              overflow: "hidden",
+              zIndex: 3,
             }}
           >
-            {onlineProfiles.map(p => (
-              <TouchableOpacity
-                key={p.id}
-                style={{
-                  width: AVATAR_SIZE,
-                  height: AVATAR_SIZE,
-                  borderRadius: AVATAR_SIZE / 2,
-                  overflow: "hidden",
-                  marginRight: spacingPx - 20,
-                  borderWidth: 2,
-                  borderColor: "white",
-                }}
-                onPress={() => {
-                  setSelectedProfile(p);
-                  setModalVisible(true);
-                  setShowDrinkSpeech(false);
-                }}
-              >
-                <Image source={{ uri: p.photoUri }} style={styles.avatarImage} />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+            <Video
+              ref={videoRef}
+              source={steamboat}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+              isLooping
+              shouldPlay={started}
+              useNativeControls={false}
+              onError={e => console.warn("Video error:", e)}
+            />
+          </View>
+
+       
+          <View style={styles.onlineRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingLeft: startOffsetPx,
+                paddingRight: startOffsetPx,
+                alignItems: "center",
+              }}
+            >
+              {onlineProfiles.map(p => (
+                <TouchableOpacity
+                  key={p.id}
+                  style={{
+                    width: AVATAR_SIZE,
+                    height: AVATAR_SIZE,
+                    borderRadius: AVATAR_SIZE / 2,
+                    overflow: "hidden",
+                    marginRight: spacingPx - 20,
+                    borderWidth: 2,
+                    borderColor: "white",
+                  }}
+                  onPress={() => {
+                    setSelectedProfile(p);
+                    setModalVisible(true);
+                    setShowDrinkSpeech(false);
+                  }}
+                >
+                  <Image source={{ uri: p.photoUri }} style={styles.avatarImage} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         </>
       )}
+
 
       {/* ─── BACK BAR LAYERS ───────────────────────── */}
       <View style={styles.barFrontContainer}>
         <Image
           style={styles.barFront}
           source={require("../assets/images/bar-front.png")}
-          resizeMode="contain"
+          resizeMode="stretch"
         />
       </View>
-
-      {/* ─── BOTTOM NAV ────────────────────────────── */}
-      <View style={styles.bottomNavbarContainer}>
-        <BottomNavbar selectedTab="bar-2" />
-      </View>
+    </ImageBackground>
 
       {/* ─── PROFILE DETAIL MODAL ──────────────────── */}
-      <Modal
+    <Modal
         visible={modalVisible}
         transparent
         animationType="slide"
@@ -364,7 +477,7 @@ const chatLabelMap: Record<ChatType, string> = {
                   {showChatButton && (
                     <TouchableOpacity
                       style={styles.modalChatButton}
-                      onPress={() => router.push(`/chat?partner=${selectedProfile.id}`)}
+                      onPress={handleChatPress}
                     >
                       <Text style={styles.modalChatButtonText}>Chat</Text>
                     </TouchableOpacity>
@@ -485,26 +598,63 @@ const chatLabelMap: Record<ChatType, string> = {
         </Modal>
       )}
 
-      
+      <Modal visible={firstMessageModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.ccContainer /* or copy your chit‑chat style */}>
+            <Text style={styles.ccLabel}>Send a Message</Text>
+            <TextInput
+              style={styles.replyInput}
+              value={firstMessageText}
+              onChangeText={setFirstMessageText}
+              placeholder="Type your first message…"
+              placeholderTextColor="#7A4C6E"
+              multiline
+            />
+            <TouchableOpacity
+              style={[styles.replyButton, sendingFirstMessage && { opacity: 0.5 }]}
+              disabled={sendingFirstMessage}
+              onPress={sendFirstMessage}
+            >
+              <Text style={styles.replyButtonText}>
+                {sendingFirstMessage ? "Sending…" : "Send"}
+              </Text>
+            </TouchableOpacity>
 
-    </ImageBackground>
+            <TouchableOpacity
+              style={styles.ccCloseButton}
+              onPress={() => setFirstMessageModalVisible(false)}
+            >
+              <Image source={closeIcon} style={styles.closeIcon} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+
+    <View style={styles.bottomNavbarContainer}>
+      <BottomNavbar selectedTab="bar-2" />
+    </View>
+  </>
   );
 }
 
 const styles = StyleSheet.create({
   background: {
-    flex: 1,
-    resizeMode: "cover",
-    alignItems: "center",
+    width: width,
+    aspectRatio: 1125 / 2436
   },
-  tvScreen: {
-    position: 'absolute',
-    top: height * 0.155,    // slide down to match the TV’s vertical position
-    left: width * 0.53,    // slide right to line up with the TV’s left edge
-    width: width * 0.28,    // match the TV screen’s width
-    height: width * 0.22,   // match its aspect ratio
-    zIndex: 3,             // above the bar-front but below your modals/nav
+
+  tvContainer: {
+    position: "absolute",
+    top:    "14.5%",   // tweak these % until it sits perfectly over the TV bezel
+    left:   "53%",
+    width:  "28%",
+    height: "12%",
+    zIndex: 3,       // above the background, below your modals/nav
+    overflow: "hidden",
   },
+
+
   // ─── BUBBLE ───────────────────────────────────
   bubbleContainer: {
     position: "absolute",
@@ -536,7 +686,7 @@ const styles = StyleSheet.create({
 
   startButton: {
     position: "absolute",
-    bottom: height * 0.17,
+    bottom: height * 0.2,
     alignSelf: "center",
     backgroundColor: "#6e1944",
     borderWidth: 4,
@@ -583,7 +733,7 @@ const styles = StyleSheet.create({
   },
   barFront: {
     width: "100%",
-    height: 750,
+    height: 830,
     zIndex: 2,
   },
 
@@ -613,7 +763,7 @@ const styles = StyleSheet.create({
     position: "relative",
     borderRadius: 16,
     padding: 20,
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   closeButton: {
     position: "absolute",
@@ -634,10 +784,10 @@ const styles = StyleSheet.create({
   },
   modalText: {
     marginTop: 16,
-    alignItems: "flex-start",
+    alignSelf: "flex-start",
   },
   modalName: {
-    color: "#e2a350",
+    color: "#ffe3d0",
     fontSize: 38,
     fontFamily: FontNames.MontserratBold,
   },
@@ -658,20 +808,19 @@ const styles = StyleSheet.create({
   bottomButtons: {
     display: "flex",
     flexDirection: "row",
-    justifyContent: "center",
+    justifyContent: "space-evenly",
     alignItems: "center",
-    width: "100%",
     marginTop: "25%"
   },
   modalChatButton: {
-    backgroundColor: "#592540",
+    backgroundColor: "#6e1944",
     borderTopWidth: 5,
     borderLeftWidth: 5,
     borderRightWidth: 5,
     borderBottomWidth: 15,
     borderColor: "#460b2a",
     paddingVertical: 5,
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     marginHorizontal: 10,
     borderRadius: 25,
     alignSelf: "center",
@@ -682,8 +831,11 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   modalChatButtonText: {
-    color: "white",
-    fontSize: 25,
+    color: "#ffe3d0",
+    textTransform: "uppercase",
+    fontSize: 27,
+    lineHeight: 35,
+    textAlignVertical: "center",
     fontFamily: FontNames.MontserratRegular,
     fontWeight: "600",
   },
@@ -701,10 +853,12 @@ const styles = StyleSheet.create({
   },
   ccContainer: {
     width: '90%',
-    backgroundColor: '#5E2A48',
+    backgroundColor: '#592540',
     borderRadius: 20,
     padding: 20,
     position: 'relative',
+    borderColor: "#460b2a",
+    borderWidth: 6,
   },
   listItem: {
     paddingVertical: 12,
@@ -715,10 +869,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   whiteText: {
-    color: '#F5E1C4',
+    color: '#ffe3d0',
   },
   pinkText: {
-    color: '#E6B8C7',
+    color: '#e78bbb',
   },
   ccLabel: {
     fontSize: 22,
@@ -730,10 +884,12 @@ const styles = StyleSheet.create({
   ccContent: {
     fontSize: 16,
     color: '#F5E1C4',
+    textAlign: "center",
     marginBottom: 20,
   },
   replyInput: {
     width: '100%',
+    height: 200,
     minHeight: 80,
     borderColor: '#40122E',
     borderWidth: 6,
@@ -742,18 +898,33 @@ const styles = StyleSheet.create({
     color: '#F5E1C4',
     backgroundColor: '#6E2A48',
     marginBottom: 20,
+    textAlignVertical: "top"
   },
   replyButton: {
-    backgroundColor: '#70214A',
+    backgroundColor: "#6e1944",
+    borderTopWidth: 5,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderBottomWidth: 15,
+    borderColor: "#460b2a",
+    paddingVertical: 5,
+    paddingHorizontal: 25,
     borderRadius: 25,
-    paddingVertical: 10,
-    paddingHorizontal: 32,
-    alignSelf: 'center',
+    alignSelf: "center",
+    shadowColor: "#460b2a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 3,
+    elevation: 5,
   },
   replyButtonText: {
-    color: '#F5E1C4',
-    fontSize: 16,
-    fontWeight: '600',
+    color: "#ffe3d0",
+    textTransform: "uppercase",
+    fontSize: 32,
+    lineHeight: 35,
+    textAlignVertical: "center",
+    fontFamily: FontNames.MontserratRegular,
+    fontWeight: "600",
   },
   ccCloseButton: {
     position: 'absolute',

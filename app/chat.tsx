@@ -82,6 +82,7 @@ export default function ChatScreen() {
   const rollAnim = useRef(new Animated.Value(500)).current;
   const [mingModalVisible, setMingModalVisible] = useState(false);
   const [mingDisplayedText, setMingDisplayedText] = useState("");
+  const [hasSentInitial, setHasSentInitial] = useState(false);
   const fullMingText = "Wait for them to answer. Don't be a creep!";
 
   const scrollViewRef = useRef<ScrollView>(null);
@@ -100,30 +101,63 @@ export default function ChatScreen() {
 // If we got an `initial` param, decode & parse it, then
 // setMessages to [ prompt, response ] before firestore kicks in.
 useEffect(() => {
-  if (!initial) return;
-  try {
-    const { prompt, response } = JSON.parse(
-      decodeURIComponent(initial)
-    ) as { prompt: string; response: string };
+  if (!initial || hasSentInitial || !chatId) return;
 
-    setMessages([
-      {
-        id: "cc-prompt",
-        text: prompt,
-        sender: partnerId,                // show as “incoming”
-        createdAt: { seconds: Date.now() / 1000 },
-      },
-      {
-        id: "cc-reply",
-        text: response,
-        sender: currentUserId,            // show as “outgoing”
-        createdAt: { seconds: Date.now() / 1000 },
-      },
-    ]);
+  let prompt: string, response: string;
+  try {
+    ({ prompt, response } = JSON.parse(
+      decodeURIComponent(initial)
+    ) as { prompt: string; response: string });
   } catch (e) {
-    console.warn("Invalid initial chit‑chat payload:", e);
+    console.warn("Bad initial payload:", e);
+    setHasSentInitial(true);
+    return;
   }
-}, [initial, partnerId, currentUserId]);
+
+  (async () => {
+    const chatRef = doc(firestore, "chats", chatId);
+    const snap    = await getDoc(chatRef);
+
+    // combine into one string (or format however you like)
+    const combined = `${prompt}\n\n ${response}`;
+
+    // update (or create) the chat doc
+    const base = {
+      users:            [currentUserId, partnerId],
+      visibleFor:       [currentUserId, partnerId],
+      updatedAt:        serverTimestamp(),
+      lastMessage:      combined,
+      lastMessageSender: currentUserId,
+      partnerName:      partnerProfile?.name || "",
+      partnerPhotoUri:  partnerProfile?.drink
+        ? drinkMapping[partnerProfile.drink.toLowerCase()]
+        : drinkMapping["water"],
+    };
+    if (!snap.exists()) {
+      await setDoc(chatRef, base);
+    } else {
+      await updateDoc(chatRef, {
+        ...base,
+        visibleFor: arrayUnion(currentUserId, partnerId),
+      });
+    }
+
+    // write a single “question+answer” message
+    const msgsRef = collection(firestore, "chats", chatId, "messages");
+    await addDoc(msgsRef, {
+      text:      combined,
+      sender:    currentUserId,
+      createdAt: serverTimestamp(),
+    });
+  })()
+    .catch(console.error)
+    .finally(() => {
+      setHasSentInitial(true);
+      // strip `initial` out of the URL so it won’t rerun on reload
+      router.replace({ pathname: "/chat", query: { partner } });
+    });
+}, [initial, hasSentInitial, chatId]);
+
 // ────────────────────────────────────────────────────────────────────
 
 
