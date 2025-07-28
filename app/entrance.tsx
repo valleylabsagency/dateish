@@ -88,7 +88,7 @@ export default function EntranceScreen() {
       if (firstTime) await signUp(username, password);
       else          await login(username, password);
       setShowAuth(false);
-      router.replace('/bar-2') //replace with entrance animation
+      router.replace('/entranceAnimation') //replace with entrance animation
     } catch {
       setAuthError(true);
     } finally {

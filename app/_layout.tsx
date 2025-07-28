@@ -232,10 +232,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
   
       <InactivityHandler>
-        <AuthWrapper>
-          <PresenceWrapper>
-            {shouldWrapMusic ? (
-              <MusicProvider>
+        <AnimatedSplashScreen>
+          <AuthWrapper>
+            <PresenceWrapper>
+              {shouldWrapMusic ? (
+                <MusicProvider>
+                  <NotificationProvider>
+                    <FirstTimeProvider>
+                      <ProfileProvider>
+                        <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
+                          <View style={styles.container}>
+                            <NotificationDisplay />
+                            <OfflineNotice />
+                            {!hideNavbar && <Navbar />}
+                            <Stack screenOptions={{ headerShown: false }} />
+                            <StatusBar hidden />
+                          </View>
+                        </NavbarContext.Provider>
+                      </ProfileProvider>
+                    </FirstTimeProvider>
+                  </NotificationProvider>
+                </MusicProvider>
+              ) : (
                 <NotificationProvider>
                   <FirstTimeProvider>
                     <ProfileProvider>
@@ -251,26 +269,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </ProfileProvider>
                   </FirstTimeProvider>
                 </NotificationProvider>
-              </MusicProvider>
-            ) : (
-              <NotificationProvider>
-                <FirstTimeProvider>
-                  <ProfileProvider>
-                    <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-                      <View style={styles.container}>
-                        <NotificationDisplay />
-                        <OfflineNotice />
-                        {!hideNavbar && <Navbar />}
-                        <Stack screenOptions={{ headerShown: false }} />
-                        <StatusBar hidden />
-                      </View>
-                    </NavbarContext.Provider>
-                  </ProfileProvider>
-                </FirstTimeProvider>
-              </NotificationProvider>
-            )}
-          </PresenceWrapper>
-        </AuthWrapper>
+              )}
+            </PresenceWrapper>
+          </AuthWrapper>
+        </AnimatedSplashScreen>
       </InactivityHandler>
    
   );
