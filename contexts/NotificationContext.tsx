@@ -5,6 +5,9 @@ import React, {
   useRef,
   ReactNode,
 } from 'react';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+import * as Notifications from 'expo-notifications';
 import { auth, firestore } from '../firebase';
 import {
   collection,
@@ -15,7 +18,21 @@ import {
   limit,
   doc,
   getDoc,
+  setDoc,
 } from 'firebase/firestore';
+
+// Configure how notifications are displayed when app is foregrounded
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,      // your in-app alert
+    shouldPlaySound: false,     // no sound in-app
+    shouldShowBadge: false,     // iOS badge
+    shouldShowBanner: true,     // iOS 14+ banner
+    shouldShowList: true,       // Android notification shade
+    shouldSetBadge: false,
+  }),
+});
 
 interface NotificationContextType {
   visible: boolean;
@@ -46,12 +63,52 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   // keep a ref in sync
   const currentChatIdRef = useRef<string | null>(null);
-  useEffect(() => { currentChatIdRef.current = currentChatId; }, [currentChatId]);
+  useEffect(() => {
+    currentChatIdRef.current = currentChatId;
+  }, [currentChatId]);
 
+  // 1️⃣ Register for push and save token
+  useEffect(() => {
+    (async () => {
+      if (!Constants.isDevice) {
+        console.warn('Must use physical device for push notifications');
+        return;
+      }
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        console.warn('Push notification permission not granted!');
+        return;
+      }
+
+      // Create or reuse channel on Android for custom sound
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          sound: 'notif_sound.wav',
+          vibrationPattern: [0, 250, 250, 250],
+        });
+      }
+
+      const tokenData = await Notifications.getExpoPushTokenAsync();
+      const token = tokenData.data;
+      console.log('Expo push token:', token);
+      if (auth.currentUser) {
+        const userDoc = doc(firestore, 'users', auth.currentUser.uid);
+        await setDoc(userDoc, { expoPushToken: token }, { merge: true });
+      }
+    })();
+  }, []);
+
+  // keep refs for filtering
   const uidRef = useRef<string | null>(null);
   const startTimeRef = useRef<number>(Date.now());
   const lastNotifiedRef = useRef<{ [chat: string]: string }>({});
-  const subscribedChats = useRef<Set<string>>(new Set());
   const msgUnsubs = useRef<(() => void)[]>([]);
 
   const hideNotification = () => {
@@ -66,6 +123,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setVisible(true), 50);
   };
 
+  // 2️⃣ Listen for incoming push responses (foreground behavior)
+  useEffect(() => {
+    const receivedSub = Notifications.addNotificationReceivedListener(notification => {
+      // You could also inspect notification.request.content.data here
+      const { body, data } = notification.request.content;
+      showNotification(body || '', data.partnerId || '', data.senderName || '');
+    });
+    return () => receivedSub.remove();
+  }, []);
+
+  // 3️⃣ Existing Firestore message‐watching logic triggers local in‐app banners
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged(user => {
       if (!user) return;
@@ -78,13 +146,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       );
 
       const unsubChats = onSnapshot(chatsQ, snapshot => {
-        // clear previous message listeners
         msgUnsubs.current.forEach(unsub => unsub());
         msgUnsubs.current = [];
 
         snapshot.forEach(chatDoc => {
           const chatId = chatDoc.id;
-
           const msgsQ = query(
             collection(firestore, 'chats', chatId, 'messages'),
             orderBy('createdAt', 'desc'),
@@ -93,12 +159,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
           const unsubMsg = onSnapshot(msgsQ, msgSnap => {
             if (msgSnap.empty) return;
-            
-
             const doc0 = msgSnap.docs[0];
-            const id0 = doc0.id;
             const data0 = doc0.data() as any;
-
             if (!data0.createdAt || !data0.sender) return;
             const ts =
               typeof data0.createdAt.toMillis === 'function'
@@ -109,12 +171,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               ts > startTimeRef.current &&
               data0.sender !== uidRef.current &&
               currentChatIdRef.current !== chatId &&
-              lastNotifiedRef.current[chatId] !== id0
+              lastNotifiedRef.current[chatId] !== doc0.id
             ) {
               getDoc(doc(firestore, 'users', data0.sender)).then(u => {
                 const realName = u.exists() ? (u.data() as any).name : 'Unknown';
                 showNotification(data0.text, data0.sender, realName);
-                lastNotifiedRef.current[chatId] = id0;
+                lastNotifiedRef.current[chatId] = doc0.id;
               });
             }
           });
@@ -142,8 +204,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         currentChatId,
         hideNotification,
         setCurrentChatId,
-      }}
-    >
+      }}>
       {children}
     </NotificationContext.Provider>
   );
