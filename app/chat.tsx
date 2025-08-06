@@ -14,7 +14,14 @@ import {
   Animated,
   Keyboard,
   Dimensions,
+  Alert
 } from "react-native";
+import {
+  getDatabase,
+  ref,
+  onValue,
+  DatabaseReference
+} from "firebase/database";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
@@ -27,6 +34,7 @@ import { NotificationContext } from "../contexts/NotificationContext";
 import { useIsFocused } from "@react-navigation/native";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
+
 
 import {
   collection,
@@ -50,7 +58,7 @@ import {
   verticalScale,
 } from "react-native-size-matters";
 
-const { width, height } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");\
 
 const withoutBg = {
   ...animationData,
@@ -69,6 +77,10 @@ export default function ChatScreen() {
   const partnerId = partner;
   const currentUserId = auth.currentUser?.uid;
   const isFocused = useIsFocused();
+
+  const typingRef = useRef<DatabaseReference | null>(null);
+  const [partnerTyping, setPartnerTyping] = useState(false);
+  const rtdb = getDatabase();
 
   const [messages, setMessages] = useState<any[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -236,6 +248,80 @@ useEffect(() => {
     }
     return () => clearInterval(intervalId);
   }, [mingModalVisible]);
+
+  
+useEffect(() => {
+  if (!chatId) return;
+  const chatRef = doc(firestore, "chats", chatId);
+  const unsubscribe = onSnapshot(chatRef, (snap) => {
+    const data = snap.data();
+    // If the partner removed *you* from visibleFor:
+    if (data?.visibleFor && !data.visibleFor.includes(currentUserId)) {
+      Alert.alert(
+        `${partnerProfile?.name || "They"} deleted this conversation.`,
+        "Time to move on!",
+        [{ text: "OK", onPress: () => router.replace("/chats") }]
+      );
+    }
+  });
+  return () => unsubscribe();
+}, [chatId, currentUserId, partnerProfile]);
+
+// 2a) initialize the RTDB ref once you know chatId:
+useEffect(() => {
+  if (!chatId) return;
+  typingRef.current = rtdb.ref(`/typing/${chatId}/${currentUserId}`);
+}, [chatId, currentUserId]);
+
+// 2b) write your own typing state:
+const onInputFocus = () => {
+  setTypingModalVisible(true);
+  typingRef.current?.set(true);
+};
+const onInputBlurOrSend = () => {
+  setTypingModalVisible(false);
+  typingRef.current?.set(false);
+};
+
+// Hook these into your TextInput:
+//   onFocus={onInputFocus} 
+//   onBlur={onInputBlurOrSend}
+
+// 2c) subscribe to partner’s typing:
+useEffect(() => {
+  if (!chatId || !partnerId) return;
+  const partnerTypingRef = rtdb.ref(`/typing/${chatId}/${partnerId}`);
+  const unsub = partnerTypingRef.on("value", (snap) => {
+    setPartnerTyping(!!snap.val());
+  });
+  return () => partnerTypingRef.off("value", unsub);
+}, [chatId, partnerId]);
+
+// subscribe to their online/offline status:
+useEffect(() => {
+  if (!partnerId) return;
+  const statusRef = rtdb.ref(`/status/${partnerId}/online`);
+  const unsub = statusRef.on("value", (snap) => {
+    const online = !!snap.val();
+    if (!online && isFocused) {
+      Alert.alert(
+        `${partnerProfile?.name || "They"} disconnected.`,
+        "",
+        [{ text: "OK", onPress: () => router.replace("/chats") }]
+      );
+    }
+  });
+  return () => statusRef.off("value", unsub);
+}, [partnerId, isFocused, partnerProfile]);
+
+
+// 2d) render indicator just above your ScrollView:
+{ partnerTyping && (
+  <View style={styles.typingIndicator}>
+    <Text style={styles.typingText}>{partnerProfile?.name} is typing…</Text>
+  </View>
+)}
+
 
   const sendMessage = async () => {
     if (inputMessage.trim() === "" || !chatId) return;
@@ -680,6 +766,18 @@ const styles = ScaledSheet.create({
     width: "100%",
     height: "100%",
   },
+  typingIndicator: {
+    padding: 8,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignSelf: "center",
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  typingText: {
+    color: "#fff",
+    fontSize: 14,
+  },
+  
   partnerIconContainer: {
     width: "110@ms",
     height: "110@ms",
