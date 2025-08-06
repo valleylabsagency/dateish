@@ -78,7 +78,7 @@ export default function ChatScreen() {
   const currentUserId = auth.currentUser?.uid;
   const isFocused = useIsFocused();
 
-  const typingRef = useRef<DatabaseReference | null>(null);
+  const typingRef = useRef<any>(null);
   const [partnerTyping, setPartnerTyping] = useState(false);
   const rtdb = getDatabase();
 
