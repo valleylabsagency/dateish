@@ -209,8 +209,9 @@ const styles = StyleSheet.create({
     right: width * 0.01
   },
   moneysImage: {
-    width: 65,
-    height: "95%"
+    width: 60,
+
+    height: "90%"
   },
   speakerWrapper: {
     width: 50,

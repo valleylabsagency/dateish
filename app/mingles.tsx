@@ -402,11 +402,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between"
   },
-  arrow: { width: 40, alignItems: "center", justifyContent: "center" },
+  arrow: { width: 40, alignItems: "center", justifyContent: "center", position: "relative", bottom: 15 },
   bubbleContent: {
     position: "absolute",
     top: 0, 
-    bottom: 0,
+    bottom: 25,
     left: 40,
     right: 40,
     justifyContent: "center",
@@ -419,6 +419,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   tapButton: {
+    position: "relative",
+    bottom: 5,
     paddingHorizontal: 24,
     paddingVertical: 8,
     borderRadius: 8,

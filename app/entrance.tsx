@@ -24,7 +24,7 @@ import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 
 const { width, height } = Dimensions.get("window");
-const MESSAGE = "Happy Hour daily! ";
+const MESSAGE = "Happy Hour daily!!!!!! ";
 
 const withoutBg = {
   ...animationData,
@@ -88,7 +88,7 @@ export default function EntranceScreen() {
       if (firstTime) await signUp(username, password);
       else          await login(username, password);
       setShowAuth(false);
-      router.replace('/entranceAnimation') //replace with entrance animation
+      router.replace('/bar-2') //replace with entrance animation
     } catch {
       setAuthError(true);
     } finally {
@@ -271,8 +271,8 @@ const styles = StyleSheet.create({
   container:    { flex: 1 },
   loading:      { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", justifyContent: "center", alignItems: "center" },
   background:   { width, height: "100%", alignItems: "center" },
-  entranceSign: { position: "absolute", top: "-15%", width: width * 0.55, height: height * 0.55 },
-  bannerContainer:  { position: "absolute", top: height * 0.23, width: width * 0.8, height: height * 0.07 },
+  entranceSign: { position: "absolute", top: "-11%", width: width * 0.55, height: height * 0.55 },
+  bannerContainer:  { position: "absolute", top: height * 0.27, width: width * 0.9, height: height * 0.07 },
   bannerBackground: { flex: 1, justifyContent: "center" },
   bannerMask:       { position: "absolute", top: height * 0.012, bottom: 0, overflow: "hidden" },
   bannerText:       { fontFamily: FontNames.ArcadePixelRegular, fontSize: 32, lineHeight: 32, color: "red", fontWeight: "bold" },

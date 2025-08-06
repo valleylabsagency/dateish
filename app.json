@@ -20,13 +20,24 @@
     "androidNavigationBar": {
       "visible": "sticky-immersive"
     },
+    "notification": {
+      "icon": "./assets/images/notification-icon.png",
+      "color": "#460b2a",
+      "iosDisplayInForeground": true,
+      "androidMode": "default",
+      "androidCollapsedTitle": "Dateish"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tylerjvalley.Dateish"
+      "bundleIdentifier": "com.tylerjvalley.Dateish",
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "package": "com.tylerjvalley.Dateish",
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "useNextNotificationsApi": true
     },
     "web": {
       "bundler": "metro",

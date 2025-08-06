@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     position: "absolute",
-    top: verticalScale(155),
+    top: verticalScale(158),
     alignSelf: "center",
     width: "90%",
   },
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   },
   aboutContainer: {
     alignItems: "center",
-    marginVertical: verticalScale(10),
+    marginVertical: verticalScale(5),
   },
   aboutText: {
     fontSize: scale(12),

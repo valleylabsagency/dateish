@@ -357,6 +357,7 @@ const chatLabelMap: Record<ChatType, string> = {
               height: TV.h,
               overflow: "hidden",
               zIndex: 3,
+              borderRadius: 9
             }}
           >
             <Video
@@ -607,7 +608,7 @@ const chatLabelMap: Record<ChatType, string> = {
               value={firstMessageText}
               onChangeText={setFirstMessageText}
               placeholder="Type your first message…"
-              placeholderTextColor="#7A4C6E"
+              placeholderTextColor="#AB83A1"
               multiline
             />
             <TouchableOpacity
@@ -652,6 +653,7 @@ const styles = StyleSheet.create({
     height: "12%",
     zIndex: 3,       // above the background, below your modals/nav
     overflow: "hidden",
+
   },
 
 
@@ -672,7 +674,7 @@ const styles = StyleSheet.create({
   // ─── Mr. Mingles ──────────────────────────────
   minglesContainer: {
     position: "absolute",
-    top: "8%",
+    top: "11%",
     left: width * 0.08,
     height: "100%",
     width: "100%",
@@ -889,7 +891,7 @@ const styles = StyleSheet.create({
   },
   replyInput: {
     width: '100%',
-    height: 200,
+    height: 130,
     minHeight: 80,
     borderColor: '#40122E',
     borderWidth: 6,
@@ -905,16 +907,16 @@ const styles = StyleSheet.create({
     borderTopWidth: 5,
     borderLeftWidth: 5,
     borderRightWidth: 5,
-    borderBottomWidth: 15,
+    borderBottomWidth: 5,
     borderColor: "#460b2a",
     paddingVertical: 5,
     paddingHorizontal: 25,
     borderRadius: 25,
     alignSelf: "center",
-    shadowColor: "#460b2a",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 3,
+    shadowColor: "black",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.8,
+    shadowRadius: 9,
     elevation: 5,
   },
   replyButtonText: {
