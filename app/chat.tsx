@@ -58,7 +58,7 @@ import {
   verticalScale,
 } from "react-native-size-matters";
 
-const { width, height } = Dimensions.get("window");\
+const { width, height } = Dimensions.get("window");
 
 const withoutBg = {
   ...animationData,
