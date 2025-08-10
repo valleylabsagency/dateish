@@ -1,5 +1,5 @@
 // bar-2.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,8 @@ import {
   Modal,
   ScrollView,
   Dimensions,
-  TextInput
+  TextInput,
+  Alert
 } from "react-native";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
@@ -25,10 +26,10 @@ import closeIcon from '../assets/images/x.png';
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 import { Video } from 'expo-av';
-import { 
-  doc, setDoc, updateDoc, collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, arrayUnion 
+import {
+  doc, setDoc, updateDoc, collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, arrayUnion
 } from "firebase/firestore";
-import { Alert } from "react-native";
+import { ProfileContext } from "../contexts/ProfileContext";
 
 const steamboat = require('../assets/videos/steamboatwillie.mp4');
 
@@ -44,9 +45,6 @@ const withoutBg = {
     layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
   ),
 }
-
-
-
 
 // Mapping of drink types to icons
 const drinkMapping: Record<string, any> = {
@@ -72,37 +70,90 @@ const drinkTextMapping: Record<string, string> = {
   water: "I don't need alcohol to have fun",
 };
 
+// Mr. Mingles welcome dialogue (tap to advance)
+const WELCOME_MESSAGES = [
+  "Hello! I’m Mr. Mingles — welcome to Dateish!",
+  "We’re not like other dating apps. No perfect-match algorithm here.",
+  "It’s simple: chat with people in the bar, see if you vibe, then grab their number.",
+  "First things first — make yourself a profile in the bathroom.",
+  "Ready? Let’s set you up so others can see you."
+];
+
 export default function Bar2Screen() {
   const router = useRouter();
+  const { profileComplete } = useContext(ProfileContext);
+
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
+    [FontNames.MontserratBold]: require("../assets/fonts/Montserrat-Bold.ttf"),
   });
 
   const [bgFrame, setBgFrame] = useState<{ x:number, y:number, w:number, h:number } | null>(null);
   const TV = bgFrame && {
     x: bgFrame.x + bgFrame.w * 0.525,    // left edge at 53% of the bg’s width
     y: bgFrame.y + bgFrame.h * 0.163,    // top edge at 15% of the bg’s height
-    w: bgFrame.w * 0.28,                // width = 28% of bg width
-    h: bgFrame.h * 0.11,                // height = 10% of bg height
+    w: bgFrame.w * 0.28,                 // width = 28% of bg width
+    h: bgFrame.h * 0.11,                 // height = 10% of bg height
   };
-  
 
+  // --------------------------------------
+  // New: Welcome dialogue state (for incomplete profiles)
+  // --------------------------------------
+  const [welcomeIndex, setWelcomeIndex] = useState(0);
+  const [welcomeDisplayed, setWelcomeDisplayed] = useState("");
+  const [welcomeTyping, setWelcomeTyping] = useState(true);
 
+  useEffect(() => {
+    if (!profileComplete) {
+      const current = WELCOME_MESSAGES[welcomeIndex] || "";
+      setWelcomeDisplayed("");
+      setWelcomeTyping(true);
+      let i = 0;
+      const interval = setInterval(() => {
+        i++;
+        if (i > current.length) {
+          clearInterval(interval);
+          setWelcomeTyping(false);
+        } else {
+          setWelcomeDisplayed(current.substring(0, i));
+        }
+      }, 22);
+      return () => clearInterval(interval);
+    }
+  }, [welcomeIndex, profileComplete]);
+
+  const handleWelcomeAdvance = () => {
+    if (welcomeTyping) return;
+    if (welcomeIndex < WELCOME_MESSAGES.length - 1) {
+      setWelcomeIndex(welcomeIndex + 1);
+    }
+  };
+
+  const skipWelcome = () => {
+    // Skip straight to profile creation
+    router.push("/bathroom?onboard=true");
+  };
+
+  // --------------------------------------
+  // Existing chat bar state
+  // --------------------------------------
   const [profiles, setProfiles] = useState<any[]>([]);
   const [onlineStatus, setOnlineStatus] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
+
+  // Note: start button appears only when profile is complete
   const [started, setStarted] = useState(false);
+
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
 
-  //new chats
+  // new chats
   const [firstMessageModalVisible, setFirstMessageModalVisible] = useState(false);
   const [firstMessageText, setFirstMessageText] = useState("");
   const [sendingFirstMessage, setSendingFirstMessage] = useState(false);
 
-
-  //chitchats modal
+  // chitchats modal
   const [chitChatModalVisible, setChitChatModalVisible] = useState(false);
   const [ccStep, setCcStep] = useState<'choose'|'show'>('choose');
   const [selectedCc, setSelectedCc] = useState<SavedChat|null>(null);
@@ -117,27 +168,14 @@ export default function Bar2Screen() {
   }, [started])
 
   // mapping ChatType → human label
-const chatLabelMap: Record<ChatType, string> = {
-  'what-happened':     'What Happened Next?',
-  'if-you-were-me':     'If You Were Me',
-  'complete-poem':      'Complete a Poem',
-  'unpopular-opinion':  'Unpopular Opinion',
-  'dont-usually-ask':   'I Don’t Usually Ask That',
-  'emoji-story':        'Emoji To Story',
-}
-
-
-  // load persisted "started" flag 
- /* useEffect(() => {
-    (async () => {
-      try {
-        const saved = await AsyncStorage.getItem("bar2Started");
-        if (saved === "true") setStarted(true);
-      } catch (e) {
-        console.error("Load start-chat flag:", e);
-      }
-    })();
-  }, []); */
+  const chatLabelMap: Record<ChatType, string> = {
+    'what-happened':     'What Happened Next?',
+    'if-you-were-me':    'If You Were Me',
+    'complete-poem':     'Complete a Poem',
+    'unpopular-opinion': 'Unpopular Opinion',
+    'dont-usually-ask':  'I Don’t Usually Ask That',
+    'emoji-story':       'Emoji To Story',
+  }
 
   // 1) fetch all other users
   useEffect(() => {
@@ -190,44 +228,40 @@ const chatLabelMap: Record<ChatType, string> = {
         style={styles.background}
         blurRadius={4}
       >
-       <LottieView
-        source={withoutBg}
-        autoPlay
-        loop
-        style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-       />
+        <LottieView
+          source={withoutBg}
+          autoPlay
+          loop
+          style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+        />
       </ImageBackground>
     );
   }
 
   const startOffsetPx = width * START_OFFSET_RATIO;
   const spacingPx     = width * SPACING_RATIO;
-  
+
   const profileChats: SavedChat[] = selectedProfile?.chitchats ?? [];
 
-   // compute our flags
-   const hasChitChats = profileChats.length > 0;
-   const showChatButton =
-     // always show Chat if there are no chit‑chats,
-     // or if chit‑chats exist but are not required
-     !hasChitChats || (hasChitChats && !selectedProfile.chitchatsRequired);
-   const showChitChatButton =
-     // show Chit Chat only if there are chit‑chats
-     hasChitChats;
- 
-   // choose layout: center if only one button, else space‑around
-   const buttonContainerStyle = [
-     styles.bottomButtons,
-     (showChatButton !== showChitChatButton) // XOR: exactly one button?
-       ? { justifyContent: "center" }
-       : { justifyContent: "space-around" },
-   ];
+  // compute our flags
+  const hasChitChats = profileChats.length > 0;
+  const showChatButton =
+    !hasChitChats || (hasChitChats && !selectedProfile?.chitchatsRequired);
+  const showChitChatButton = hasChitChats;
 
-   const handleChatPress = async () => {
+  // choose layout: center if only one button, else space‑around
+  const buttonContainerStyle = [
+    styles.bottomButtons,
+    (showChatButton !== showChitChatButton)
+      ? { justifyContent: "center" }
+      : { justifyContent: "space-around" },
+  ];
+
+  const handleChatPress = async () => {
     const currentUserId = auth.currentUser?.uid!;
     const partnerId = selectedProfile.id;
     const chatId = [currentUserId, partnerId].sort().join("_");
-  
+
     // look for any existing message
     const msgsSnap = await getDocs(
       query(
@@ -235,12 +269,10 @@ const chatLabelMap: Record<ChatType, string> = {
         limit(1)
       )
     );
-  
+
     if (msgsSnap.empty) {
-      // no messages yet → pop up your “first message” modal
       setFirstMessageModalVisible(true);
     } else {
-      // already chatted → go straight to chat screen
       router.push(`/chat?partner=${partnerId}`);
     }
   };
@@ -248,13 +280,13 @@ const chatLabelMap: Record<ChatType, string> = {
   const sendFirstMessage = async () => {
     if (!firstMessageText.trim()) return;
     setSendingFirstMessage(true);
-  
+
     try {
       const currentUserId = auth.currentUser!.uid;
       const partnerId = selectedProfile.id;
       const chatId = [currentUserId, partnerId].sort().join("_");
       const chatDocRef = doc(firestore, "chats", chatId);
-  
+
       // create or update chat doc
       const chatSnap = await getDoc(chatDocRef);
       if (!chatSnap.exists()) {
@@ -272,7 +304,7 @@ const chatLabelMap: Record<ChatType, string> = {
           visibleFor: arrayUnion(currentUserId, partnerId),
         });
       }
-  
+
       // add the actual message
       await addDoc(
         collection(firestore, "chats", chatId, "messages"),
@@ -282,11 +314,11 @@ const chatLabelMap: Record<ChatType, string> = {
           createdAt: serverTimestamp(),
         }
       );
-  
+
       Alert.alert("Sent!", "Your message was delivered.");
       setFirstMessageText("");
       setFirstMessageModalVisible(false);
-      //router.push(`/chat?partner=${partnerId}`);
+      // router.push(`/chat?partner=${partnerId}`);
     } catch (err) {
       console.error(err);
       Alert.alert("Error", "Could not send message. Please try again.");
@@ -294,134 +326,172 @@ const chatLabelMap: Record<ChatType, string> = {
       setSendingFirstMessage(false);
     }
   };
-  
-  
 
   return (
     <>
-    <ImageBackground
-      source={require("../assets/images/bar-back.png")}
-      style={styles.background}
-      resizeMode="contain"
-      onLayout={e => {
-        const { x, y, width: w, height: h } = e.nativeEvent.layout;
-        setBgFrame({ x, y, w, h });
-      }}
- >
-      {/* ─── WELCOME MODE: Mr. Mingles + speech bubble + button ───────── */}
-      {!started && (
-        <>
-          <View style={styles.bubbleContainer}>
-            <ImageBackground
-              source={require("../assets/images/speech-bubble.png")}
-              style={styles.bubble}
-              resizeMode="stretch"
-            >
-              {/* intentionally left blank */}
-            </ImageBackground>
-          </View>
-
-          <View style={styles.minglesContainer}>
-            <Image
-              source={require("../assets/images/mr-mingles.png")}
-              style={styles.minglesImage}
-              resizeMode="contain"
-            />
-          </View>
+      <ImageBackground
+        source={require("../assets/images/bar-back.png")}
+        style={styles.background}
+        resizeMode="contain"
+        onLayout={e => {
+          const { x, y, width: w, height: h } = e.nativeEvent.layout;
+          setBgFrame({ x, y, w, h });
+        }}
+      >
+        {/* ─── WELCOME SECTION (only if profile is NOT complete) ───────── */}
+        {!profileComplete && (
           <TouchableOpacity
-            style={styles.startButton}
-            onPress={async () => {
-              setStarted(true);
-              try {
-                await AsyncStorage.setItem("bar2Started", "true");
-              } catch (e) {
-                console.error("Save start-chat flag:", e);
-              }
-            }}
+            activeOpacity={1}
+            onPress={handleWelcomeAdvance}
+            style={{ flex: 1 }}
           >
-            <Text style={styles.startButtonText}>Start Chatting</Text>
+            <View style={styles.bubbleContainer}>
+              <ImageBackground
+                source={require("../assets/images/speech-bubble.png")}
+                style={styles.bubble}
+                resizeMode="stretch"
+              >
+                <View style={styles.bubbleTextWrap}>
+                  <Text style={styles.bubbleText}>{welcomeDisplayed}</Text>
+                </View>
+              </ImageBackground>
+            </View>
+
+            <View style={styles.minglesContainer}>
+              <Image
+                source={require("../assets/images/mr-mingles.png")}
+                style={styles.minglesImage}
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Skip button */}
+            <TouchableOpacity style={styles.skipButton} onPress={skipWelcome}>
+              <Text style={styles.skipText}>Skip</Text>
+            </TouchableOpacity>
+
+            {/* CTA: Create Profile */}
+            {!welcomeTyping && welcomeIndex === WELCOME_MESSAGES.length - 1 && (
+              <TouchableOpacity
+                style={styles.createProfileButton}
+                onPress={() => router.push("/bathroom?onboard=true")}
+              >
+                <Text style={styles.createProfileText}>Create Profile</Text>
+              </TouchableOpacity>
+            )}
           </TouchableOpacity>
-        </>
-      )}
+        )}
 
-      {/* ─── CHAT MODE: avatars appear after "Start Chatting" ─────────── */}
-      {started && onlineProfiles.length > 0 && (
-        <>
-          
-          <View
-            style={{
-              position: "absolute",
-              top:    TV.y,
-              left:   TV.x,
-              width:  TV.w,
-              height: TV.h,
-              overflow: "hidden",
-              zIndex: 3,
-              borderRadius: 9
-            }}
-          >
-            <Video
-              ref={videoRef}
-              source={steamboat}
-              style={StyleSheet.absoluteFill}
-              resizeMode="cover"
-              isLooping
-              shouldPlay={started}
-              useNativeControls={false}
-              onError={e => console.warn("Video error:", e)}
-            />
-          </View>
+        {/* ─── START CHAT SCREEN (profile complete, not started) ───────── */}
+        {profileComplete && !started && (
+          <>
+            <View style={styles.bubbleContainer}>
+              <ImageBackground
+                source={require("../assets/images/speech-bubble.png")}
+                style={styles.bubble}
+                resizeMode="stretch"
+              />
+            </View>
 
-       
-          <View style={styles.onlineRow}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingLeft: startOffsetPx,
-                paddingRight: startOffsetPx,
-                alignItems: "center",
+            <View style={styles.minglesContainer}>
+              <Image
+                source={require("../assets/images/mr-mingles.png")}
+                style={styles.minglesImage}
+                resizeMode="contain"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.startButton}
+              onPress={async () => {
+                setStarted(true);
+                try {
+                  await AsyncStorage.setItem("bar2Started", "true");
+                } catch (e) {
+                  console.error("Save start-chat flag:", e);
+                }
               }}
             >
-              {onlineProfiles.map(p => (
-                <TouchableOpacity
-                  key={p.id}
-                  style={{
-                    width: AVATAR_SIZE,
-                    height: AVATAR_SIZE,
-                    borderRadius: AVATAR_SIZE / 2,
-                    overflow: "hidden",
-                    marginRight: spacingPx - 20,
-                    borderWidth: 2,
-                    borderColor: "white",
-                  }}
-                  onPress={() => {
-                    setSelectedProfile(p);
-                    setModalVisible(true);
-                    setShowDrinkSpeech(false);
-                  }}
-                >
-                  <Image source={{ uri: p.photoUri }} style={styles.avatarImage} />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </>
-      )}
+              <Text style={styles.startButtonText}>Start Chatting</Text>
+            </TouchableOpacity>
+          </>
+        )}
 
+        {/* ─── CHAT MODE: avatars appear after "Start Chatting" ───────── */}
+        {profileComplete && started && onlineProfiles.length > 0 && TV && (
+          <>
+            <View
+              style={{
+                position: "absolute",
+                top:    TV.y,
+                left:   TV.x,
+                width:  TV.w,
+                height: TV.h,
+                overflow: "hidden",
+                zIndex: 3,
+                borderRadius: 9
+              }}
+            >
+              <Video
+                ref={videoRef}
+                source={steamboat}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+                isLooping
+                shouldPlay={started}
+                useNativeControls={false}
+                onError={e => console.warn("Video error:", e)}
+              />
+            </View>
 
-      {/* ─── BACK BAR LAYERS ───────────────────────── */}
-      <View style={styles.barFrontContainer}>
-        <Image
-          style={styles.barFront}
-          source={require("../assets/images/bar-front.png")}
-          resizeMode="stretch"
-        />
-      </View>
-    </ImageBackground>
+            <View style={styles.onlineRow}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingLeft: width * START_OFFSET_RATIO,
+                  paddingRight: width * START_OFFSET_RATIO,
+                  alignItems: "center",
+                }}
+              >
+                {onlineProfiles.map(p => (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={{
+                      width: AVATAR_SIZE,
+                      height: AVATAR_SIZE,
+                      borderRadius: AVATAR_SIZE / 2,
+                      overflow: "hidden",
+                      marginRight: width * SPACING_RATIO - 20,
+                      borderWidth: 2,
+                      borderColor: "white",
+                    }}
+                    onPress={() => {
+                      setSelectedProfile(p);
+                      setModalVisible(true);
+                      setShowDrinkSpeech(false);
+                    }}
+                  >
+                    <Image source={{ uri: p.photoUri }} style={styles.avatarImage} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </>
+        )}
+
+        {/* ─── BACK BAR LAYERS ───────────────────────── */}
+        <View style={styles.barFrontContainer}>
+          <Image
+            style={styles.barFront}
+            source={require("../assets/images/bar-front.png")}
+            resizeMode="stretch"
+          />
+        </View>
+      </ImageBackground>
 
       {/* ─── PROFILE DETAIL MODAL ──────────────────── */}
-    <Modal
+      <Modal
         visible={modalVisible}
         transparent
         animationType="slide"
@@ -493,14 +563,12 @@ const chatLabelMap: Record<ChatType, string> = {
                     </TouchableOpacity>
                   )}
                 </View>
-
-
-                
               </>
             )}
           </View>
         </View>
       </Modal>
+
       {selectedProfile && (
         <Modal visible={chitChatModalVisible} transparent animationType="fade">
           <View style={styles.overlay}>
@@ -553,30 +621,27 @@ const chatLabelMap: Record<ChatType, string> = {
                           placeholderTextColor="#7A4C6E"
                           multiline
                         />
-                         <TouchableOpacity
-                            style={styles.replyButton}
-                            onPress={() => {
-                              // build a payload containing both the prompt & the response
-                              const payload = {
-                                prompt: cc.content,
-                                response: replyText.trim(),
-                              }
-                              const encoded = encodeURIComponent(JSON.stringify(payload))
+                        <TouchableOpacity
+                          style={styles.replyButton}
+                          onPress={() => {
+                            const payload = {
+                              prompt: cc.content,
+                              response: replyText.trim(),
+                            }
+                            const encoded = encodeURIComponent(JSON.stringify(payload))
 
-                              // navigate into chat with both pieces attached
-                              router.push(
-                                `/chat?partner=${selectedProfile.id}&initial=${encoded}`
-                              )
+                            router.push(
+                              `/chat?partner=${selectedProfile.id}&initial=${encoded}`
+                            )
 
-                              // reset modal state
-                              setChitChatModalVisible(false)
-                              setCcStep('choose')
-                              setSelectedCc(null)
-                              setReplyText('')
-                            }}
-                          >
-                            <Text style={styles.replyButtonText}>Send</Text>
-                          </TouchableOpacity>
+                            setChitChatModalVisible(false)
+                            setCcStep('choose')
+                            setSelectedCc(null)
+                            setReplyText('')
+                          }}
+                        >
+                          <Text style={styles.replyButtonText}>Send</Text>
+                        </TouchableOpacity>
                       </>
                     )
                   })()}
@@ -592,7 +657,7 @@ const chatLabelMap: Record<ChatType, string> = {
                   setReplyText('')
                 }}
               >
-                 <Image source={closeIcon} style={styles.closeIcon} />
+                <Image source={closeIcon} style={styles.closeIcon} />
               </TouchableOpacity>
             </View>
           </View>
@@ -601,7 +666,7 @@ const chatLabelMap: Record<ChatType, string> = {
 
       <Modal visible={firstMessageModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.ccContainer /* or copy your chit‑chat style */}>
+          <View style={styles.ccContainer}>
             <Text style={styles.ccLabel}>Send a Message</Text>
             <TextInput
               style={styles.replyInput}
@@ -631,11 +696,10 @@ const chatLabelMap: Record<ChatType, string> = {
         </View>
       </Modal>
 
-
-    <View style={styles.bottomNavbarContainer}>
-      <BottomNavbar selectedTab="bar-2" />
-    </View>
-  </>
+      <View style={styles.bottomNavbarContainer}>
+        <BottomNavbar selectedTab="bar-2" />
+      </View>
+    </>
   );
 }
 
@@ -644,18 +708,6 @@ const styles = StyleSheet.create({
     width: width,
     aspectRatio: 1125 / 2436
   },
-
-  tvContainer: {
-    position: "absolute",
-    top:    "14.5%",   // tweak these % until it sits perfectly over the TV bezel
-    left:   "53%",
-    width:  "28%",
-    height: "12%",
-    zIndex: 3,       // above the background, below your modals/nav
-    overflow: "hidden",
-
-  },
-
 
   // ─── BUBBLE ───────────────────────────────────
   bubbleContainer: {
@@ -669,6 +721,19 @@ const styles = StyleSheet.create({
   bubble: {
     width: width * 0.9,
     height: BUBBLE_HEIGHT,
+  },
+  bubbleTextWrap: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  bubbleText: {
+    color: "#fff",
+    fontSize: 22,
+    textAlign: "center",
+    fontFamily: FontNames.MontserratRegular,
   },
 
   // ─── Mr. Mingles ──────────────────────────────
@@ -686,6 +751,51 @@ const styles = StyleSheet.create({
     height: height * 0.8,
   },
 
+  // Skip (welcome)
+  skipButton: {
+    position: "absolute",
+    top: 30,
+    right: 20,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    zIndex: 5,
+  },
+  skipText: {
+    color: "#ffe3d0",
+    fontSize: 16,
+    fontFamily: FontNames.MontserratRegular,
+  },
+
+  // CTA to profile (welcome)
+  createProfileButton: {
+    position: "absolute",
+    bottom: height * 0.2,
+    alignSelf: "center",
+    backgroundColor: "#6e1944",
+    borderWidth: 4,
+    borderColor: "#460b2a",
+    width: "90%",
+    height: 70,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.7,
+    shadowRadius: 6,
+    elevation: 8,
+    zIndex: 10,
+    paddingTop: 10,
+  },
+  createProfileText: {
+    fontSize: 28,
+    fontFamily: FontNames.MontserratBold,
+    color: "#ffe3d0",
+    textAlign: "center",
+    textTransform: "uppercase",
+  },
+
+  // ─── START CHAT button (profile complete, not started) ─────────────
   startButton: {
     position: "absolute",
     bottom: height * 0.2,
@@ -846,7 +956,6 @@ const styles = StyleSheet.create({
   },
 
   // -- CHIT CHATS MODAL --
-
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -971,3 +1080,4 @@ const styles = StyleSheet.create({
 });
 
 export { Bar2Screen };
+

@@ -12,6 +12,7 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -23,15 +24,13 @@ import BottomNavbar from "../components/BottomNavbar";
 import ProfileNavbar from "../components/ProfileNavbar";
 import { ProfileContext } from "../contexts/ProfileContext";
 import { scale, verticalScale, moderateScale } from "react-native-size-matters";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { auth, storage, firestore } from "../firebase";
+import { auth, firestore } from "../firebase";
 import { FontNames } from "../constants/fonts";
 import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 import closeIcon from '../assets/images/x.png'
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
-
 
 // resolve the asset to get its intrinsic size
 const bathroomImg = require("../assets/images/bathroom.png");
@@ -47,11 +46,12 @@ const withoutBg = {
 
 export default function BathroomScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ onboard?: string }>();
   const { profile, saveProfile, setProfileComplete, profileComplete } = useContext(ProfileContext);
 
   // form state
   const [name, setName] = useState("");
-  const [age, setAge] = useState("");
+  const [age, setAge] = useState(""); // stored for now; derived from dob step
   const [location, setLocation] = useState("");
   const [about, setAbout] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -68,79 +68,71 @@ export default function BathroomScreen() {
   const fullModalText =
     "Finish your profile you lazy shit!\n\nThen you will be able to see others and use the app...";
 
-  // Mr. Mingles warning modal
+  // Mr. Mingles warning modal (existing)
   const [modalVisible, setModalVisible] = useState(false);
   const rollAnim = useRef(new Animated.Value(500)).current;
   const [chats, setChats] = useState<SavedChat[]>([])
 
+  // NEW: Onboarding flow (uses the SAME “Mr. Mingles” modal container)
+  const [onboardingVisible, setOnboardingVisible] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0);
 
+  // DOB step fields + refs for auto-advance
+  const [dobDD, setDobDD] = useState("");
+  const [dobMM, setDobMM] = useState("");
+  const [dobYYYY, setDobYYYY] = useState("");
+  const ddRef = useRef<TextInput>(null);
+  const mmRef = useRef<TextInput>(null);
+  const yyyyRef = useRef<TextInput>(null);
+
+  // determine if Next should be enabled on each step
+  const nextEnabled =
+    onboardingStep === 0 ? name.trim().length > 0
+    : onboardingStep === 1 ? dobDD.length === 2 && dobMM.length === 2 && dobYYYY.length === 4 && isValidAdult(dobDD, dobMM, dobYYYY)
+    : onboardingStep === 2 ? location.trim().length > 0
+    : true;
+
+  // show animation only on first and last step
+  const showAnimatedMM = onboardingVisible && (onboardingStep === 0 || onboardingStep === 3);
+
+  // Firestore user ref for chit-chats
   const userDocRef = auth.currentUser
-  ? doc(firestore, 'users', auth.currentUser.uid)
-  : null
+    ? doc(firestore, 'users', auth.currentUser.uid)
+    : null
 
   useEffect(() => {
     if (!userDocRef) return
-  
-    // subscribe to changes in the user document
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
       if (!docSnap.exists()) return
-  
       const data = docSnap.data()
-      // hydrate your chats array
-      if (Array.isArray(data.chitchats)) {
-        setChats(data.chitchats as SavedChat[])
-      }
-      // hydrate the toggle
-      if (typeof data.chitchatsRequired === 'boolean') {
-        setMustAnswer(data.chitchatsRequired)
-      }
+      if (Array.isArray(data.chitchats)) setChats(data.chitchats as SavedChat[])
+      if (typeof data.chitchatsRequired === 'boolean') setMustAnswer(data.chitchatsRequired)
     })
-  
-    // clean up listener on unmount
     return () => unsubscribe()
   }, [userDocRef])
-
 
   async function handleSave(type: ChatType, content: string) {
     const newChats = [...chats, { type, content }]
     setChats(newChats)
-  
     if (userDocRef) {
-      try {
-        await updateDoc(userDocRef, { chitchats: newChats })
-      } catch (e) {
-        console.error('Failed to save chitchats:', e)
-      }
+      try { await updateDoc(userDocRef, { chitchats: newChats }) } catch (e) { console.error('Failed to save chitchats:', e) }
     }
-  
     setShowChitChats(false)
   }
-  
+
   async function handleDelete(idx: number) {
     const newChats = chats.filter((_, i) => i !== idx)
     setChats(newChats)
-  
     if (userDocRef) {
-      try {
-        await updateDoc(userDocRef, { chitchats: newChats })
-      } catch (e) {
-        console.error('Failed to delete chitchat:', e)
-      }
+      try { await updateDoc(userDocRef, { chitchats: newChats }) } catch (e) { console.error('Failed to delete chitchat:', e) }
     }
   }
 
   async function toggleRequired(val: boolean) {
     setMustAnswer(val)
     if (!userDocRef) return
-    try {
-      await updateDoc(userDocRef, { chitchatsRequired: val })
-    } catch (e) {
-      console.error('Failed to update chitchatsRequired:', e)
-    }
+    try { await updateDoc(userDocRef, { chitchatsRequired: val }) } catch (e) { console.error('Failed to update chitchatsRequired:', e) }
   }
-  
-  
-
 
   // pre-fill from context
   useEffect(() => {
@@ -162,16 +154,16 @@ export default function BathroomScreen() {
     [FontNames.MontSerratSemiBold]: require("../assets/fonts/Montserrat-SemiBold.ttf"),
   });
 
-  // animate Mr. Mingles warning
+  // animate Mr. Mingles warning (existing)
   useEffect(() => {
     Animated.timing(rollAnim, {
-      toValue: modalVisible ? 0 : 500,
-      duration: modalVisible ? 1000 : 0,
+      toValue: (modalVisible || showAnimatedMM) ? 0 : 500,
+      duration: (modalVisible || showAnimatedMM) ? 1000 : 0,
       useNativeDriver: true,
     }).start();
-  }, [modalVisible]);
+  }, [modalVisible, showAnimatedMM]);
 
-  // typewriter for warning
+  // typewriter for warning (existing)
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
     if (modalVisible) {
@@ -186,6 +178,14 @@ export default function BathroomScreen() {
     }
     return () => clearInterval(intervalId!);
   }, [modalVisible]);
+
+  // OPEN ONBOARDING when routed from bar welcome (onboard=true) and profile not complete
+  useEffect(() => {
+    if (params.onboard === "true" && !profileComplete) {
+      setOnboardingVisible(true);
+      setOnboardingStep(0);
+    }
+  }, [params.onboard, profileComplete]);
 
   // take photo
   const handleTakePhoto = async () => {
@@ -249,6 +249,11 @@ export default function BathroomScreen() {
     try {
       await saveProfile({ name, age, location, about, photoUri });
       setProfileComplete(true);
+      // Post-save nudge about Chit Chats
+      Alert.alert(
+        "Pro tip",
+        "Tired of ‘Hey’ and ‘Sup’? Check out the Chit Chats for prompts worth replying to!"
+      );
       router.back();
     } catch (e) {
       console.error(e);
@@ -257,7 +262,213 @@ export default function BathroomScreen() {
     }
   };
 
- 
+  // Helpers
+  function computeAgeFromDob(dd: string, mm: string, yyyy: string) {
+    const d = parseInt(dd, 10);
+    const m = parseInt(mm, 10) - 1;
+    const y = parseInt(yyyy, 10);
+    const birth = new Date(y, m, d);
+    if (isNaN(birth.getTime())) return -1;
+    const today = new Date();
+    let a = today.getFullYear() - y;
+    const beforeBirthday =
+      today.getMonth() < m || (today.getMonth() === m && today.getDate() < d);
+    if (beforeBirthday) a--;
+    return a;
+  }
+
+  function isValidAdult(dd: string, mm: string, yyyy: string) {
+    if (dd.length !== 2 || mm.length !== 2 || yyyy.length !== 4) return false;
+    const ageNum = computeAgeFromDob(dd, mm, yyyy);
+    return ageNum >= 21;
+  }
+
+  // Onboarding step handlers
+  const handleNext = async () => {
+    if (!nextEnabled) return;
+
+    if (onboardingStep === 0) {
+      // lock-in name (note: "can’t change later" – you could persist immediately if desired)
+      setOnboardingStep(1);
+    } else if (onboardingStep === 1) {
+      const ageNum = computeAgeFromDob(dobDD, dobMM, dobYYYY);
+      if (ageNum < 0) return;
+      if (ageNum < 21) {
+        Alert.alert(
+          "Sorry!",
+          "Dateish is age 21 and up. Hopefully see you again when you’re older. 🙂",
+          [
+            { text: "Back", onPress: () => router.replace("/") }
+          ]
+        );
+        return;
+      }
+      setAge(String(ageNum));
+      setOnboardingStep(2);
+    } else if (onboardingStep === 2) {
+      setOnboardingStep(3);
+    } else if (onboardingStep === 3) {
+      setOnboardingVisible(false);
+      // user can complete remaining fields now
+    }
+  };
+
+  const handleLocationPrompt = async () => {
+    await handleRequestLocation();
+  };
+
+  // auto-advance between DOB fields
+  const onChangeDD = (t: string) => {
+    const v = t.replace(/\D/g, "").slice(0, 2);
+    setDobDD(v);
+    if (v.length === 2) mmRef.current?.focus();
+  };
+  const onChangeMM = (t: string) => {
+    const v = t.replace(/\D/g, "").slice(0, 2);
+    setDobMM(v);
+    if (v.length === 2) yyyyRef.current?.focus();
+  };
+  const onChangeYYYY = (t: string) => {
+    const v = t.replace(/\D/g, "").slice(0, 4);
+    setDobYYYY(v);
+  };
+
+  const renderOnboardingContent = () => {
+    return (
+      <View style={modalStyles.modalContainer}>
+        {/* Speech bubble area */}
+        <View style={onboardStyles.speechWrap}>
+          {/* Title/question */}
+          <Text style={onboardStyles.questionText}>
+            {onboardingStep === 0 && "What’s your name?"}
+            {onboardingStep === 1 && "What’s your Date of Birth?"}
+            {onboardingStep === 2 && "Where are you from?"}
+            {onboardingStep === 3 && "Complete the rest of the stuff on your own."}
+          </Text>
+
+          {/* Inputs per step */}
+          {onboardingStep === 0 && (
+            <>
+              <TextInput
+                style={onboardStyles.input}
+                placeholder="Your name"
+                placeholderTextColor="#999"
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+              />
+              <Text style={onboardStyles.comment}>
+                You won’t be able to change it after.
+              </Text>
+            </>
+          )}
+
+          {onboardingStep === 1 && (
+            <>
+              <View style={onboardStyles.dobRow}>
+                <TextInput
+                  ref={ddRef}
+                  style={[onboardStyles.input, onboardStyles.dobCell]}
+                  placeholder="DD"
+                  placeholderTextColor="#999"
+                  keyboardType="number-pad"
+                  value={dobDD}
+                  onChangeText={onChangeDD}
+                  maxLength={2}
+                />
+                <Text style={onboardStyles.slash}>/</Text>
+                <TextInput
+                  ref={mmRef}
+                  style={[onboardStyles.input, onboardStyles.dobCell]}
+                  placeholder="MM"
+                  placeholderTextColor="#999"
+                  keyboardType="number-pad"
+                  value={dobMM}
+                  onChangeText={onChangeMM}
+                  maxLength={2}
+                />
+                <Text style={onboardStyles.slash}>/</Text>
+                <TextInput
+                  ref={yyyyRef}
+                  style={[onboardStyles.input, onboardStyles.dobYear]}
+                  placeholder="YYYY"
+                  placeholderTextColor="#999"
+                  keyboardType="number-pad"
+                  value={dobYYYY}
+                  onChangeText={onChangeYYYY}
+                  maxLength={4}
+                />
+              </View>
+              <Text style={onboardStyles.comment}>
+                You won’t be able to change it after.
+              </Text>
+              {dobDD && dobMM && dobYYYY && computeAgeFromDob(dobDD, dobMM, dobYYYY) < 21 && (
+                <Text style={onboardStyles.errorText}>
+                  Dateish is age 21 and up. Sorry! Hopefully see you again when you’re older. :)
+                </Text>
+              )}
+            </>
+          )}
+
+          {onboardingStep === 2 && (
+            <>
+              <TouchableOpacity style={styles.editButton} onPress={handleLocationPrompt}>
+                <Text style={styles.editButtonText}>Allow & Fill Location</Text>
+              </TouchableOpacity>
+              <TextInput
+                style={[onboardStyles.input, { marginTop: verticalScale(8) }]}
+                placeholder="City, Country"
+                placeholderTextColor="#999"
+                value={location}
+                onChangeText={setLocation}
+              />
+              <Text style={onboardStyles.comment}>
+                You can always change this if you move around :)
+              </Text>
+            </>
+          )}
+
+          {onboardingStep === 3 && (
+            <>
+              <Text style={[onboardStyles.comment, { marginTop: verticalScale(8) }]}>
+                I’m going out for a smoke. Come back to the bar when you finish.
+              </Text>
+              <Text style={[onboardStyles.comment, { marginTop: verticalScale(8), fontStyle: "italic" }]}>
+                Tip: Tired of “Hey” and “Sup”? Check out the Chit Chats to get something worth replying to!
+              </Text>
+            </>
+          )}
+        </View>
+
+        {/* Mr. Mingles image (animated only first/last) */}
+        {showAnimatedMM && (
+          <Animated.Image
+            source={require("../assets/images/mr-mingles.png")}
+            style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
+            resizeMode="contain"
+          />
+        )}
+
+        {/* Next / OK controls */}
+        <TouchableOpacity
+          style={[onboardStyles.nextButton, !nextEnabled && onboardStyles.nextButtonDisabled]}
+          disabled={!nextEnabled}
+          onPress={handleNext}
+        >
+          <Text style={onboardStyles.nextText}>
+            {onboardingStep === 3 ? "OK" : "Next"}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Bubble pointer */}
+        <View style={modalStyles.triangleContainer}>
+          <View style={modalStyles.outerTriangle} />
+          <View style={modalStyles.innerTriangle} />
+        </View>
+      </View>
+    );
+  };
+
   const renderAboutEditor = () => (
     <Modal animationType="fade" transparent visible={editingAbout}>
       <KeyboardAvoidingView
@@ -298,144 +509,155 @@ export default function BathroomScreen() {
 
   return (
     <>
-    <ImageBackground
-      source={bathroomImg}
-      style={styles.background}
-      resizeMode="stretch"
-      imageStyle={{ marginTop: moderateScale(30) }}
-    >
-       <ProfileNavbar onBack={handleSubmit} />
-      <View style={styles.formContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Name"
-          placeholderTextColor="#999"
-          value={name}
-          onChangeText={setName}
-        />
+      <ImageBackground
+        source={bathroomImg}
+        style={styles.background}
+        resizeMode="stretch"
+        imageStyle={{ marginTop: moderateScale(30) }}
+      >
+        <ProfileNavbar onBack={handleSubmit} />
+        <View style={styles.formContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Name"
+            placeholderTextColor="#999"
+            value={name}
+            onChangeText={setName}
+          />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Age"
-          placeholderTextColor="#999"
-          value={age}
-          onChangeText={setAge}
-          keyboardType="numeric"
-        />
+          <TextInput
+            style={styles.input}
+            placeholder="Age"
+            placeholderTextColor="#999"
+            value={age}
+            onChangeText={setAge}
+            keyboardType="numeric"
+          />
 
-        <View style={styles.locationContainer}>
-          {locationLoading ? (
-            <LottieView
-                    source={withoutBg}
-                    autoPlay
-                    loop
-                    style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-                   />
-          ) : (
-            <TextInput
-              style={styles.input}
-              placeholder="Location"
-              placeholderTextColor="#999"
-              value={location}
-              onChangeText={setLocation}
-            />
-          )}
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={handleRequestLocation}
-          >
-            <Text style={styles.editButtonText}>Get Location</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.locationContainer}>
+            {locationLoading ? (
+              <LottieView
+                source={withoutBg}
+                autoPlay
+                loop
+                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+              />
+            ) : (
+              <TextInput
+                style={styles.input}
+                placeholder="Location"
+                placeholderTextColor="#999"
+                value={location}
+                onChangeText={setLocation}
+              />
+            )}
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={handleRequestLocation}
+            >
+              <Text style={styles.editButtonText}>Get Location</Text>
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.photoContainer}>
-          {photoUri ? (
-            <Image source={{ uri: photoUri }} style={styles.photo} />
-          ) : (
-            <MaterialIcons name="person" size={scale(125)} color="grey" />
-          )}
-          <TouchableOpacity
-            style={[styles.editButton, styles.editButtonPhoto]}
-            onPress={handleTakePhoto}
-          >
-            <Text style={styles.editButtonText}>Take a pic</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.photoContainer}>
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={styles.photo} />
+            ) : (
+              <MaterialIcons name="person" size={scale(125)} color="grey" />
+            )}
+            <TouchableOpacity
+              style={[styles.editButton, styles.editButtonPhoto]}
+              onPress={handleTakePhoto}
+            >
+              <Text style={styles.editButtonText}>Take a pic</Text>
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.aboutContainer}>
-          <TouchableOpacity onPress={() => setEditingAbout(true)}>
-            <Text style={styles.aboutText}>
-              {about || "Write something about yourself..."}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.editButton, styles.bottomEdit]}
-            onPress={() => setEditingAbout(true)}
-          >
-            <Text style={styles.editButtonText}>EDIT</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Warning Modal */}
-      <Modal transparent visible={modalVisible} animationType="slide">
-        <View style={modalStyles.modalOverlay}>
-          <TouchableOpacity
-            style={modalStyles.closeButton}
-            onPress={() => setModalVisible(false)}
-          >
-             <Image source={closeIcon} style={styles.closeIcon} />
-          </TouchableOpacity>
-          <View style={modalStyles.modalContainer}>
-            <Text style={modalStyles.modalText}>{modalTypedText}</Text>
-            <View style={modalStyles.triangleContainer}>
-              <View style={modalStyles.outerTriangle} />
-              <View style={modalStyles.innerTriangle} />
-            </View>
-            <Animated.Image
-              source={require("../assets/images/mr-mingles.png")}
-              style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
-              resizeMode="contain"
-            />
+          <View style={styles.aboutContainer}>
+            <TouchableOpacity onPress={() => setEditingAbout(true)}>
+              <Text style={styles.aboutText}>
+                {about || "Write something about yourself..."}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.editButton, styles.bottomEdit]}
+              onPress={() => setEditingAbout(true)}
+            >
+              <Text style={styles.editButtonText}>EDIT</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
 
-      <TouchableOpacity
-        style={styles.hitbox}
-        onPress={() => router.push('/settings')}
-      />
-      <TouchableOpacity
-        style={styles.hitboxChats}
-        onPress={() => setShowChitChats(true)}
-      />
+        {/* Existing Incomplete Profile Warning Modal */}
+        <Modal transparent visible={modalVisible} animationType="slide">
+          <View style={modalStyles.modalOverlay}>
+            <TouchableOpacity
+              style={modalStyles.closeButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Image source={closeIcon} style={styles.closeIcon} />
+            </TouchableOpacity>
+            <View style={modalStyles.modalContainer}>
+              <Text style={modalStyles.modalText}>{modalTypedText}</Text>
+              <View style={modalStyles.triangleContainer}>
+                <View style={modalStyles.outerTriangle} />
+                <View style={modalStyles.innerTriangle} />
+              </View>
+              <Animated.Image
+                source={require("../assets/images/mr-mingles.png")}
+                style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
+                resizeMode="contain"
+              />
+            </View>
+          </View>
+        </Modal>
 
-      <ChitChats
-        visible={showChitChats}
-        onClose={() => setShowChitChats(false)}
-        existingChats={chats}
-        onSave={handleSave}
-        onDelete={handleDelete}
-        required={mustAnswer}
-        onRequiredChange={toggleRequired}
-      />
+        {/* NEW: Onboarding Modal (uses same visual motif) */}
+        <Modal transparent visible={onboardingVisible} animationType="fade">
+          <View style={modalStyles.modalOverlay}>
+            <TouchableOpacity
+              style={modalStyles.closeButton}
+              onPress={() => setOnboardingVisible(false)}
+            >
+              <Image source={closeIcon} style={styles.closeIcon} />
+            </TouchableOpacity>
+            {renderOnboardingContent()}
+          </View>
+        </Modal>
 
-      {renderAboutEditor()}
+        <TouchableOpacity
+          style={styles.hitbox}
+          onPress={() => router.push('/settings')}
+        />
+        <TouchableOpacity
+          style={styles.hitboxChats}
+          onPress={() => setShowChitChats(true)}
+        />
 
-      {isSaving && (
-        <View style={styles.loadingOverlay}>
-          <LottieView
-                  source={withoutBg}
-                  autoPlay
-                  loop
-                  style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-                 />
-        </View>
-      )}
+        <ChitChats
+          visible={showChitChats}
+          onClose={() => setShowChitChats(false)}
+          existingChats={chats}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          required={mustAnswer}
+          onRequiredChange={toggleRequired}
+        />
 
-    </ImageBackground>
-    
-  </>
+        {renderAboutEditor()}
+
+        {isSaving && (
+          <View style={styles.loadingOverlay}>
+            <LottieView
+              source={withoutBg}
+              autoPlay
+              loop
+              style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+            />
+          </View>
+        )}
+      </ImageBackground>
+    </>
   );
 }
 
@@ -443,7 +665,6 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
     width: "100%",
-    // height removed so aspectRatio determines height
     alignItems: "center",
   },
   formContainer: {
@@ -474,9 +695,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(8),
     paddingVertical: verticalScale(4),
     borderRadius: 20,
-    
     borderWidth: 1,
     borderColor: "black",
+    marginTop: verticalScale(6),
+    alignSelf: "center",
   },
   editButtonText: {
     fontSize: scale(9),
@@ -604,7 +826,6 @@ const modalStyles = StyleSheet.create({
     fontSize: moderateScale(35),
     fontFamily: FontNames.MontserratExtraLight,
   },
-  
   modalContainer: {
     width: "90%",
     height: verticalScale(400),
@@ -614,6 +835,7 @@ const modalStyles = StyleSheet.create({
     borderRadius: 20,
     padding: verticalScale(20),
     alignItems: "center",
+    position: "relative",
   },
   modalText: {
     color: "#eceded",
@@ -661,5 +883,88 @@ const modalStyles = StyleSheet.create({
     position: "absolute",
     bottom: scale(-340),
     right: scale(-100),
+  },
+});
+
+// Onboarding-specific styles (inside the “lazy shit” modal container)
+const onboardStyles = StyleSheet.create({
+  speechWrap: {
+    width: "100%",
+    backgroundColor: "transparent",
+    alignItems: "center",
+  },
+  questionText: {
+    color: "#eceded",
+    fontSize: scale(22),
+    textAlign: "center",
+    fontFamily: FontNames.MontserratExtraLight,
+    marginBottom: verticalScale(10),
+  },
+  input: {
+    width: "90%",
+    borderColor: "#fff",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: scale(10),
+    color: "#fff",
+    fontSize: scale(16),
+    fontFamily: FontNames.MontserratRegular,
+    textAlign: "center",
+  },
+  comment: {
+    color: "#cfd2ff",
+    fontSize: scale(12),
+    marginTop: verticalScale(8),
+    textAlign: "center",
+    fontFamily: FontNames.MontserratExtraLightItalic,
+  },
+  errorText: {
+    color: "#ffb3b3",
+    fontSize: scale(12),
+    marginTop: verticalScale(8),
+    textAlign: "center",
+  },
+  nextButton: {
+    position: "absolute",
+    bottom: verticalScale(20),
+    alignSelf: "center",
+    backgroundColor: "#6e1944",
+    borderWidth: 4,
+    borderColor: "#460b2a",
+    paddingVertical: verticalScale(8),
+    paddingHorizontal: scale(24),
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.7,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  nextButtonDisabled: {
+    opacity: 0.4,
+  },
+  nextText: {
+    fontSize: scale(18),
+    color: "#ffe3d0",
+    fontFamily: FontNames.MontserratBold,
+    textTransform: "uppercase",
+    textAlign: "center",
+  },
+  dobRow: {
+    marginTop: verticalScale(6),
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dobCell: {
+    width: scale(60),
+  },
+  dobYear: {
+    width: scale(90),
+  },
+  slash: {
+    color: "#fff",
+    marginHorizontal: scale(6),
+    fontSize: scale(22),
   },
 });
