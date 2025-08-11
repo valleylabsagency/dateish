@@ -20,6 +20,8 @@ import {
   getDatabase,
   ref,
   onValue,
+  off, 
+  set,
   DatabaseReference
 } from "firebase/database";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -78,9 +80,11 @@ export default function ChatScreen() {
   const currentUserId = auth.currentUser?.uid;
   const isFocused = useIsFocused();
 
-  const typingRef = useRef<any>(null);
+  const db = getDatabase();
+
+  const typingRef = useRef<DatabaseReference | null>(null);
   const [partnerTyping, setPartnerTyping] = useState(false);
-  const rtdb = getDatabase();
+  
 
   const [messages, setMessages] = useState<any[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -102,6 +106,30 @@ export default function ChatScreen() {
 
   const { profile } = useContext(ProfileContext);
   const { setCurrentChatId } = useContext(NotificationContext);
+
+  const setTypingFlag = async (val: boolean) => {
+    if (!typingRef.current) return;
+    try { await set(typingRef.current, val); }
+    catch (e) { console.warn("set(typing) failed:", e); }
+  };
+  
+  const openTyping = () => {
+    setTypingFlag(true);
+    setTypingModalVisible(true);
+  };
+  const closeTyping = (send?: boolean) => {
+    setTypingFlag(false);
+    setTypingModalVisible(false);
+    if (send) sendMessage();
+  };
+
+  useEffect(() => {
+    if (!typingRef.current) return;
+    set(typingRef.current, typingModalVisible);
+    return () => {
+      if (typingRef.current) set(typingRef.current, false);
+    };
+  }, [typingModalVisible]);
 
   const chatId =
     currentUserId && partnerId
@@ -270,38 +298,42 @@ useEffect(() => {
 // 2a) initialize the RTDB ref once you know chatId:
 useEffect(() => {
   if (!chatId) return;
-  typingRef.current = rtdb.ref(`/typing/${chatId}/${currentUserId}`);
+  typingRef.current = ref(db, `/typing/${chatId}/${currentUserId}`);
+  return () => {
+    if (typingRef.current) set(typingRef.current, false)
+  }
 }, [chatId, currentUserId]);
 
 // 2b) write your own typing state:
 const onInputFocus = () => {
   setTypingModalVisible(true);
-  typingRef.current?.set(true);
+  if (typingRef.current) set(typingRef.current, true)
 };
 const onInputBlurOrSend = () => {
   setTypingModalVisible(false);
-  typingRef.current?.set(false);
+  if (typingRef.current) set(typingRef.current, false)
 };
 
-// Hook these into your TextInput:
-//   onFocus={onInputFocus} 
-//   onBlur={onInputBlurOrSend}
+
 
 // 2c) subscribe to partner’s typing:
 useEffect(() => {
   if (!chatId || !partnerId) return;
-  const partnerTypingRef = rtdb.ref(`/typing/${chatId}/${partnerId}`);
-  const unsub = partnerTypingRef.on("value", (snap) => {
-    setPartnerTyping(!!snap.val());
-  });
-  return () => partnerTypingRef.off("value", unsub);
-}, [chatId, partnerId]);
+  const partnerTypingRef = ref(db, `/typing/${chatId}/${partnerId}`);
+  const cb = (snap: any) => {
+    const v = !!snap.val();
+    setPartnerTyping(v);
+  };
+  onValue(partnerTypingRef, cb);
+  return () => off(partnerTypingRef, "value", cb);
+}, [db, chatId, partnerId]);
+
 
 // subscribe to their online/offline status:
 useEffect(() => {
   if (!partnerId) return;
-  const statusRef = rtdb.ref(`/status/${partnerId}/online`);
-  const unsub = statusRef.on("value", (snap) => {
+  const statusRef = ref(db, `/status/${partnerId}/online`);
+  const cb = (snap: any) => {
     const online = !!snap.val();
     if (!online && isFocused) {
       Alert.alert(
@@ -310,9 +342,12 @@ useEffect(() => {
         [{ text: "OK", onPress: () => router.replace("/chats") }]
       );
     }
-  });
-  return () => statusRef.off("value", unsub);
-}, [partnerId, isFocused, partnerProfile]);
+  };
+
+  onValue(statusRef, cb);
+  return () => off(statusRef, "value", cb);
+}, [db, partnerId, isFocused, partnerProfile]);
+
 
 
 // 2d) render indicator just above your ScrollView:
@@ -325,7 +360,7 @@ useEffect(() => {
 
   const sendMessage = async () => {
     if (inputMessage.trim() === "" || !chatId) return;
-    setTypingModalVisible(false);
+    //setTypingModalVisible(false);
     Keyboard.dismiss();
     setInputMessage("");
 
@@ -457,63 +492,62 @@ useEffect(() => {
             style={styles.chatContainer}
             contentContainerStyle={styles.chatContent}
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() =>
-              scrollViewRef.current?.scrollToEnd({ animated: true })
-            }
+            onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
           >
             {loadingMessages ? (
-              <LottieView
-                      source={withoutBg}
-                      autoPlay
-                      loop
-                      style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-                     />
+              <LottieView source={withoutBg} autoPlay loop style={{ width: 600, height: 600, backgroundColor: "transparent" }} />
             ) : (
-              messages.map((msg, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.chatBubble,
-                    msg.sender === currentUserId
-                      ? styles.userBubble
-                      : styles.partnerBubble,
-                  ]}
-                >
-                  <Text style={styles.chatText}>{msg.text}</Text>
-                  {msg.createdAt?.seconds && (
-                    <Text style={styles.timestamp}>
-                      {new Date(msg.createdAt.seconds * 1000).toLocaleTimeString(
-                        [],
-                        { hour: "2-digit", minute: "2-digit" }
-                      )}
+              <>
+                {messages.map((msg, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.chatBubble,
+                      msg.sender === currentUserId ? styles.userBubble : styles.partnerBubble,
+                    ]}
+                  >
+                    <Text style={styles.chatText}>{msg.text}</Text>
+                    {msg.createdAt?.seconds && (
+                      <Text style={styles.timestamp}>
+                        {new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </Text>
+                    )}
+                  </View>
+                ))}
+
+                {partnerTyping ? (
+                  <View style={[styles.chatBubble, styles.partnerBubble, { opacity: 0.8 }]}>
+                    <Text style={styles.chatText}>
+                      {(partnerProfile?.name || "They")} is typing…
                     </Text>
-                  )}
-                </View>
-              ))
+                  </View>
+                ) : null}
+              </>
             )}
           </ScrollView>
         </View>
 
         <View style={styles.inputContainer}>
-          <TouchableOpacity onPress={() => setTypingModalVisible(true)}>
-            <TextInput
-              ref={inputRef}
-              style={styles.textInput}
-              placeholder="Type your message..."
-              placeholderTextColor="#999"
-              returnKeyType="send"
-              editable={false}
-            />
+          <TouchableOpacity onPress={openTyping} activeOpacity={0.8} style={{ flex: 1 }}>
+            <View style={styles.textInput}>
+              <Text
+                numberOfLines={1}
+                style={{ color: inputMessage ? "#111" : "#999", fontSize: 16 }}
+              >
+                {inputMessage || "Type your message..."}
+              </Text>
+            </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
+          <TouchableOpacity style={styles.sendButton} onPress={() => closeTyping(true)}>
             <Text style={styles.sendButtonText}>Send</Text>
           </TouchableOpacity>
         </View>
+
       </KeyboardAvoidingView>
 
       {/* Typing Modal */}
-      <Modal visible={typingModalVisible} animationType="fade" transparent>
+      <Modal visible={typingModalVisible} animationType="fade" transparent onRequestClose={() => closeTyping(false)}>
         <View style={typingModalStyles.container}>
           <View style={typingModalStyles.inputBox}>
             <TextInput
@@ -527,10 +561,7 @@ useEffect(() => {
             />
             <TouchableOpacity
               style={typingModalStyles.doneButton}
-              onPress={() => {
-                setTypingModalVisible(false);
-                sendMessage();
-              }}
+              onPress={() => closeTyping(true)}
             >
               <Text style={typingModalStyles.doneButtonText}>Done</Text>
             </TouchableOpacity>
@@ -756,6 +787,7 @@ const typingModalStyles = ScaledSheet.create({
   doneButtonText: {
     color: "#fff",
     fontSize: "18@ms",
+  
   },
 });
 
@@ -805,7 +837,7 @@ const styles = ScaledSheet.create({
     flexGrow: 1,
     justifyContent: "flex-end",
     paddingHorizontal: "10@ms",
-    paddingBottom: "3%",
+    paddingBottom: "3%",   
   },
   chatBubble: {
     maxWidth: "70%",
