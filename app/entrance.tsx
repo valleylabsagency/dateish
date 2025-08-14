@@ -24,7 +24,7 @@ import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 
 const { width, height } = Dimensions.get("window");
-const MESSAGE = "Happy Hour daily!!!!!! ";
+const MESSAGE = "Happy Hour daily! ";
 
 const withoutBg = {
   ...animationData,
@@ -154,7 +154,7 @@ export default function EntranceScreen() {
                   style={[styles.bannerText, { transform: [{ translateX: scrollX }] }]}
                   numberOfLines={1}
                 >
-                  {MESSAGE.repeat(3)}
+                  {MESSAGE}
                 </Animated.Text>
           
               
@@ -250,16 +250,7 @@ export default function EntranceScreen() {
                 <Text style={authStyles.checkboxLabel}>It's my first time here</Text>
               </View>
             </View>
-            {loadingAuth && (
-              <View style={authStyles.loadingOverlay}>
-                <LottieView
-                        source={withoutBg}
-                        autoPlay
-                        loop
-                        style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-                       />
-              </View>
-            )}
+            
           </ImageBackground>
         </View>
       </Modal>
