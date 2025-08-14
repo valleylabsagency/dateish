@@ -11,6 +11,7 @@ import {
   ScrollView,
   Dimensions,
   TextInput,
+  Pressable,
   Alert
 } from "react-native";
 import { useFonts } from "expo-font";
@@ -30,8 +31,11 @@ import {
   doc, setDoc, updateDoc, collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, arrayUnion
 } from "firebase/firestore";
 import { ProfileContext } from "../contexts/ProfileContext";
+import { useIsFocused } from "@react-navigation/native";
 
 const steamboat = require('../assets/videos/steamboatwillie.mp4');
+
+
 
 const { width, height } = Dimensions.get("window");
 const BUBBLE_HEIGHT = height * 0.18;           // height for the speech bubble
@@ -102,6 +106,28 @@ export default function Bar2Screen() {
   const [welcomeIndex, setWelcomeIndex] = useState(0);
   const [welcomeDisplayed, setWelcomeDisplayed] = useState("");
   const [welcomeTyping, setWelcomeTyping] = useState(true);
+  const isFocused = useIsFocused();
+
+  useEffect(() => {
+    // whenever this screen is focused, refresh the started flag
+    (async () => {
+      try {
+        const v = await AsyncStorage.getItem("bar2Started");
+        setStarted(v === "true");
+      } catch {}
+    })();
+  }, [isFocused]);
+
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(async (u) => {
+      if (!u) {
+        await AsyncStorage.removeItem("bar2Started");
+        setStarted(false);
+      }
+    });
+    return unsub;
+  }, []);
+  
 
   useEffect(() => {
     if (!profileComplete) {
@@ -160,6 +186,19 @@ export default function Bar2Screen() {
   const [replyText, setReplyText] = useState('');
 
   const videoRef = useRef<Video>(null);
+
+  const [tvOn, setTvOn] = useState(true);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+    if (started && tvOn) {
+      videoRef.current.playAsync().catch(() => {});
+    } else {
+      videoRef.current.pauseAsync().catch(() => {});
+    }
+  }, [tvOn, started]);
+
+  const toggleTV = () => setTvOn(prev => !prev);
 
   useEffect(() => {
     if (started && videoRef.current) {
@@ -232,7 +271,7 @@ export default function Bar2Screen() {
           source={withoutBg}
           autoPlay
           loop
-          style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+          style={{ width: 600, height: 600, backgroundColor: "transparent", margin: "auto", position: "relative", right: "25%", bottom: "10%" }}
         />
       </ImageBackground>
     );
@@ -318,6 +357,7 @@ export default function Bar2Screen() {
       Alert.alert("Sent!", "Your message was delivered.");
       setFirstMessageText("");
       setFirstMessageModalVisible(false);
+      setModalVisible(false);
       // router.push(`/chat?partner=${partnerId}`);
     } catch (err) {
       console.error(err);
@@ -412,7 +452,7 @@ export default function Bar2Screen() {
                 }
               }}
             >
-              <Text style={styles.startButtonText}>Start Chatting</Text>
+              <Text numberOfLines={1} style={styles.startButtonText}>Start Chatting</Text>
             </TouchableOpacity>
           </>
         )}
@@ -420,7 +460,8 @@ export default function Bar2Screen() {
         {/* ─── CHAT MODE: avatars appear after "Start Chatting" ───────── */}
         {profileComplete && started && onlineProfiles.length > 0 && TV && (
           <>
-            <View
+            <Pressable
+             onPress={toggleTV}
               style={{
                 position: "absolute",
                 top:    TV.y,
@@ -431,18 +472,34 @@ export default function Bar2Screen() {
                 zIndex: 3,
                 borderRadius: 9
               }}
+              accessibilityRole="button"
+              accessibilityLabel={tvOn ? "Turn TV off" : "Turn TV on"}
             >
-              <Video
+               <Video
                 ref={videoRef}
                 source={steamboat}
                 style={StyleSheet.absoluteFill}
                 resizeMode="cover"
                 isLooping
-                shouldPlay={started}
+                shouldPlay={started && tvOn}  // <- key line
                 useNativeControls={false}
                 onError={e => console.warn("Video error:", e)}
               />
-            </View>
+              {!tvOn && (
+                // Optional: simple “TV off” overlay; remove if not needed
+                <View style={{
+                  ...StyleSheet.absoluteFillObject,
+                  backgroundColor: "black",
+                  opacity: 1,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}>
+                  <Text style={{ color: "#ffe3d0", fontFamily: FontNames.MontserratRegular }}>
+                   — 
+                  </Text>
+                </View>
+              )}
+            </Pressable>
 
             <View style={styles.onlineRow}>
               <ScrollView
@@ -748,7 +805,7 @@ const styles = StyleSheet.create({
   },
   minglesImage: {
     width: width * 0.8,
-    height: height * 0.8,
+    height: height * 0.75,
   },
 
   // Skip (welcome)
@@ -806,20 +863,22 @@ const styles = StyleSheet.create({
     width: "90%",
     height: 70,
     borderRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.7,
-    shadowRadius: 6,
-    elevation: 8,
     zIndex: 10,
     paddingTop: 10,
+    boxShadow: "0px 9px 0px rgba(0,0,0,.3)", 
+   
+
   },
+  
   startButtonText: {
-    fontSize: 32,
-    fontFamily: FontNames.MontserratRegular,
+    fontSize: 38,
+    lineHeight: 38,
+    fontFamily: FontNames.MontSerratSemiBold,
     textTransform: "uppercase",
     color: "#ffe3d0",
+    zIndex: 10,
     textAlign: "center",
+   
   },
 
   // ─── ONLINE ROW ──────────────────────────────
