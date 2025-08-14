@@ -513,7 +513,7 @@ export default function BathroomScreen() {
         source={bathroomImg}
         style={styles.background}
         resizeMode="stretch"
-        imageStyle={{ marginTop: moderateScale(30) }}
+        imageStyle={{ marginTop: moderateScale(50) }}
       >
         <ProfileNavbar onBack={handleSubmit} />
         <View style={styles.formContainer}>
@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     position: "absolute",
-    top: verticalScale(158),
+    top: verticalScale(170),
     alignSelf: "center",
     width: "90%",
   },
@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "black",
-    marginTop: verticalScale(6),
+    marginTop: verticalScale(1),
     alignSelf: "center",
   },
   editButtonText: {

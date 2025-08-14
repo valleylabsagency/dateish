@@ -572,7 +572,7 @@ useEffect(() => {
       <View style={styles.bottomProfiles}>
         <View style={styles.profileWithDrink}>
           <TouchableOpacity
-            onPress={() => router.push("/profile?self=true&from=chat")}
+            onPress={() => router.push("/bathroom?self=true&from=chat")}
           >
             <Image source={currentUserImage} style={styles.currentUserImage} />
           </TouchableOpacity>
