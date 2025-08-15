@@ -942,8 +942,8 @@ const styles = StyleSheet.create({
     right: 12,
   },
   closeIcon: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 18,
     tintColor: '#F5E1C4',
   },
   modalImage: {
@@ -1035,11 +1035,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listText: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '500',
+    fontFamily: FontNames.MontserratRegular,
   },
   whiteText: {
-    color: '#ffe3d0',
+    color: '#d8bfd8',
   },
   pinkText: {
     color: '#e78bbb',
@@ -1050,6 +1051,7 @@ const styles = StyleSheet.create({
     color: '#E6B8C7',
     textAlign: 'center',
     marginBottom: 12,
+    marginTop: 12
   },
   ccContent: {
     fontSize: 16,
@@ -1058,8 +1060,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   replyInput: {
-    width: '100%',
-    height: 130,
+    width: '80%',
+    height: 180,
     minHeight: 80,
     borderColor: '#40122E',
     borderWidth: 6,
@@ -1068,14 +1070,15 @@ const styles = StyleSheet.create({
     color: '#F5E1C4',
     backgroundColor: '#6E2A48',
     marginBottom: 20,
+    marginHorizontal: "auto",
     textAlignVertical: "top"
   },
   replyButton: {
     backgroundColor: "#6e1944",
-    borderTopWidth: 5,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderBottomWidth: 5,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderRightWidth: 3,
+    borderBottomWidth: 3,
     borderColor: "#460b2a",
     paddingVertical: 5,
     paddingHorizontal: 25,
@@ -1086,6 +1089,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.8,
     shadowRadius: 9,
     elevation: 5,
+    boxShadow: "5px 9px 0px rgba(0,0,0,.3)", 
   },
   replyButtonText: {
     color: "#ffe3d0",

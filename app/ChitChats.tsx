@@ -12,6 +12,8 @@ import {
   ScrollView,
 } from 'react-native'
 import closeIcon from '../assets/images/x.png'
+import { FontNames } from "../constants/fonts";
+import { useFonts } from "expo-font";
 
 export type ChatType =
   | 'what-happened'
@@ -26,6 +28,7 @@ export interface SavedChat {
   content: string
 }
 
+ 
 interface ChitChatsProps {
   visible: boolean
   onClose: () => void
@@ -113,14 +116,31 @@ export default function ChitChats({
     }
   }, [visible])
 
-  const handleSave = () => {
-    if (selectedType && inputText.trim()) {
-      onSave(selectedType, inputText.trim())
+  const handleSave = async () => {
+    if (!selectedType || !inputText.trim()) return;
+
+    try {
+      // if onSave is sync or async, this will handle both
+      await Promise.resolve(onSave(selectedType, inputText.trim()));
+      // reset local UI and go back to "My Chit Chats"
+      setSelectedType(null);
+      setInputText('');
+      setShowExample(false);
+      setStep('first');
+    } catch (e) {
+      // optional: show an error if onSave fails
+      console.error(e);
     }
-    onClose()
   }
 
   const meta = selectedType ? chatMeta[selectedType] : null
+  const [fontsLoaded] = useFonts({
+    [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
+    [FontNames.MontserratBold]: require("../assets/fonts/Montserrat-Bold.ttf"),
+  });
+
+
+  if (!fontsLoaded) return null;
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -176,13 +196,15 @@ export default function ChitChats({
 
               <View style={styles.switchRow}>
                 <Text style={styles.switchLabel}>
-                  Ppl have to answer Chit Chats
+                  Ppl <Text style={{fontWeight: "bold"}}>have</Text> to answer Chit Chats
                 </Text>
                 <Switch
-                 value={required}
-                 onValueChange={onRequiredChange}
-                 trackColor={{ false: '#E0D0DE', true: '#862A46' }}
-                 thumbColor={required ? '#511A31' : '#FFFFFF'}
+                  value={required}
+                  onValueChange={onRequiredChange}
+                  trackColor={{ false: '#511A31', true: '#d8bfd8' }}
+                  ios_backgroundColor="#E0D0DE"
+                  thumbColor={required ? '#511A31' : '#FFFFFF'}
+                  style={{ transform: [{ scaleX: 1.6 }, { scaleY: 1.6 }] }} 
                 />
               </View>
             </>
@@ -267,10 +289,10 @@ const styles = StyleSheet.create({
   },
   container: {
     width: '90%',
-    height: "60%",
+   // height: "60%",
     backgroundColor: '#5E2A48',
     borderRadius: 20,
-    padding: 40,
+    paddingVertical: 30,
     position: 'relative',
     borderWidth: 6,
     borderColor: "#460b2a"
@@ -283,13 +305,13 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   closeIcon: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 18,
     tintColor: '#F5E1C4',
   },
 
   title: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '700',
     color: '#D8A657',
     textAlign: 'center',
@@ -299,21 +321,24 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#F5E1C4',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 62,
+    paddingHorizontal: 60,
   },
 
   subtitle: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: '600',
-    color: '#E6B8C7',
+    color: '#e78bbb',
     marginBottom: 8,
-    marginHorizontal: "auto"
+    marginHorizontal: "auto",
+    fontFamily: FontNames.MontserratRegular
   },
   noChats: {
-    fontSize: 16,
-    color: '#F5E1C4',
+    fontSize: 18,
+    color: '#ffe3d0',
     marginBottom: 20,
     textAlign: 'center',
+    fontFamily: FontNames.MontserratRegular
   },
 
   chatRow: {
@@ -343,45 +368,53 @@ const styles = StyleSheet.create({
     color: '#FF4C4C',
     fontSize: 20,
     lineHeight: 20,
+    fontWeight: "bold",
+    fontFamily: FontNames.MontSerratSemiBold,
+    position: "relative",
+    right: 30
   },
 
   addButton: {
     backgroundColor: "#6e1944",
-    borderTopWidth: 5,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderBottomWidth: 15,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderRightWidth: 3,
+    borderBottomWidth: 3,
     borderColor: "#460b2a",
-    paddingVertical: 10,
+    paddingVertical: 5,
     paddingHorizontal: 30,
     borderRadius: 25,
     alignSelf: "center",
-    shadowColor: "#460b2a",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowColor: "black",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.8,
+    shadowRadius: 9,
+    elevation: 5,
     marginBottom: 50,
+    boxShadow: "5px 9px 0px rgba(0,0,0,.3)", 
   },
   addDisabled: {
     opacity: 0.5,
   },
   addButtonText: {
     color: '#F5E1C4',
-    fontSize: 16,
+    fontSize: 28,
     fontWeight: '600',
+    fontFamily: FontNames.MontserratRegular
   },
 
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
+    paddingHorizontal: 30
   },
   switchLabel: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 20,
     color: '#F5E1C4',
     marginRight: 12,
+    paddingLeft: 20
   },
 
   listItem: {
@@ -391,12 +424,13 @@ const styles = StyleSheet.create({
   listText: {
     fontSize: 20,
     fontWeight: '500',
+    fontFamily: FontNames.MontserratRegular
   },
   whiteText: {
-    color: '#F5E1C4',
+    color: '#d8bfd8',
   },
   pinkText: {
-    color: '#E6B8C7',
+    color: '#e78bbb',
   },
 
   formTitle: {
@@ -405,36 +439,53 @@ const styles = StyleSheet.create({
     color: '#E6B8C7',
     textAlign: 'center',
     marginBottom: 12,
+    marginTop: 20
   },
   formDescription: {
-    fontSize: 16,
+    fontSize: 20,
     color: '#F5E1C4',
     textAlign: 'center',
     marginBottom: 16,
+    paddingHorizontal: 24
   },
   textInput: {
-    width: '100%',
-    minHeight: 100,
+    width: '70%',
+    minHeight: 150,
     borderColor: '#40122E',
     borderWidth: 6,
     borderRadius: 12,
     padding: 12,
     color: '#F5E1C4',
-    backgroundColor: '#6E2A48',
+    backgroundColor: '#6e1944',
     marginBottom: 20,
+    marginHorizontal: "auto",
+    textAlignVertical: "top",
+    fontSize: 20
   },
   saveButton: {
-    backgroundColor: '#70214A',
+    backgroundColor: "#6e1944",
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderRightWidth: 3,
+    borderBottomWidth: 3,
+    borderColor: "#460b2a",
+    paddingVertical: 5,
+    paddingHorizontal: 30,
     borderRadius: 25,
-    paddingVertical: 10,
-    paddingHorizontal: 32,
-    alignSelf: 'center',
-    marginBottom: 8,
+    alignSelf: "center",
+    shadowColor: "black",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.8,
+    shadowRadius: 9,
+    elevation: 5,
+    marginBottom: 50,
+    boxShadow: "5px 9px 0px rgba(0,0,0,.3)", 
   },
   saveButtonText: {
     color: '#F5E1C4',
-    fontSize: 16,
+    fontSize: 32,
     fontWeight: '600',
+    fontFamily: FontNames.MontserratRegular
   },
   helpButton: {
     position: 'absolute',
