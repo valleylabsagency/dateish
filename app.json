@@ -21,7 +21,6 @@
       "visible": "sticky-immersive"
     },
     "notification": {
-      "icon": "./assets/images/notification-icon.png",
       "color": "#460b2a",
       "iosDisplayInForeground": true,
       "androidMode": "default",
@@ -36,8 +35,7 @@
     },
     "android": {
       "package": "com.tylerjvalley.Dateish",
-      "icon": "./assets/images/icon.png",
-      "useNextNotificationsApi": true
+      "icon": "./assets/images/icon.png"
     },
     "web": {
       "bundler": "metro",
