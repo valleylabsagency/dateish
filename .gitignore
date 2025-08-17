@@ -77,3 +77,5 @@ yarn-error.*
 
 # @end expo-cliandroid/
 ios/
+
+android/
