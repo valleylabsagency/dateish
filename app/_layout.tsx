@@ -10,7 +10,7 @@ import {
   Animated,
   useWindowDimensions,
 } from "react-native";
-import { Stack, usePathname, useLocalSearchParams } from "expo-router";
+import { Stack, usePathname, useLocalSearchParams, Slot } from "expo-router";
 import Navbar from "../components/Navbar";
 import { NavbarContext } from '../contexts/NavbarContext';
 import { ProfileProvider } from "../contexts/ProfileContext";
@@ -20,6 +20,7 @@ import { NotificationProvider, NotificationContext } from "@/contexts/Notificati
 import InactivityHandler from "../components/InactivityHandler";
 import PresenceWrapper from "@/contexts/PresenceContext";
 import AuthWrapper from "../contexts/AuthContext";
+import ForegroundGate from "../contexts/ForegroundGate";
 import * as Updates from "expo-updates";
 import { getDatabase, ref, onValue } from "firebase/database";
 import { Video, AVPlaybackStatus, ResizeMode } from "expo-av";
@@ -235,8 +236,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <InactivityHandler>
         <AuthWrapper>
           <PresenceWrapper>
-            {shouldWrapMusic ? (
-              <MusicProvider>
+            <ForegroundGate>
+              {shouldWrapMusic ? (
+                <MusicProvider>
+                  <NotificationProvider>
+                    <FirstTimeProvider>
+                      <ProfileProvider>
+                        <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
+                          <View style={styles.container}>
+                            <NotificationDisplay />
+                            <OfflineNotice />
+                            {!hideNavbar && <Navbar />}
+                            <Stack screenOptions={{ headerShown: false }} />
+                            <StatusBar hidden />
+                          </View>
+                        </NavbarContext.Provider>
+                      </ProfileProvider>
+                    </FirstTimeProvider>
+                  </NotificationProvider>
+                </MusicProvider>
+              ) : (
                 <NotificationProvider>
                   <FirstTimeProvider>
                     <ProfileProvider>
@@ -252,24 +271,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </ProfileProvider>
                   </FirstTimeProvider>
                 </NotificationProvider>
-              </MusicProvider>
-            ) : (
-              <NotificationProvider>
-                <FirstTimeProvider>
-                  <ProfileProvider>
-                    <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-                      <View style={styles.container}>
-                        <NotificationDisplay />
-                        <OfflineNotice />
-                        {!hideNavbar && <Navbar />}
-                        <Stack screenOptions={{ headerShown: false }} />
-                        <StatusBar hidden />
-                      </View>
-                    </NavbarContext.Provider>
-                  </ProfileProvider>
-                </FirstTimeProvider>
-              </NotificationProvider>
-            )}
+              )}
+            </ForegroundGate>
           </PresenceWrapper>
         </AuthWrapper>
       </InactivityHandler>

@@ -24,6 +24,8 @@ import PopUp from "../components/PopUp";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 
+import { auth } from "../firebase";
+
 const { width, height } = Dimensions.get("window");
 const MESSAGE = "Happy Hour daily! ";
 
@@ -43,7 +45,6 @@ const h = d.getHours();
 // 17..23 or 0..4 => OPEN, exactly 05:00:00 and after => CLOSED
 return (h >= OPEN_HOUR) || (h < CLOSE_HOUR);
 }
-
 
 
 export default function EntranceScreen() {
@@ -74,10 +75,12 @@ export default function EntranceScreen() {
   
 
   const [fontsLoaded] = useFonts({
-    [FontNames.ArcadePixelRegular]:       require("../assets/fonts/ArcadePixel-Regular.otf"),
-    [FontNames.MontserratBold]:    require("../assets/fonts/Montserrat-Bold.ttf"),
-    [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
+    [FontNames.ArcadePixelRegular]: require("../assets/fonts/ArcadePixel-Regular.otf"),
+    [FontNames.MontserratBold]:     require("../assets/fonts/Montserrat-Bold.ttf"),
+    [FontNames.MontserratRegular]:  require("../assets/fonts/Montserrat-Regular.ttf"),
+    [FontNames.MontserratExtraLightItalic]: require("../assets/fonts/Montserrat-ExtraLightItalic.ttf"), 
   });
+  
 
   useEffect(() => {
     // set immediately
@@ -126,8 +129,13 @@ export default function EntranceScreen() {
   };
 
   const handleEntrancePress = () => {
+    const user = auth.currentUser;
     if (isBarOpen) {
-      setShowAuth(true);
+      if (user) {
+        router.replace("/bar-2");
+      } else {
+        setShowAuth(true);
+      }
     } else {
       setShowPopupRules(true);
     }
@@ -292,16 +300,6 @@ export default function EntranceScreen() {
           </ImageBackground>
         </View>
       </Modal>
-      <Modal 
-    visible={showAuth} 
-    transparent 
-    animationType="slide"
-    onDismiss={() => setPlayAnimation(true)}
-    onRequestClose={() => setPlayAnimation(true)}
-  >
-    {/* ...existing auth modal content... */}
-  </Modal>
-
   {/* — Bar Rules popup when closed — */}
       <PopUp
           visible={showPopupRules}
@@ -356,7 +354,7 @@ const styles = StyleSheet.create({
   },
   rulesContainer: {
     marginTop: 8,
-    margin: "auto",
+   alignSelf: "center"
   },
   hoursContainer: {
     alignItems: "center",

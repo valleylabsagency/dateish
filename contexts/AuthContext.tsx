@@ -10,16 +10,10 @@ const AuthWrapper = ({ children }: AuthWrapperProps): JSX.Element => {
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        // User is logged in, navigate to the bar page
-        router.push("/entrance");
-      } else {
-        // No user, navigate to the welcome page
-        router.push("/entrance");
-      }
+    const unsubscribe = auth.onAuthStateChanged(() => {
+      // Always funnel to Entrance (signed in or not)
+      router.replace("/entrance");
     });
-
     return () => unsubscribe();
   }, [router]);
 

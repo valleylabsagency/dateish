@@ -21,11 +21,8 @@ export default function PresenceWrapper({ children }: PresenceWrapperProps) {
       // Listen for connection state changes
       const unsubscribeConnected = onValue(connectedRef, (snap) => {
         if (snap.val() === true) {
-          // Schedule onDisconnect to set status to false when disconnected
           onDisconnect(userStatusRef).set({ online: false });
-          // Immediately set status to online
           set(userStatusRef, { online: true });
-          console.log(`User ${user.uid} set to online`);
         }
       });
 
@@ -46,14 +43,11 @@ export default function PresenceWrapper({ children }: PresenceWrapperProps) {
 
       // Cleanup the connected listener and AppState listener for this user
       return () => {
-        subscription.remove();
         unsubscribeConnected();
       };
     });
 
-    return () => {
-      unsubscribeAuth();
-    };
+    return () => unsubscribeAuth();
   }, []);
 
   return <>{children}</>;
