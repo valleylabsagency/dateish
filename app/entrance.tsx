@@ -20,6 +20,7 @@ import { FirstTimeContext } from "../contexts/FirstTimeContext";
 import { signUp, login } from "../services/authservice";
 import { FontNames } from "../constants/fonts";
 import closeIcon from '../assets/images/x.png';
+import PopUp from "../components/PopUp";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 
@@ -32,6 +33,17 @@ const withoutBg = {
     layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
   ),
 }
+
+// Open 5pm (17) to 5am (05), local device time
+const OPEN_HOUR = 17; // 5pm
+const CLOSE_HOUR = 5; // 5am
+
+function isBarOpenNow(d = new Date()) {
+const h = d.getHours();
+// 17..23 or 0..4 => OPEN, exactly 05:00:00 and after => CLOSED
+return (h >= OPEN_HOUR) || (h < CLOSE_HOUR);
+}
+
 
 
 export default function EntranceScreen() {
@@ -51,12 +63,29 @@ export default function EntranceScreen() {
   const scrollX = useRef(new Animated.Value(width)).current;
   const videoRef = useRef<Video>(null);
   const hasStartedRef = useRef(false);
+  const [isBarOpen, setIsBarOpen] = useState<boolean>(isBarOpenNow());
+  const [showPopupRules, setShowPopupRules] = useState(false);
+
+  const signSrc = isBarOpen
+  ? require("../assets/images/open-sign.png")
+  : require("../assets/images/closed-sign.png");
+
+
+  
 
   const [fontsLoaded] = useFonts({
     [FontNames.ArcadePixelRegular]:       require("../assets/fonts/ArcadePixel-Regular.otf"),
     [FontNames.MontserratBold]:    require("../assets/fonts/Montserrat-Bold.ttf"),
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
   });
+
+  useEffect(() => {
+    // set immediately
+    setIsBarOpen(isBarOpenNow());
+    // refresh every minute
+    const id = setInterval(() => setIsBarOpen(isBarOpenNow()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   // marquee loop
   useEffect(() => {
@@ -93,6 +122,14 @@ export default function EntranceScreen() {
       setAuthError(true);
     } finally {
       setLoadingAuth(false);
+    }
+  };
+
+  const handleEntrancePress = () => {
+    if (isBarOpen) {
+      setShowAuth(true);
+    } else {
+      setShowPopupRules(true);
     }
   };
   
@@ -163,18 +200,19 @@ export default function EntranceScreen() {
         </View>
 
         <TouchableOpacity
-          onPress={() => setShowAuth(true)}
+          onPress={handleEntrancePress}
           style={styles.doorTouchable}
           activeOpacity={0.8}
         >
           <Image
-            source={require("../assets/images/open-sign.png")}
+            source={signSrc}
             style={styles.doorSign}
             resizeMode="contain"
           />
         </TouchableOpacity>
+
         <TouchableOpacity
-          onPress={() => setShowAuth(true)}
+          onPress={handleEntrancePress}
           style={styles.pressable}
           activeOpacity={0.8}
         />
@@ -254,6 +292,47 @@ export default function EntranceScreen() {
           </ImageBackground>
         </View>
       </Modal>
+      <Modal 
+    visible={showAuth} 
+    transparent 
+    animationType="slide"
+    onDismiss={() => setPlayAnimation(true)}
+    onRequestClose={() => setPlayAnimation(true)}
+  >
+    {/* ...existing auth modal content... */}
+  </Modal>
+
+  {/* — Bar Rules popup when closed — */}
+      <PopUp
+          visible={showPopupRules}
+          title="Bar Rules"
+          onClose={() => setShowPopupRules(false)}
+        >
+        <View style={styles.rulesContainer}>
+          <View style={styles.hoursContainer}>
+            <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
+            <Text style={styles.hours}>17:00–05:00</Text>
+          </View>
+      
+          <View style={styles.hoursContainer}>
+            <Text style={styles.hoursText}>Happy Hour:{"\n"}</Text>
+            <Text style={styles.hours}>17:00–21:00</Text>
+          </View> 
+      
+          <View style={styles.hoursContainer}>
+            <View style={styles.vipContainer}>
+            <Text style={styles.vipText}>VIP</Text>
+            <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
+            </View>
+           
+            <Text style={styles.hours}>All Day Erry Day</Text>
+          </View>
+      
+          <Text style={styles.ruleText}>No Nude Pics</Text>
+          <Text style={[styles.hoursText, {marginBottom: 20}]}>No Links Allowed</Text>
+          <Text style={styles.ruleText}>Age 21 and Up</Text>
+        </View>
+      </PopUp>
     </View>
   );
 }
@@ -275,6 +354,47 @@ const styles = StyleSheet.create({
     height: 24,
     tintColor: 'black',
   },
+  rulesContainer: {
+    marginTop: 8,
+    margin: "auto",
+  },
+  hoursContainer: {
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  hoursText: {
+    fontSize: 24,
+    color: "#d8bfd8",
+    fontFamily: FontNames.MontserratRegular,
+    textAlign: "center",
+    marginBottom: -35
+  },
+  hours: {
+    fontSize: 26,
+    color: "#ffe3d0",
+    fontFamily: FontNames.MontserratExtraLightItalic,
+    textAlign: "center",
+    marginBottom: 20
+  },
+  vipContainer: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  vipText: {
+    color: "red",          // highlight VIP in red
+    fontSize: 26,
+    fontFamily: FontNames.MontserratBold,
+    marginRight: 6,
+    marginBottom: 5
+  },
+  ruleText: {
+    fontSize: 26,
+    color: "#e78bbb",
+    textAlign: "center",
+    marginBottom: 10
+  }
 });
 
 const authStyles = StyleSheet.create({
