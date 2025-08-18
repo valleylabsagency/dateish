@@ -26,7 +26,15 @@ const withoutBg = {
   ),
 }
 
-export default function Navbar() {
+type NavbarProps = {
+  /** If provided, this is called instead of the default WC navigation. */
+  onBathroomPress?: () => void;
+  /** If provided (and onBathroomPress is not), this route is used instead of "/bathroom". */
+  bathroomRoute?: string; // e.g. "/bathroom?onboard=true"
+};
+
+
+export default function Navbar({ onBathroomPress, bathroomRoute }: NavbarProps) {
   const router = useRouter();
   const { showWcButton } = useContext(NavbarContext);
 
@@ -97,7 +105,18 @@ export default function Navbar() {
     <View style={styles.navbar}>
       {/* Conditionally render the WC button */}
       
-        <TouchableOpacity onPress={() => router.push("/bathroom")}>
+      <TouchableOpacity
+          onPress={() => {
+            if (onBathroomPress) {
+              onBathroomPress();
+            } else {
+              router.push(bathroomRoute ?? "/bathroom");
+            }
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Open bathroom"
+          testID="wc-button"
+        >
           <Image
             source={require("../assets/images/icons/WC.png")}
             style={styles.navIcon}

@@ -12,7 +12,8 @@ import {
   Dimensions,
   TextInput,
   Pressable,
-  Alert
+  Alert,
+  Animated
 } from "react-native";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
@@ -32,6 +33,8 @@ import {
 } from "firebase/firestore";
 import { ProfileContext } from "../contexts/ProfileContext";
 import { useIsFocused } from "@react-navigation/native";
+import { MaterialIcons } from "@expo/vector-icons";
+import Navbar from "@/components/Navbar";
 
 const steamboat = require('../assets/videos/steamboatwillie.mp4');
 
@@ -76,11 +79,17 @@ const drinkTextMapping: Record<string, string> = {
 
 // Mr. Mingles welcome dialogue (tap to advance)
 const WELCOME_MESSAGES = [
-  "Hello! I’m Mr. Mingles — welcome to Dateish!",
-  "We’re not like other dating apps. No perfect-match algorithm here.",
-  "It’s simple: chat with people in the bar, see if you vibe, then grab their number.",
-  "First things first — make yourself a profile in the bathroom.",
-  "Ready? Let’s set you up so others can see you."
+  "Beep Boop Beep Mothafuckas!",
+  "Hello! I’m Mr. Mingles, how you doin?",
+  "Welcome to Dateish!",
+  "We're not like other dating apps.",
+  "We don't have a fancy algorithm to match you with your \"perfect match\".",
+  "Here you have to talk to people to actually know if you're a good match.",
+  "Kinda old school… Go to a bar, talk to several people",
+  "And if you like someone, ask for their number!",
+  "Remember that shit??",
+  "Who will you see? Whoever is in the bar right now! Like REAL life.",
+  "Alright, enough chit chat! Go to the bathroom and make yourself a profile."
 ];
 
 export default function Bar2Screen() {
@@ -106,7 +115,45 @@ export default function Bar2Screen() {
   const [welcomeIndex, setWelcomeIndex] = useState(0);
   const [welcomeDisplayed, setWelcomeDisplayed] = useState("");
   const [welcomeTyping, setWelcomeTyping] = useState(true);
+  const [pointerTarget, setPointerTarget] = useState<'mingles'|'bathroom'|null>(null);
+  const [minglesFrame, setMinglesFrame] = useState<{x:number,y:number,width:number,height:number} | null>(null);
+
   const isFocused = useIsFocused();
+
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!pointerTarget) {
+      pulse.stopAnimation();
+      pulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 700, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pointerTarget]);
+  
+  const pointerScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
+
+  // Show pointer after first line (→ Mingles). On final line (→ Bathroom). Hide otherwise.
+useEffect(() => {
+  if (profileComplete) return;          // only during onboarding
+  if (welcomeTyping) return;            // wait until the line finishes typing
+
+  if (welcomeIndex === 0) {
+    setPointerTarget('mingles');        // after first line
+  } else if (welcomeIndex === WELCOME_MESSAGES.length - 1) {
+    setPointerTarget('bathroom');       // final line
+  } else {
+    setPointerTarget(null);             // middle lines
+  }
+}, [welcomeTyping, welcomeIndex, profileComplete]);
+  
 
   useEffect(() => {
     // whenever this screen is focused, refresh the started flag
@@ -316,6 +363,12 @@ export default function Bar2Screen() {
     }
   };
 
+  const onMinglesPress = () => {
+    if (welcomeTyping) return;   // don't advance mid-typing
+    setPointerTarget(null);      // hide pointer after the tap
+    handleWelcomeAdvance();      // go to next message
+  };
+
   const sendFirstMessage = async () => {
     if (!firstMessageText.trim()) return;
     setSendingFirstMessage(true);
@@ -369,6 +422,11 @@ export default function Bar2Screen() {
 
   return (
     <>
+    <Navbar
+      bathroomRoute={!profileComplete ? "/bathroom?onboard=true" : "/bathroom"}
+      // or, if you want to run any local side-effects first, you can use:
+      // onBathroomPress={() => router.push(!profileComplete ? "/bathroom?onboard=true" : "/bathroom")}
+    />
       <ImageBackground
         source={require("../assets/images/bar-back.png")}
         style={styles.background}
@@ -380,11 +438,7 @@ export default function Bar2Screen() {
       >
         {/* ─── WELCOME SECTION (only if profile is NOT complete) ───────── */}
         {!profileComplete && (
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={handleWelcomeAdvance}
-            style={{ flex: 1 }}
-          >
+          <View style={{ flex: 1 }}>
             <View style={styles.bubbleContainer}>
               <ImageBackground
                 source={require("../assets/images/speech-bubble.png")}
@@ -397,29 +451,58 @@ export default function Bar2Screen() {
               </ImageBackground>
             </View>
 
-            <View style={styles.minglesContainer}>
-              <Image
-                source={require("../assets/images/mr-mingles.png")}
-                style={styles.minglesImage}
-                resizeMode="contain"
-              />
+            <View
+              style={[styles.minglesContainer, { zIndex: 2 }]}
+              collapsable={false}
+              onLayout={e => {
+                const { x, y, width, height } = e.nativeEvent.layout;
+                setMinglesFrame({ x, y, width, height });
+              }}
+            >
+              <Pressable onPress={onMinglesPress} hitSlop={20}>
+                <Image
+                  source={require("../assets/images/mr-mingles.png")}
+                  style={styles.minglesImage}
+                  resizeMode="contain"
+                />
+              </Pressable>
             </View>
+            {/* Pointer → Mr. Mingles (after first line) */}
+            {pointerTarget === 'mingles' && minglesFrame && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.pointerBase,
+                  {
+                    top:  minglesFrame.y + minglesFrame.height * 0.25,
+                    left: minglesFrame.x + minglesFrame.width  * 0.60,
+                    transform: [{ rotate: '-90deg' }, { scale: pointerScale }],
+                  },
+                ]}
+              >
+                <MaterialIcons name="touch-app" size={48} color="#fff" />
+              </Animated.View>
+            )}
+
+            {/* Pointer → Bathroom (on final line). Adjust top/left if your icon lives elsewhere */}
+            {pointerTarget === 'bathroom' && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.pointerBase,
+                  styles.pointerBathroom,
+                  { transform: [{ rotate: '-25deg' }, { scale: pointerScale }] },
+                ]}
+              >
+                <MaterialIcons name="touch-app" size={48} color="#fff" />
+              </Animated.View>
+            )}
 
             {/* Skip button */}
             <TouchableOpacity style={styles.skipButton} onPress={skipWelcome}>
               <Text style={styles.skipText}>Skip</Text>
             </TouchableOpacity>
-
-            {/* CTA: Create Profile */}
-            {!welcomeTyping && welcomeIndex === WELCOME_MESSAGES.length - 1 && (
-              <TouchableOpacity
-                style={styles.createProfileButton}
-                onPress={() => router.push("/bathroom?onboard=true")}
-              >
-                <Text style={styles.createProfileText}>Create Profile</Text>
-              </TouchableOpacity>
-            )}
-          </TouchableOpacity>
+          </View>
         )}
 
         {/* ─── START CHAT SCREEN (profile complete, not started) ───────── */}
@@ -434,11 +517,14 @@ export default function Bar2Screen() {
             </View>
 
             <View style={styles.minglesContainer}>
-              <Image
-                source={require("../assets/images/mr-mingles.png")}
-                style={styles.minglesImage}
-                resizeMode="contain"
-              />
+              <View>
+                <Image
+                  source={require("../assets/images/mr-mingles.png")}
+                  style={styles.minglesImage}
+                  resizeMode="contain"
+                />
+              </View>
+              
             </View>
 
             <TouchableOpacity
@@ -538,11 +624,12 @@ export default function Bar2Screen() {
         )}
 
         {/* ─── BACK BAR LAYERS ───────────────────────── */}
-        <View style={styles.barFrontContainer}>
+        <View style={styles.barFrontContainer} pointerEvents="none">
           <Image
             style={styles.barFront}
             source={require("../assets/images/bar-front.png")}
             resizeMode="stretch"
+            pointerEvents="none"
           />
         </View>
       </ImageBackground>
@@ -782,7 +869,7 @@ const styles = StyleSheet.create({
   bubbleTextWrap: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 30,
+    //paddingTop: 30,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -791,6 +878,8 @@ const styles = StyleSheet.create({
     fontSize: 22,
     textAlign: "center",
     fontFamily: FontNames.MontserratRegular,
+    position: "relative",
+    bottom: 10,
   },
 
   // ─── Mr. Mingles ──────────────────────────────
@@ -811,18 +900,34 @@ const styles = StyleSheet.create({
   // Skip (welcome)
   skipButton: {
     position: "absolute",
-    top: 30,
-    right: 20,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    top: "18%",
+    right: "40%",
+    backgroundColor: "#6e1944",
+    borderWidth: 4,
+    borderColor: "#460b2a",
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 12,
     zIndex: 5,
+    width: 70
   },
   skipText: {
     color: "#ffe3d0",
     fontSize: 16,
-    fontFamily: FontNames.MontserratRegular,
+    fontFamily: FontNames.MontSerratSemiBold,
+  },
+
+  pointerBase: {
+    position: "absolute",
+    width: 55,
+    height: 55,
+    zIndex: 20,
+  },
+  
+  // Approx top-left for your bathroom icon (tweak as needed)
+  pointerBathroom: {
+    top: height * -.01,  // ~5.5% from top
+    left: width * 0.06,   // ~6% from left
   },
 
   // CTA to profile (welcome)

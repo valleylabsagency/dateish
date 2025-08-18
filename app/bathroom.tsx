@@ -442,11 +442,19 @@ export default function BathroomScreen() {
 
         {/* Mr. Mingles image (animated only first/last) */}
         {showAnimatedMM && (
-          <Animated.Image
+          <Animated.View
+          pointerEvents="none"
+          style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
+          // optional: accessibility clean-up so screen readers ignore the overlay:
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Image
             source={require("../assets/images/mr-mingles.png")}
-            style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
+            style={{ width: "100%", height: "100%" }}
             resizeMode="contain"
           />
+        </Animated.View>
         )}
 
         {/* Next / OK controls */}
@@ -881,8 +889,9 @@ const modalStyles = StyleSheet.create({
     width: scale(350),
     height: scale(420),
     position: "absolute",
-    bottom: scale(-340),
-    right: scale(-100),
+    bottom: scale(-250),
+    right: scale(-140),
+    zIndex: 100
   },
 });
 
