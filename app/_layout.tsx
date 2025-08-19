@@ -232,7 +232,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-  
+    <AnimatedSplashScreen>
       <InactivityHandler>
         <AuthWrapper>
           <PresenceWrapper>
@@ -276,6 +276,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </PresenceWrapper>
         </AuthWrapper>
       </InactivityHandler>
+    </AnimatedSplashScreen>
    
   );
 }
