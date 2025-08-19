@@ -24,7 +24,7 @@ async function sendPush(
     title,
     body,
     data,
-    sound = "push-notif.wav",
+    sound = "push_notif.wav",
   }: { title: string; body: string; data?: any; sound?: string }
 ) {
   const messages = tokens.map((token) => ({

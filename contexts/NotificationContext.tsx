@@ -98,7 +98,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         await Notifications.setNotificationChannelAsync('default', {
           name: 'default',
           importance: Notifications.AndroidImportance.MAX,
-          sound: 'push-notif.wav',
+          sound: 'push_notif.wav',
           vibrationPattern: [0, 250, 250, 250],
         });
       }
