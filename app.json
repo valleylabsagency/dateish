@@ -47,7 +47,12 @@
       "expo-video",
       "expo-font",
       "expo-web-browser",
-      "expo-audio"
+      "expo-audio",
+      ["expo-notifications", {
+        "icon": "./assets/images/icon.png",
+        "color": "#460b2a",
+        "sounds": ["./assets/sounds/push-notif.wav"]  
+      }]
     ],
     "experiments": {
       "typedRoutes": true

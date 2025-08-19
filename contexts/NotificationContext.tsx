@@ -24,13 +24,12 @@ import {
 // Configure how notifications are displayed when app is foregrounded
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,      // your in-app alert
-    shouldPlaySound: false,     // no sound in-app
-    shouldShowBadge: false,     // iOS badge
-    shouldShowBanner: true,     // iOS 14+ banner
-    shouldShowList: true,       // Android notification shade
-    shouldSetBadge: false,
+  handleNotification: async (): Promise<Notifications.NotificationBehavior> => ({
+    shouldShowAlert: true,   // shows alert-style UI in foreground
+    shouldPlaySound: false,  // no sound in foreground
+    shouldSetBadge: false,   // don’t change app badge
+    shouldShowBanner: true,  // iOS foreground banner
+    shouldShowList: true,    // show in Android/iOS notification list
   }),
 });
 
@@ -67,6 +66,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     currentChatIdRef.current = currentChatId;
   }, [currentChatId]);
 
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
+      const data = resp.notification.request.content.data as any;
+      // e.g., if you send { chatId, partnerId } in data:
+      // router.push(`/chat?partner=${data.partnerId}`);
+    });
+    return () => sub.remove();
+  }, []);
+
   // 1️⃣ Register for push and save token
   useEffect(() => {
     (async () => {
@@ -90,12 +98,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         await Notifications.setNotificationChannelAsync('default', {
           name: 'default',
           importance: Notifications.AndroidImportance.MAX,
-          sound: 'notif_sound.wav',
+          sound: 'push-notif.wav',
           vibrationPattern: [0, 250, 250, 250],
         });
       }
 
-      const tokenData = await Notifications.getExpoPushTokenAsync();
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: Constants?.expoConfig?.extra?.eas?.projectId,
+      });
+
       const token = tokenData.data;
       console.log('Expo push token:', token);
       if (auth.currentUser) {
