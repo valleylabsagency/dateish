@@ -1,22 +1,43 @@
-import { auth } from '../firebase';
+import { auth, firestore } from '../firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getDatabase, ref, set } from "firebase/database";
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export const signUp = (username, password) => {
-  // Construct a pseudo-email using the username.
   const pseudoEmail = `${username}@dateish.com`;
+
   return createUserWithEmailAndPassword(auth, pseudoEmail, password)
-    .then((userCredential) => {
+    .then(async (userCredential) => {
       const user = userCredential.user;
-      console.log("User account created for:", username);
-      // Optionally, create a user profile in Firestore here.
-      return user;
+      const uid = user.uid;
+
+      // Create/merge a Firestore user doc with isVip:false
+      const userRef = doc(firestore, 'users', uid);
+      const snap = await getDoc(userRef);
+
+      if (!snap.exists()) {
+        await setDoc(
+          userRef,
+          {
+            isVip: false,
+            createdAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } else if (snap.data()?.isVip === undefined) {
+        // Backfill if doc exists but lacks isVip
+        await setDoc(userRef, { isVip: false }, { merge: true });
+      }
+
+      console.log('User account created for:', username);
+      return user; // keep your original return
     })
     .catch((error) => {
-      console.error("Error creating account:", error);
+      console.error('Error creating account:', error);
       throw error;
     });
 };
+
 
 export const login = (username, password) => {
   const pseudoEmail = `${username}@dateish.com`;

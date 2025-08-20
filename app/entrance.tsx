@@ -23,8 +23,9 @@ import closeIcon from '../assets/images/x.png';
 import PopUp from "../components/PopUp";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
-
-import { auth } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, onSnapshot } from "firebase/firestore";
+import { auth, firestore } from "../firebase";
 
 const { width, height } = Dimensions.get("window");
 const MESSAGE = "Happy Hour daily! ";
@@ -66,6 +67,8 @@ export default function EntranceScreen() {
   const hasStartedRef = useRef(false);
   const [isBarOpen, setIsBarOpen] = useState<boolean>(isBarOpenNow());
   const [showPopupRules, setShowPopupRules] = useState(false);
+  const [isVip, setIsVip] = useState(false);
+
 
   const signSrc = isBarOpen
   ? require("../assets/images/open-sign.png")
@@ -80,15 +83,43 @@ export default function EntranceScreen() {
     [FontNames.MontserratRegular]:  require("../assets/fonts/Montserrat-Regular.ttf"),
     [FontNames.MontserratExtraLightItalic]: require("../assets/fonts/Montserrat-ExtraLightItalic.ttf"), 
   });
+
+  
+  const USERS_COLLECTION = "users";
+
+  useEffect(() => {
+    let unsubUserDoc: (() => void) | undefined;
+
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      // clean up previous doc listener
+      if (unsubUserDoc) { unsubUserDoc(); unsubUserDoc = undefined; }
+
+      if (!user) {
+        setIsVip(false);
+        return;
+      }
+      const ref = doc(firestore, USERS_COLLECTION, user.uid);
+      unsubUserDoc = onSnapshot(ref,
+        (snap) => setIsVip(Boolean(snap.data()?.isVip)),
+        () => setIsVip(false)
+      );
+    });
+
+    return () => {
+      unsubAuth();
+      if (unsubUserDoc) unsubUserDoc();
+    };
+  }, []);
+
   
 
   useEffect(() => {
-    // set immediately
-    setIsBarOpen(isBarOpenNow());
-    // refresh every minute
-    const id = setInterval(() => setIsBarOpen(isBarOpenNow()), 60_000);
+    const update = () => setIsBarOpen(isVip || isBarOpenNow());
+    update(); // set immediately
+    const id = setInterval(update, 60_000);
     return () => clearInterval(id);
-  }, []);
+  }, [isVip]);
+  
 
   // marquee loop
   useEffect(() => {
