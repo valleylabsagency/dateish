@@ -1,0 +1,10 @@
+# Ignore node_modules and build artifacts
+
+node_modules \*_/node_modules
+lib/
+dist/
+_.log
+
+# Explicitly include the lockfile used by Cloud Build
+
+!functions/package-lock.json
