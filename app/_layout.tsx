@@ -20,6 +20,7 @@ import { NotificationProvider, NotificationContext } from "@/contexts/Notificati
 import InactivityHandler from "../components/InactivityHandler";
 import PresenceWrapper from "@/contexts/PresenceContext";
 import AuthWrapper from "../contexts/AuthContext";
+import { MoneysProvider } from '@/contexts/MoneysContext';
 import ForegroundGate from "../contexts/ForegroundGate";
 import * as Updates from "expo-updates";
 import { getDatabase, ref, onValue } from "firebase/database";
@@ -235,10 +236,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <AnimatedSplashScreen>
       <InactivityHandler>
         <AuthWrapper>
-          <PresenceWrapper>
-            <ForegroundGate>
-              {shouldWrapMusic ? (
-                <MusicProvider>
+          <MoneysProvider>
+            <PresenceWrapper>
+              <ForegroundGate>
+                {shouldWrapMusic ? (
+                  <MusicProvider>
+                    <NotificationProvider>
+                      <FirstTimeProvider>
+                        <ProfileProvider>
+                          <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
+                            <View style={styles.container}>
+                              <NotificationDisplay />
+                              <OfflineNotice />
+                              {!hideNavbar && <Navbar />}
+                              <Stack screenOptions={{ headerShown: false }} />
+                              <StatusBar hidden />
+                            </View>
+                          </NavbarContext.Provider>
+                        </ProfileProvider>
+                      </FirstTimeProvider>
+                    </NotificationProvider>
+                  </MusicProvider>
+                ) : (
                   <NotificationProvider>
                     <FirstTimeProvider>
                       <ProfileProvider>
@@ -254,26 +273,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       </ProfileProvider>
                     </FirstTimeProvider>
                   </NotificationProvider>
-                </MusicProvider>
-              ) : (
-                <NotificationProvider>
-                  <FirstTimeProvider>
-                    <ProfileProvider>
-                      <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-                        <View style={styles.container}>
-                          <NotificationDisplay />
-                          <OfflineNotice />
-                          {!hideNavbar && <Navbar />}
-                          <Stack screenOptions={{ headerShown: false }} />
-                          <StatusBar hidden />
-                        </View>
-                      </NavbarContext.Provider>
-                    </ProfileProvider>
-                  </FirstTimeProvider>
-                </NotificationProvider>
-              )}
-            </ForegroundGate>
-          </PresenceWrapper>
+                )}
+              </ForegroundGate>
+            </PresenceWrapper>
+          </MoneysProvider>
         </AuthWrapper>
       </InactivityHandler>
     </AnimatedSplashScreen>

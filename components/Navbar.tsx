@@ -17,6 +17,9 @@ import { MusicContext } from "../contexts/MusicContext";
 import PopUp from "../components/PopUp";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
+import { useMoneys } from "@/contexts/MoneysContext";
+
+
 
 const { width, height } = Dimensions.get("window");
 const withoutBg = {
@@ -39,6 +42,12 @@ export default function Navbar({ onBathroomPress, bathroomRoute }: NavbarProps) 
   const { showWcButton } = useContext(NavbarContext);
 
 
+  const { balance, loading, error } = useMoneys();
+
+  const formatMoneys = (n: number | null | undefined) =>
+    typeof n === "number" ? Math.floor(n).toLocaleString() : "—";
+  
+  const displayBalance = loading ? "…" : formatMoneys(balance);
   // Access the music context so we can toggle music or show loading
   const { isPlaying, soundLoading, toggleMusic } = useContext(MusicContext);
 
@@ -135,7 +144,7 @@ export default function Navbar({ onBathroomPress, bathroomRoute }: NavbarProps) 
       >
      
          
-        <Text style={styles.moneysAmount}>10</Text>
+        <Text style={styles.moneysAmount}>{displayBalance}</Text>
         <Image style={styles.moneysImage} source={require("../assets/images/moneys.png")} />
         
       </TouchableOpacity>
