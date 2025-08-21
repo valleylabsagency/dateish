@@ -3,54 +3,29 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } f
 import { getDatabase, ref, set } from "firebase/database";
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
-export const signUp = (username, password) => {
+export const signUp = async (username, password) => {
   const pseudoEmail = `${username}@dateish.com`;
+  const { user } = await createUserWithEmailAndPassword(auth, pseudoEmail, password);
 
-  return createUserWithEmailAndPassword(auth, pseudoEmail, password)
-    .then(async (userCredential) => {
-      const user = userCredential.user;
-      const uid = user.uid;
+  // Seed the Firestore user doc (this is what entrance.tsx listens to)
+  await setDoc(
+    doc(firestore, "users", user.uid),
+    {
+      username,
+      isVip: false,
+      createdAt: serverTimestamp(),
+    },
+    { merge: true } // in case doc already exists
+  );
 
-      // Create/merge a Firestore user doc with isVip:false
-      const userRef = doc(firestore, 'users', uid);
-      const snap = await getDoc(userRef);
-
-      if (!snap.exists()) {
-        await setDoc(
-          userRef,
-          {
-            isVip: false,
-            createdAt: serverTimestamp(),
-          },
-          { merge: true }
-        );
-      } else if (snap.data()?.isVip === undefined) {
-        // Backfill if doc exists but lacks isVip
-        await setDoc(userRef, { isVip: false }, { merge: true });
-      }
-
-      console.log('User account created for:', username);
-      return user; // keep your original return
-    })
-    .catch((error) => {
-      console.error('Error creating account:', error);
-      throw error;
-    });
+  return user;
 };
 
 
-export const login = (username, password) => {
+export const login = async (username, password) => {
   const pseudoEmail = `${username}@dateish.com`;
-  return signInWithEmailAndPassword(auth, pseudoEmail, password)
-    .then((userCredential) => {
-      const user = userCredential.user;
-      console.log("User signed in:", username);
-      return user;
-    })
-    .catch((error) => {
-      console.error("Error signing in:", error);
-      throw error;
-    });
+  const { user } = await signInWithEmailAndPassword(auth, pseudoEmail, password);
+  return user;
 };
 
 export const logout = async () => {

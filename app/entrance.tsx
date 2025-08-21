@@ -24,8 +24,9 @@ import PopUp from "../components/PopUp";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, onSnapshot } from "firebase/firestore";
+import { getDoc, setDoc, updateDoc, doc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { auth, firestore } from "../firebase";
+import ConfettiCannon from 'react-native-confetti-cannon';
 
 const { width, height } = Dimensions.get("window");
 const MESSAGE = "Happy Hour daily! ";
@@ -60,6 +61,7 @@ export default function EntranceScreen() {
   const [password, setPassword] = useState("");
   const [loadingAuth, setLoadingAuth] = useState(false);
   const [authError, setAuthError] = useState(false);
+  const [authFlow, setAuthFlow] = useState<'normal' | 'vipGate'>('normal');
 
   const [textWidth, setTextWidth] = useState(0);
   const scrollX = useRef(new Animated.Value(width)).current;
@@ -68,11 +70,20 @@ export default function EntranceScreen() {
   const [isBarOpen, setIsBarOpen] = useState<boolean>(isBarOpenNow());
   const [showPopupRules, setShowPopupRules] = useState(false);
   const [isVip, setIsVip] = useState(false);
+  const [showNotVipPopup, setShowNotVipPopup] = useState(false);
+  const [showVipCongrats, setShowVipCongrats] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
 
+  const [notVipVisible, setNotVipVisible] = useState(false);
+  const [vipTypedText, setVipTypedText] = useState("");
+  const vipRollAnim = useRef(new Animated.Value(500)).current; // slide-in from right
 
   const signSrc = isBarOpen
   ? require("../assets/images/open-sign.png")
   : require("../assets/images/closed-sign.png");
+
+  const VIP_SPEECH =
+  "You're not a VIP yet, just a regular old P.\nWanna become one?";
 
 
   
@@ -144,20 +155,114 @@ export default function EntranceScreen() {
     return () => loop.stop();
   }, [textWidth]);
 
+  useEffect(() => {
+    Animated.timing(vipRollAnim, {
+      toValue: notVipVisible ? 0 : 500,
+      duration: notVipVisible ? 1000 : 0,
+      useNativeDriver: true,
+    }).start();
+  }, [notVipVisible]);
+
+  useEffect(() => {
+    let id: NodeJS.Timeout | undefined;
+    if (notVipVisible) {
+      setVipTypedText("");
+      let i = 0;
+      id = setInterval(() => {
+        i++;
+        setVipTypedText(VIP_SPEECH.slice(0, i));
+        if (i >= VIP_SPEECH.length) clearInterval(id);
+      }, 25);
+    } else {
+      setVipTypedText("");
+    }
+    return () => id && clearInterval(id);
+  }, [notVipVisible]);
+  
+  
+
+  const startVipAuth = () => {
+    setAuthFlow('vipGate');
+    setShowPopupRules(false);     
+    setTimeout(() => setShowAuth(true), 0);
+  };
+  
+
   const handleSignUpOrIn = async () => {
     setLoadingAuth(true);
     setAuthError(false);
     try {
-      if (firstTime) await signUp(username, password);
-      else          await login(username, password);
+      const user = firstTime
+        ? await signUp(username, password)
+        : await login(username, password);
+  
+      // Fetch VIP status
+      const ref = doc(firestore, USERS_COLLECTION, user.uid);
+      const snap = await getDoc(ref);
+      const vipNow = Boolean(snap.data()?.isVip);
+  
       setShowAuth(false);
-      router.replace('/entranceAnimation') //replace with entrance animation
+  
+      // If bar is closed and user isn't VIP -> show Mr. Mingles upsell
+      if (!isBarOpenNow() && !vipNow) {
+        setNotVipVisible(true);
+        return;
+      }
+  
+      // Otherwise proceed
+      router.replace("/entranceAnimation");
     } catch {
       setAuthError(true);
     } finally {
       setLoadingAuth(false);
     }
   };
+
+  async function becomeVipNow() {
+    const u = auth.currentUser;
+    if (!u) {
+      // show login
+      setShowAuth(true);
+      return;
+    }
+    const ref = doc(firestore, "users", u.uid);
+  
+    try {
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        // preserve all other fields; only flip VIP
+        await updateDoc(ref, {
+          isVip: true,
+          vipSince: serverTimestamp(),
+        });
+      } else {
+        // create WITHOUT touching moneys; use merge to avoid future conflicts
+        await setDoc(
+          ref,
+          { isVip: true, vipSince: serverTimestamp() },
+          { merge: true }
+        );
+      }
+  
+      // instant UI feedback (your onSnapshot will also update shortly)
+      setIsVip(true);
+      setShowNotVipPopup(false);
+      setShowVipCongrats(true);
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 2500);
+    } catch (e: any) {
+      console.error("becomeVipNow failed:", e.code, e.message);
+      // optionally show an error popup
+    }
+  }
+  
+  const closeCongratsAndEnter = () => {
+    setShowVipCongrats(false);
+    setShowConfetti(false);
+    router.replace('/entranceAnimation');
+  };
+  
+  
 
   const handleEntrancePress = () => {
     const user = auth.currentUser;
@@ -360,10 +465,134 @@ export default function EntranceScreen() {
           <Text style={styles.ruleText}>No Nude Pics</Text>
           <Text style={[styles.hoursText, {marginBottom: 20}]}>No Links Allowed</Text>
           <Text style={styles.ruleText}>Age 21 and Up</Text>
+          <TouchableOpacity
+            style={styles.vipCta}
+            onPress={startVipAuth}   
+          >
+            <Text style={styles.vipCtaText}>I'm a VIP, let me in</Text>
+          </TouchableOpacity>
         </View>
       </PopUp>
+      {/* Not VIP popup (Mr Mingles) */}
+      {/* Mr. Mingles VIP Upsell (bathroom-style) */}
+      <Modal transparent visible={notVipVisible} animationType="fade">
+        <View style={mmStyles.modalOverlay}>
+          <TouchableOpacity
+            style={mmStyles.closeButton}
+            onPress={() => setNotVipVisible(false)}
+            activeOpacity={0.8}
+          >
+            <Image source={require("../assets/images/x.png")} style={styles.closeIcon} />
+          </TouchableOpacity>
+
+          <View style={mmStyles.modalContainer}>
+            {/* Mingles speech (typewriter) */}
+            <Text style={mmStyles.modalText}>{vipTypedText}</Text>
+
+            {/* Triangle pointer */}
+            <View style={mmStyles.triangleContainer}>
+              <View style={mmStyles.outerTriangle} />
+              <View style={mmStyles.innerTriangle} />
+            </View>
+
+            {/* Animated Mr. Mingles */}
+            <Animated.Image
+              source={require("../assets/images/mr-mingles.png")}
+              style={[mmStyles.mrMingles, { transform: [{ translateX: vipRollAnim }] }]}
+              resizeMode="contain"
+            />
+
+            {/* Actions */}
+            <View style={mmStyles.ctaRow}>
+            <TouchableOpacity
+              style={mmStyles.vipBtn}
+              onPress={async () => {
+                try {
+                  const u = auth.currentUser;
+                  if (!u) {
+                    setNotVipVisible(false);
+                    setShowAuth(true);
+                    return;
+                  }
+
+                  await updateDoc(doc(firestore, USERS_COLLECTION, u.uid), {
+                    isVip: true,
+                  });
+
+                  // Close the upsell, then show confetti + congrats modal
+                  setNotVipVisible(false);
+                  setShowConfetti(true);
+                  setShowVipCongrats(true);    // we'll use this to show a Mingles-style congrats modal
+                  setIsVip(true);
+                } catch (e) {
+                  console.error("VIP upgrade failed:", e);
+                }
+              }}
+            >
+              <Text style={mmStyles.vipBtnText}>Become a VIP</Text>
+            </TouchableOpacity>
+
+              <TouchableOpacity
+                style={mmStyles.laterBtn}
+                onPress={() => setNotVipVisible(false)}
+              >
+                <Text style={mmStyles.laterBtnText}>Maybe later</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* VIP Congrats (Mr. Mingles style) */}
+      <Modal transparent visible={showVipCongrats} animationType="fade">
+        <View style={mmStyles.modalOverlay}>
+          {/* Optional X to close if you want */}
+          {/* <TouchableOpacity style={mmStyles.closeButton} onPress={() => setShowVipCongrats(false)}>
+            <Image source={require("../assets/images/x.png")} style={styles.closeIcon} />
+          </TouchableOpacity> */}
+
+          <View style={mmStyles.modalContainer}>
+            <Text style={mmStyles.modalText}>Congrats! You are now a VIP!</Text>
+
+            {/* Triangle pointer (keeps the same look) */}
+            <View style={mmStyles.triangleContainer}>
+              <View style={mmStyles.outerTriangle} />
+              <View style={mmStyles.innerTriangle} />
+            </View>
+
+            {/* Mr. Mingles image (static is fine here) */}
+            <Image
+              source={require("../assets/images/mr-mingles.png")}
+              style={mmStyles.mrMingles}
+              resizeMode="contain"
+            />
+
+            {/* Big Enter button */}
+            <TouchableOpacity
+              style={[mmStyles.vipBtn, { position: "absolute", bottom: 16, alignSelf: "center" }]}
+              onPress={() => {
+                setShowVipCongrats(false);
+                setShowConfetti(false);
+                router.replace("/entranceAnimation");
+              }}
+            >
+              <Text style={mmStyles.vipBtnText}>Enter</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {showConfetti && (
+      <ConfettiCannon
+        count={150}
+        origin={{ x: width / 2, y: -10 }}
+        fadeOut
+        onAnimationEnd={() => setShowConfetti(false)}
+      />
+    )}
+
     </View>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
@@ -423,7 +652,75 @@ const styles = StyleSheet.create({
     color: "#e78bbb",
     textAlign: "center",
     marginBottom: 10
-  }
+  },
+  vipButton: {
+    marginTop: 30,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: '#e2a350',
+    alignSelf: "center",
+    width: 140,
+    boxShadow: "5px 9px 0px rgba(0,0,0,.3)", 
+  },
+  vipButtonText: {
+    fontSize: 16,
+    color: '#460b2a',
+    fontFamily: FontNames.MontserratBold,
+    textAlign: "center"
+  },
+  minglesBody: {
+    fontSize: 18,
+    color: '#ffe3d0',
+    textAlign: 'center',
+    fontFamily: FontNames.MontserratRegular,
+    marginHorizontal: 10,
+  },
+  vipCtaButton: {
+    backgroundColor: '#ffcf33',
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  vipCtaButtonText: {
+    fontSize: 16,
+    color: '#460b2a',
+    fontFamily: FontNames.MontserratBold,
+    textAlign: "center"
+  },
+  closeLink: {
+    color: '#d8bfd8',
+    textDecorationLine: 'underline',
+    fontSize: 14,
+  },
+  congratsBody: {
+    fontSize: 18,
+    color: '#ffe3d0',
+    textAlign: 'center',
+    fontFamily: FontNames.MontserratRegular,
+  },
+  congratsBodySmall: {
+    fontSize: 14,
+    color: '#d8bfd8',
+    textAlign: 'center',
+    fontFamily: FontNames.MontserratRegular,
+  },
+  vipCta: {
+    marginTop: 30,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: '#e2a350',
+    alignSelf: "center",
+    width: 140,
+    boxShadow: "5px 9px 0px rgba(0,0,0,.3)",
+  },
+  vipCtaText: {
+    color: "#592540",
+    fontFamily: FontNames.MontserratBold,
+    fontSize: 14,
+    textAlign: "center",
+  },
 });
 
 const authStyles = StyleSheet.create({
@@ -453,3 +750,119 @@ const authStyles = StyleSheet.create({
     fontFamily: FontNames.MontserratBold,
   },
 });
+
+const mmStyles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closeButton: {
+    position: "absolute",
+    top: height * 0.05,
+    right: width * 0.05,
+    zIndex: 100,
+  },
+  modalContainer: {
+    width: "90%",
+    height: height * 0.45,
+    backgroundColor: "#020621",
+    borderWidth: 4,
+    borderColor: "#fff",
+    borderRadius: 20,
+    padding: 20,
+    alignItems: "center",
+    position: "relative",
+    overflow: "visible",
+  },
+  modalText: {
+    color: "#eceded",
+    fontSize: 20,
+    textAlign: "center",
+    marginBottom: 16,
+    fontFamily: FontNames.MontserratExtraLight,
+  },
+  triangleContainer: {
+    position: "absolute",
+    bottom: -24,
+    right: 24,
+    width: 0,
+    height: 0,
+  },
+  outerTriangle: {
+    width: 5,
+    height: 5,
+    borderLeftWidth: 26,
+    borderRightWidth: 26,
+    borderTopWidth: 24,
+    position: "absolute",
+    left: -44,
+    top: -24,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#fff",
+  },
+  innerTriangle: {
+    position: "absolute",
+    top: -25,
+    left: -40,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 22,
+    borderRightWidth: 22,
+    borderTopWidth: 22,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#020621",
+  },
+  mrMingles: {
+    width: 320,
+    height: 380,
+    position: "absolute",
+    bottom: -330,
+    right: -120,
+    zIndex: 100,
+  },
+  ctaRow: {
+    position: "absolute",
+    bottom: 16,
+    alignSelf: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  vipBtn: {
+    backgroundColor: "#6e1944",
+    borderWidth: 4,
+    borderColor: "#460b2a",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.7,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  vipBtnText: {
+    fontSize: 16,
+    color: "#ffe3d0",
+    fontFamily: FontNames.MontserratBold,
+    textTransform: "uppercase",
+    textAlign: "center",
+  },
+  laterBtn: {
+    borderWidth: 2,
+    borderColor: "#ffe3d0",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    alignSelf: "center",
+  },
+  laterBtnText: {
+    fontSize: 14,
+    color: "#ffe3d0",
+    fontFamily: FontNames.MontserratRegular,
+  },
+});
+
