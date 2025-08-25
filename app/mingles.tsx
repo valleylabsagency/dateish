@@ -20,6 +20,9 @@ import PopUp from "../components/PopUp";
 import { verticalScale } from "react-native-size-matters";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
+import { spendMoneys } from '../services/moneys';
+import { MoneysContext } from "../contexts/MoneysContext";
+
 
 const { width, height } = Dimensions.get("window");
 const BUBBLE_HEIGHT = height * 0.18;
@@ -46,6 +49,9 @@ export default function MinglesScreen() {
 
   // toggles the drink‐speech bubble
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
+
+  const { triggerSpend } = useContext(MoneysContext);
+
 
   useEffect(() => {
     setShowWcButton(true);
@@ -85,6 +91,23 @@ export default function MinglesScreen() {
     }
     setDrinkLoading(false);
     setShowDrinkMenu(false);
+  };
+
+  const handleTipJar = async () => {
+    try {
+      // Spend exactly 1 for the tip jar
+      const result = await spendMoneys({ amount: 1, reason: "tip-jar" });
+      triggerSpend(1);
+  
+      // (Optional) You can show a quick “thanks” animation here if you want
+      // then show the Tips popup:
+      setPopupFlag("tips");
+     //setShowPopupTips(true);
+    } catch (e: any) {
+      console.error("Tip jar failed:", e.code, e.message);
+      // If e.code === 'functions/not-found', the URL retry in the helper should have caught it;
+      // If it still fails, check project/region and any App Check enforcement.
+    }
   };
 
   // ─── Derive drink icon + text ───────────────
@@ -256,10 +279,7 @@ export default function MinglesScreen() {
         />
         <TouchableOpacity
           style={styles.overlayTouchableTips}
-          onPress={() => {
-            setPopupFlag("tips");
-            setShowPopupTips(true);
-          }}
+          onPress={handleTipJar}          
           activeOpacity={0.6}
         />
 

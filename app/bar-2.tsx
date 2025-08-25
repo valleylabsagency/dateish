@@ -35,6 +35,8 @@ import { ProfileContext } from "../contexts/ProfileContext";
 import { useIsFocused } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
 import Navbar from "@/components/Navbar";
+import { spendMoneys, getMessageCost } from '../services/moneys';
+import { MoneysContext } from "../contexts/MoneysContext";
 
 const steamboat = require('../assets/videos/steamboatwillie.mp4');
 
@@ -121,6 +123,8 @@ export default function Bar2Screen() {
   const isFocused = useIsFocused();
 
   const pulse = useRef(new Animated.Value(0)).current;
+
+  const { triggerSpend } = useContext(MoneysContext);
 
   useEffect(() => {
     if (!pointerTarget) {
@@ -343,6 +347,16 @@ useEffect(() => {
       : { justifyContent: "space-around" },
   ];
 
+  const openFirstMessageModal = () => {
+    setModalVisible(false);
+    setTimeout(() => setFirstMessageModalVisible(true), 50);
+  };
+  
+  const openChitChatModal = () => {
+    setModalVisible(false);
+    setTimeout(() => setChitChatModalVisible(true), 50);
+  };
+  
   const handleChatPress = async () => {
     const currentUserId = auth.currentUser?.uid!;
     const partnerId = selectedProfile.id;
@@ -357,7 +371,7 @@ useEffect(() => {
     );
 
     if (msgsSnap.empty) {
-      setFirstMessageModalVisible(true);
+      openFirstMessageModal();
     } else {
       router.push(`/chat?partner=${partnerId}`);
     }
@@ -374,6 +388,10 @@ useEffect(() => {
     setSendingFirstMessage(true);
 
     try {
+      const cost = getMessageCost();
+      await spendMoneys({ amount: cost, reason: "start-chat-first-message" });
+      triggerSpend(cost);
+
       const currentUserId = auth.currentUser!.uid;
       const partnerId = selectedProfile.id;
       const chatId = [currentUserId, partnerId].sort().join("_");
@@ -412,9 +430,14 @@ useEffect(() => {
       setFirstMessageModalVisible(false);
       setModalVisible(false);
       // router.push(`/chat?partner=${partnerId}`);
-    } catch (err) {
+    } catch (err: any) {
+       // Friendly handling for “not enough moneys”
+       if (err?.code === "functions/failed-precondition" || /Insufficient moneys/i.test(err?.message)) {
+        Alert.alert("Out of moneys", "You don’t have enough moneys to start a new chat. Visit the shop to top up.");
+        } else {
+          Alert.alert("Error", "Could not send message. Please try again.");
+        }
       console.error(err);
-      Alert.alert("Error", "Could not send message. Please try again.");
     } finally {
       setSendingFirstMessage(false);
     }
@@ -701,7 +724,7 @@ useEffect(() => {
                   {showChitChatButton && (
                     <TouchableOpacity
                       style={styles.modalChatButton}
-                      onPress={() => setChitChatModalVisible(true)}
+                      onPress={openChitChatModal}
                     >
                       <Text style={styles.modalChatButtonText}>Chit Chat</Text>
                     </TouchableOpacity>

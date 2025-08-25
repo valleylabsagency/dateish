@@ -24,7 +24,7 @@ import PopUp from "../components/PopUp";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 import { onAuthStateChanged } from "firebase/auth";
-import { getDoc, setDoc, updateDoc, doc, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { getDoc, setDoc, updateDoc, doc, onSnapshot, serverTimestamp, setLogLevel } from "firebase/firestore";
 import { auth, firestore } from "../firebase";
 import ConfettiCannon from 'react-native-confetti-cannon';
 

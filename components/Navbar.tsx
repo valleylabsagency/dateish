@@ -17,6 +17,8 @@ import { MusicContext } from "../contexts/MusicContext";
 import PopUp from "../components/PopUp";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
+import { ProfileContext } from '../contexts/ProfileContext';
+import { MoneysContext } from "../contexts/MoneysContext";
 
 const { width, height } = Dimensions.get("window");
 const withoutBg = {
@@ -37,6 +39,16 @@ type NavbarProps = {
 export default function Navbar({ onBathroomPress, bathroomRoute }: NavbarProps) {
   const router = useRouter();
   const { showWcButton } = useContext(NavbarContext);
+
+  const { profile } = useContext(ProfileContext);
+  const { activeDrops } = useContext(MoneysContext);
+
+   const isVip = !!profile?.isVip;
+
+   const displayMoneys =
+    typeof profile?.moneys === "number"
+      ? profile!.moneys!
+      : (isVip ? 300 : 100);
 
 
   // Access the music context so we can toggle music or show loading
@@ -135,8 +147,23 @@ export default function Navbar({ onBathroomPress, bathroomRoute }: NavbarProps) 
       >
      
          
-        <Text style={styles.moneysAmount}>10</Text>
+        <Text style={styles.moneysAmount}>{displayMoneys}</Text>
         <Image style={styles.moneysImage} source={require("../assets/images/moneys.png")} />
+        {activeDrops.map(d => (
+            <Animated.Text
+              key={d.id}
+              pointerEvents="none"
+              style={[
+                styles.spendFallText,
+                {
+                  transform: [{ translateY: d.y }],
+                  opacity: d.opacity,
+                },
+              ]}
+            >
+              -{d.amount}
+            </Animated.Text>
+          ))}
         
       </TouchableOpacity>
 
@@ -212,7 +239,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 8,
     height: 35,
-    width: width * 0.26,
     paddingHorizontal: "2%",
     paddingVertical: 0,
     marginRight: "5%",
@@ -222,7 +248,7 @@ const styles = StyleSheet.create({
   moneysAmount: {
     color: "#460b2a",
     fontSize: 30,
-    letterSpacing: 0,
+    letterSpacing: -2,
     position: "relative",
     bottom: height * 0.004,
     right: width * 0.01
@@ -249,4 +275,16 @@ const styles = StyleSheet.create({
     height: 40,
     position: "absolute",
   },
+  spendFallText: {
+    position: "absolute",
+    left: "15%",         // tweak until it visually appears under the number
+    top: 0,           // starts near the top of the bar
+    fontSize: 32,
+    fontWeight: "700",
+    color: "red", // nice “spent” red; change if you prefer
+    textShadowColor: "rgba(0,0,0,0.25)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
 });

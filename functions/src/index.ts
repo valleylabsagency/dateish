@@ -9,13 +9,91 @@ import * as admin from "firebase-admin";
 import fetch from "node-fetch";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {onValueWritten} from "firebase-functions/v2/database";
-import {onCall} from "firebase-functions/v2/https";
+import {onCall, HttpsError, onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 const db = admin.firestore();
 const rtdb = admin.database();
+
+export const ping = onCall({region: "us-central1"}, async () => {
+  return {ok: true, when: Date.now()};
+});
+
+export const helloHttp = onRequest({region: "us-central1"}, (req, res) => {
+  res.status(200).send("hello from functions");
+});
+
+
+// Helper: 5pm in America/New_York every day
+export const dailyFillMoneys = onSchedule(
+  {schedule: "0 17 * * *", timeZone: "America/New_York"},
+  async () => {
+    const users = await db.collection("users").get();
+    const batch = db.batch();
+    const now = admin.firestore.Timestamp.now();
+
+    users.forEach((docSnap) => {
+      const u = docSnap.data() || {};
+      const current = Number(u.moneys || 0);
+      const base = u.isVip ? 300 : 100;
+      const newBal = Math.max(current, base);
+
+      if (newBal > current) {
+        const ref = docSnap.ref;
+        batch.update(ref, {moneys: newBal, lastFillAt: now});
+        // ledger (optional)
+        const ledgerRef = ref.collection("moneys_ledger").doc();
+        batch.set(ledgerRef, {
+          type: "fill",
+          amount: newBal - current,
+          at: now,
+          note: u.isVip ? "VIP daily fill" : "Daily fill",
+        });
+      }
+    });
+
+    if (!users.empty) await batch.commit();
+  }
+);
+
+// Happy Hour helper: 5pm–9pm local (ET assumed server-side)
+function isHappyHour(date = new Date()) {
+  const h = date.getHours();
+  return h >= 17 && h < 21;
+}
+
+// Spend moneys atomically
+export const spendMoneys = onCall({region: "us-central1"}, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Login required");
+
+  const {amount, reason} = (req.data || {}) as {amount: number; reason?: string};
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new HttpsError("invalid-argument", "amount must be > 0");
+  }
+
+  // Example: decrement from users/{uid}.moneys and write a ledger row
+  const userRef = db.collection("users").doc(uid);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    if (!snap.exists) throw new HttpsError("failed-precondition", "User doc missing");
+    const cur = Number(snap.get("moneys") || 0);
+    if (cur < amount) throw new HttpsError("failed-precondition", "Insufficient moneys");
+    tx.update(userRef, {moneys: cur - amount});
+    tx.set(userRef.collection("moneys_ledger").doc(), {
+      type: "spend",
+      amount,
+      reason: reason || null,
+      at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+  const newSnap = await userRef.get();
+  return {ok: true, newBalance: newSnap.get("moneys") ?? 0};
+});
+
 
 // Helper: send Expo push notifications
 async function sendPush(
@@ -150,4 +228,94 @@ export const broadcastStopShorts = onCall(async (req) => {
     data: {screen: "Bar"},
   });
   return {success: true};
+});
+
+async function spendForUid(uid: string, amount: number, reason?: string) {
+  const db = admin.firestore();
+  const userRef = db.collection("users").doc(uid);
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    if (!snap.exists) throw new Error("User doc missing");
+    const cur = Number(snap.get("moneys") || 0);
+    if (cur < amount) throw new Error("Insufficient moneys");
+    tx.update(userRef, { moneys: cur - amount });
+    tx.set(userRef.collection("moneys_ledger").doc(), {
+      type: "spend",
+      amount,
+      reason: reason || null,
+      at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+  const newSnap = await userRef.get();
+  return { ok: true, newBalance: newSnap.get("moneys") ?? 0 };
+}
+
+// ---------- HTTP (onRequest) versions ----------
+export const pingHttp = onRequest({ region: "us-central1" }, async (req, res) => {
+  // CORS (RN/Expo)
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+
+  try {
+    const authHeader = req.headers.authorization || "";
+    const m = authHeader.match(/^Bearer (.+)$/i);
+    if (!m) {
+      res.status(401).send("Missing bearer token");
+      return;
+    }
+    // Verify Firebase ID token
+    const decoded = await admin.auth().verifyIdToken(m[1]);
+    res.json({ ok: true, uid: decoded.uid, when: Date.now() });
+  } catch (err: any) {
+    res.status(401).send("Invalid token");
+  }
+});
+
+export const spendMoneysHttp = onRequest({ region: "us-central1" }, async (req, res) => {
+  // CORS (RN/Expo)
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+
+  try {
+    const authHeader = req.headers.authorization || "";
+    const m = authHeader.match(/^Bearer (.+)$/i);
+    if (!m) {
+      res.status(401).send("Missing bearer token");
+      return;
+    }
+    // Verify Firebase ID token
+    const decoded = await admin.auth().verifyIdToken(m[1]);
+
+    // Body can be either `{data: {...}}` (callable style) or plain JSON
+    const body = (req.body && (req.body.data ?? req.body)) || {};
+    const amount = Number(body.amount);
+    const reason = body.reason as string | undefined;
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      res.status(400).json({ error: "amount must be > 0" });
+      return;
+    }
+
+    const result = await spendForUid(decoded.uid, amount, reason);
+    res.json(result);
+  } catch (err: any) {
+    // Auth errors show as 401, others as 400 to surface message
+    if (String(err?.message || "").includes("auth")) {
+      res.status(401).send("Invalid token");
+      return;
+    }
+    res.status(400).json({ error: err?.message ?? "spend failed" });
+  }
 });

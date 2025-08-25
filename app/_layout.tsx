@@ -13,6 +13,7 @@ import {
 import { Stack, usePathname, useLocalSearchParams, Slot } from "expo-router";
 import Navbar from "../components/Navbar";
 import { NavbarContext } from '../contexts/NavbarContext';
+import { MoneysProvider } from "../contexts/MoneysContext";
 import { ProfileProvider } from "../contexts/ProfileContext";
 import { FirstTimeProvider } from "../contexts/FirstTimeContext";
 import { MusicProvider, MusicContext } from "@/contexts/MusicContext";
@@ -236,9 +237,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <InactivityHandler>
         <AuthWrapper>
           <PresenceWrapper>
-            <ForegroundGate>
-              {shouldWrapMusic ? (
-                <MusicProvider>
+            <MoneysProvider>
+              <ForegroundGate>
+                {shouldWrapMusic ? (
+                  <MusicProvider>
+                    <NotificationProvider>
+                      <FirstTimeProvider>
+                        <ProfileProvider>
+                          <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
+                            <View style={styles.container}>
+                              <NotificationDisplay />
+                              <OfflineNotice />
+                              {!hideNavbar && <Navbar />}
+                              <Stack screenOptions={{ headerShown: false }} />
+                              <StatusBar hidden />
+                            </View>
+                          </NavbarContext.Provider>
+                        </ProfileProvider>
+                      </FirstTimeProvider>
+                    </NotificationProvider>
+                  </MusicProvider>
+                ) : (
                   <NotificationProvider>
                     <FirstTimeProvider>
                       <ProfileProvider>
@@ -254,25 +273,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       </ProfileProvider>
                     </FirstTimeProvider>
                   </NotificationProvider>
-                </MusicProvider>
-              ) : (
-                <NotificationProvider>
-                  <FirstTimeProvider>
-                    <ProfileProvider>
-                      <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-                        <View style={styles.container}>
-                          <NotificationDisplay />
-                          <OfflineNotice />
-                          {!hideNavbar && <Navbar />}
-                          <Stack screenOptions={{ headerShown: false }} />
-                          <StatusBar hidden />
-                        </View>
-                      </NavbarContext.Provider>
-                    </ProfileProvider>
-                  </FirstTimeProvider>
-                </NotificationProvider>
-              )}
-            </ForegroundGate>
+                )}
+              </ForegroundGate>
+            </MoneysProvider>
           </PresenceWrapper>
         </AuthWrapper>
       </InactivityHandler>

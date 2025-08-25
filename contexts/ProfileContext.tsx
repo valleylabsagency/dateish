@@ -17,6 +17,9 @@ interface Profile {
   about?: string;
   photoUri?: string;
   drink?: string;
+  isVip?: boolean;
+  moneys?: number;
+  vipSince?: any;
 }
 
 interface ProfileContextType {
@@ -59,62 +62,42 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
   //    When a user logs out, update the previous user's doc to online:false.
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      console.log("Auth state changed. user.uid =", user?.uid ?? null);
-
       if (!user && previousUser.current) {
-        // User logged out; update the previous user to online:false.
         try {
-          const profileDocRef = doc(firestore, "users", previousUser.current.uid);
-          await setDoc(profileDocRef, { online: false }, { merge: true });
-          console.log(`Set user ${previousUser.current.uid} offline.`);
-        } catch (error) {
-          console.error("Error updating online status to false:", error);
+          const ref = doc(firestore, "users", previousUser.current.uid);
+          await setDoc(ref, { online: false }, { merge: true });
+        } catch (err) {
+          console.error("Error setting offline:", err);
         }
         previousUser.current = null;
         setCurrentUser(null);
         setProfile(null);
         setProfileComplete(false);
       } else if (user) {
-        // User logged in; update their online status to true.
         previousUser.current = user;
         setCurrentUser(user);
         try {
-          const profileDocRef = doc(firestore, "users", user.uid);
-          await setDoc(profileDocRef, { online: true }, { merge: true });
-          console.log(`Set user ${user.uid} online.`);
-        } catch (error) {
-          console.error("Error updating online status to true:", error);
+          const ref = doc(firestore, "users", user.uid);
+          await setDoc(ref, { online: true }, { merge: true });
+        } catch (err) {
+          console.error("Error setting online:", err);
         }
       }
     });
-
-    return () => {
-      unsubscribeAuth();
-    };
+    return () => unsubscribeAuth();
   }, []);
 
   // 2) Subscribe to the Firestore doc for the *currentUser*
   useEffect(() => {
     let unsubscribeDoc: Unsubscribe | null = null;
-
     if (currentUser) {
-      const userUid = currentUser.uid;
-      console.log("Subscribing to Firestore doc for:", userUid);
-
-      const profileDocRef = doc(firestore, "users", userUid);
-      unsubscribeDoc = onSnapshot(profileDocRef, (docSnap) => {
-        console.log(
-          `Profile snapshot triggered for user: ${userUid}, docSnap.exists: ${docSnap.exists()}`
-        );
-
-        if (docSnap.exists()) {
-          const data = docSnap.data() as Profile;
-          console.log("Profile data from Firestore:", JSON.stringify(data));
-
+      const ref = doc(firestore, "users", currentUser.uid);
+      unsubscribeDoc = onSnapshot(ref, (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as Profile;
           setProfile(data);
           setProfileComplete(isProfileComplete(data));
         } else {
-          console.log("No profile doc found for this user; setting empty profile object.");
           setProfile({});
           setProfileComplete(false);
         }
@@ -123,32 +106,26 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
       setProfile(null);
       setProfileComplete(false);
     }
-
     return () => {
-      if (unsubscribeDoc) {
-        console.log("Unsubscribing from previous user doc listener.");
-        unsubscribeDoc();
-      }
+      if (unsubscribeDoc) unsubscribeDoc();
     };
   }, [currentUser]);
 
   // 3) Save the updated profile data to Firestore.
   const saveProfile = async (profileData: Partial<Profile>) => {
     try {
-      if (!currentUser) {
-        console.log("No current user, cannot save profile.");
-        return;
-      }
+      if (!currentUser) return;
 
-      const newProfile = { ...(profile || {}), ...profileData };
+      // 🔒 Never let the client write server-controlled fields
+      const { moneys: _dropMoneys, isVip: _dropVip, vipSince: _dropVipSince, ...clientSafe } =
+        profileData;
+
+      const newProfile = { ...(profile || {}), ...clientSafe };
       setProfile(newProfile);
       setProfileComplete(isProfileComplete(newProfile));
 
-      const userUid = currentUser.uid;
-      const profileDocRef = doc(firestore, "users", userUid);
-      await setDoc(profileDocRef, { ...newProfile, online: true }, { merge: true });
-
-      console.log("Profile saved:", newProfile);
+      const ref = doc(firestore, "users", currentUser.uid);
+      await setDoc(ref, { ...clientSafe, online: true }, { merge: true });
     } catch (error) {
       console.error("Error saving profile:", error);
     }

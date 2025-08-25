@@ -1,15 +1,16 @@
 {
   "compilerOptions": {
-    "target": "es2020",
-    "module": "commonjs",
+    "target": "ES2020",
+    "module": "CommonJS",
+    "lib": ["ES2020"],
     "rootDir": "src",
     "outDir": "lib",
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
     "strict": true,
-    "lib": ["es2020"],           // no DOM types
-    "skipLibCheck": true,        // ignore node_modules type mismatches
-    "types": ["node"]            // only pull in node typings
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "sourceMap": true
   },
   "include": ["src"]
 }

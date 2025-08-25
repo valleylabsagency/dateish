@@ -153,7 +153,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       const chatsQ = query(
         collection(firestore, 'chats'),
-        where('users', 'array-contains', user.uid)
+        where('users', 'array-contains', user.uid),
+        where('visibleFor', 'array-contains', user.uid), 
+        orderBy('updatedAt', 'desc')                     
       );
 
       const unsubChats = onSnapshot(chatsQ, snapshot => {
@@ -161,6 +163,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         msgUnsubs.current = [];
 
         snapshot.forEach(chatDoc => {
+          const chat = chatDoc.data() as any;
+          if (!Array.isArray(chat.visibleFor) || !chat.visibleFor.includes(user.uid)) return; // extra safety
           const chatId = chatDoc.id;
           const msgsQ = query(
             collection(firestore, 'chats', chatId, 'messages'),
