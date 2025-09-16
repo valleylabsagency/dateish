@@ -10,6 +10,7 @@ import {
   Image,
   TextInput,
   ScrollView,
+  Alert,
 } from 'react-native'
 import closeIcon from '../assets/images/x.png'
 import { FontNames } from "../constants/fonts";
@@ -28,12 +29,12 @@ export interface SavedChat {
   content: string
 }
 
- 
 interface ChitChatsProps {
   visible: boolean
   onClose: () => void
   existingChats: SavedChat[]
-  onSave: (type: ChatType, content: string) => void
+  // index is optional; provided when editing an existing one
+  onSave: (type: ChatType, content: string, index?: number) => void
   onDelete: (index: number) => void
   required: boolean
   onRequiredChange: (val: boolean) => void
@@ -100,36 +101,60 @@ export default function ChitChats({
   onRequiredChange
 }: ChitChatsProps) {
   const [step, setStep] = useState<'first' | 'selectType' | 'form'>('first')
-  const [mustAnswer, setMustAnswer] = useState(false)
   const [selectedType, setSelectedType] = useState<ChatType | null>(null)
   const [inputText, setInputText] = useState('')
   const [showExample, setShowExample] = useState(false)
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
-  // Reset state when we open or close
+  // Reset state when opening/closing
   useEffect(() => {
     if (!visible) {
       setStep('first')
-      setMustAnswer(false)
       setSelectedType(null)
       setInputText('')
       setShowExample(false)
+      setEditingIndex(null)
     }
   }, [visible])
+  
+
+  // Back/Close stack behavior for all “X” actions (and Android hardware back)
+  const handleClosePress = () => {
+    if (showExample) { // example → form
+      setShowExample(false)
+      return
+    }
+    if (step === 'form') { // form → selectType (or first if we were editing)
+      if (editingIndex !== null) {
+        setEditingIndex(null)
+        setSelectedType(null)
+        setInputText('')
+        setStep('first')
+      } else {
+        setStep('selectType')
+      }
+      return
+    }
+    if (step === 'selectType') { // selectType → first
+      setStep('first')
+      return
+    }
+    // first → actually close modal
+    onClose()
+  }
 
   const handleSave = async () => {
-    if (!selectedType || !inputText.trim()) return;
-
+    if (!selectedType || !inputText.trim()) return
     try {
-      // if onSave is sync or async, this will handle both
-      await Promise.resolve(onSave(selectedType, inputText.trim()));
-      // reset local UI and go back to "My Chit Chats"
-      setSelectedType(null);
-      setInputText('');
-      setShowExample(false);
-      setStep('first');
+      await Promise.resolve(onSave(selectedType, inputText.trim(), editingIndex ?? undefined))
+      // Stay open; go back to main list view
+      setSelectedType(null)
+      setInputText('')
+      setShowExample(false)
+      setEditingIndex(null)
+      setStep('first')
     } catch (e) {
-      // optional: show an error if onSave fails
-      console.error(e);
+      console.error(e)
     }
   }
 
@@ -137,17 +162,20 @@ export default function ChitChats({
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
     [FontNames.MontserratBold]: require("../assets/fonts/Montserrat-Bold.ttf"),
-  });
-
-
-  if (!fontsLoaded) return null;
+  })
+  if (!fontsLoaded) return null
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={handleClosePress} // Android hardware back
+    >
       <View style={styles.overlay}>
         <View style={styles.container}>
-          {/* Close */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          {/* Close / Back */}
+          <TouchableOpacity style={styles.closeButton} onPress={handleClosePress}>
             <Image source={closeIcon} style={styles.closeIcon} />
           </TouchableOpacity>
 
@@ -168,14 +196,36 @@ export default function ChitChats({
               ) : (
                 existingChats.map(({ type, content }, idx) => (
                   <View key={idx} style={styles.chatRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.chatLabel}>
-                        {chatMeta[type].label}
+                    {/* Tap row to edit */}
+                    <TouchableOpacity
+                      style={{ flex: 1 }}
+                      onPress={() => {
+                        setEditingIndex(idx)
+                        setSelectedType(type)
+                        setInputText(content)
+                        setShowExample(false)
+                        setStep('form')
+                      }}
+                    >
+                      <Text style={styles.chatLabel}>{chatMeta[type].label}</Text>
+                      <Text numberOfLines={1} style={styles.chatContentPreview}>
+                        {content}
                       </Text>
-                    </View>
+                    </TouchableOpacity>
+
+                    {/* Delete with confirm */}
                     <TouchableOpacity
                       style={styles.deleteButton}
-                      onPress={() => onDelete(idx)}
+                      onPress={() => {
+                        Alert.alert(
+                          'Delete Chit Chat?',
+                          'Are you sure you want to delete this Chit Chat?',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Delete', style: 'destructive', onPress: () => onDelete(idx) },
+                          ]
+                        )
+                      }}
                     >
                       <Text style={styles.deleteX}>✕</Text>
                     </TouchableOpacity>
@@ -188,7 +238,13 @@ export default function ChitChats({
                   styles.addButton,
                   existingChats.length >= 5 && styles.addDisabled,
                 ]}
-                onPress={() => existingChats.length < 5 && setStep('selectType')}
+                onPress={() => {
+                  if (existingChats.length >= 5) return
+                  setEditingIndex(null)
+                  setSelectedType(null)
+                  setInputText('')
+                  setStep('selectType')
+                }}
                 disabled={existingChats.length >= 5}
               >
                 <Text style={styles.addButtonText}>ADD</Text>
@@ -203,8 +259,8 @@ export default function ChitChats({
                   onValueChange={onRequiredChange}
                   trackColor={{ false: '#511A31', true: '#d8bfd8' }}
                   ios_backgroundColor="#E0D0DE"
-                  thumbColor={required ? '#511A31' : '#FFFFFF'}
-                  style={{ transform: [{ scaleX: 1.6 }, { scaleY: 1.6 }] }} 
+                  thumbColor={required ? '#511A31' : '#F5E1C4'}  // OFF = offwhite like the X
+                  style={{ transform: [{ scaleX: 1.6 }, { scaleY: 1.6 }] }}
                 />
               </View>
             </>
@@ -238,7 +294,9 @@ export default function ChitChats({
             <>
               {!showExample ? (
                 <>
-                  <Text style={styles.formTitle}>{meta.label}</Text>
+                  <Text style={styles.formTitle}>
+                    {meta.label}{editingIndex !== null ? ' (Edit)' : ''}
+                  </Text>
                   <Text style={styles.formDescription}>
                     {meta.description}
                   </Text>
@@ -256,7 +314,9 @@ export default function ChitChats({
                     style={styles.saveButton}
                     onPress={handleSave}
                   >
-                    <Text style={styles.saveButtonText}>SAVE</Text>
+                    <Text style={styles.saveButtonText}>
+                      {editingIndex !== null ? 'UPDATE' : 'SAVE'}
+                    </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -289,7 +349,6 @@ const styles = StyleSheet.create({
   },
   container: {
     width: '90%',
-   // height: "60%",
     backgroundColor: '#5E2A48',
     borderRadius: 20,
     paddingVertical: 30,
@@ -346,19 +405,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: "center",
     marginBottom: 16,
+    paddingHorizontal: 20,
   },
   chatLabel: {
     fontSize: 16,
     fontWeight: '600',
     color: '#F5E1C4',
-    marginBottom: 4,
-    margin: "auto",
+    marginBottom: 2,
     textAlign: "center"
   },
-  chatContent: {
-    fontSize: 14,
+  chatContentPreview: {
+    fontSize: 12,
     color: '#E6B8C7',
-    margin: "auto",
+    textAlign: 'center',
+    opacity: 0.9,
   },
   deleteButton: {
     marginLeft: 12,
@@ -371,7 +431,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontFamily: FontNames.MontSerratSemiBold,
     position: "relative",
-    right: 30
+    right: 10,
   },
 
   addButton: {
@@ -391,7 +451,7 @@ const styles = StyleSheet.create({
     shadowRadius: 9,
     elevation: 5,
     marginBottom: 50,
-    boxShadow: "5px 9px 0px rgba(0,0,0,.3)", 
+    boxShadow: "5px 9px 0px rgba(0,0,0,.3)",
   },
   addDisabled: {
     opacity: 0.5,
@@ -479,7 +539,7 @@ const styles = StyleSheet.create({
     shadowRadius: 9,
     elevation: 5,
     marginBottom: 50,
-    boxShadow: "5px 9px 0px rgba(0,0,0,.3)", 
+    boxShadow: "5px 9px 0px rgba(0,0,0,.3)",
   },
   saveButtonText: {
     color: '#F5E1C4',

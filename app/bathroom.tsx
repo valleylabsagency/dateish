@@ -117,13 +117,25 @@ export default function BathroomScreen() {
     return () => unsubscribe()
   }, [userDocRef])
 
-  async function handleSave(type: ChatType, content: string) {
-    const newChats = [...chats, { type, content }]
-    setChats(newChats)
-    if (userDocRef) {
-      try { await updateDoc(userDocRef, { chitchats: newChats }) } catch (e) { console.error('Failed to save chitchats:', e) }
+  async function handleSave(type: ChatType, content: string, index?: number) {
+    const next = [...chats];
+    if (index != null) {
+      // edit existing
+      next[index] = { type, content };
+    } else {
+      // add new
+      next.push({ type, content });
     }
-    setShowChitChats(false)
+  
+    setChats(next);
+  
+    if (userDocRef) {
+      try {
+        await updateDoc(userDocRef, { chitchats: next });
+      } catch (e) {
+        console.error('Failed to save chitchats:', e);
+      }
+    }
   }
 
   async function handleDelete(idx: number) {
@@ -786,7 +798,7 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     position: "absolute",
-    top: verticalScale(170),
+    top: verticalScale(175),
     alignSelf: "center",
     width: "90%",
   },
@@ -797,12 +809,12 @@ const styles = StyleSheet.create({
   },
   input: {
     width: "100%",
-    fontSize: scale(18),
+    fontSize: scale(17),
     textAlign: "center",
     textAlignVertical: "center",
     color: "#908db3",
     fontFamily: FontNames.MontserratBold,
-    paddingVertical: verticalScale(2)
+    paddingVertical: verticalScale(1)
   },
   locationContainer: {
     alignItems: "center",
