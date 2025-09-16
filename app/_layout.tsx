@@ -232,15 +232,50 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return (
-   
-      <InactivityHandler>
-        <AuthProvider>
-          <PresenceWrapper>
-            <MoneysProvider>
-              <ForegroundGate>
-                {shouldWrapMusic ? (
-                  <MusicProvider>
+  return (/*
+    <AnimatedSplashScreen>
+      {demoAllowed === null ? (
+        // While we don't know yet, render a blank screen behind the splash.
+        <View style={styles.centered} />
+      ) : demoAllowed === false ? (
+        // Demo ended page (this will still be hidden by the splash overlay until it fades)
+        <ImageBackground
+          source={require("../assets/images/chat-background.png")}
+          style={styles.background}
+          resizeMode="cover"
+        >
+          <View style={styles.centered}>
+            <Text style={styles.message}>
+              Demo trial is over, thanks for participating!
+            </Text>
+          </View>
+        </ImageBackground>
+      ) : (*/
+        // Normal app
+        <InactivityHandler>
+          <AuthProvider>
+            <PresenceWrapper>
+              <MoneysProvider>
+                <ForegroundGate>
+                  {shouldWrapMusic ? (
+                    <MusicProvider>
+                      <NotificationProvider>
+                        <FirstTimeProvider>
+                          <ProfileProvider>
+                            <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
+                              <View style={styles.container}>
+                                <NotificationDisplay />
+                                <OfflineNotice />
+                                {!hideNavbar && <Navbar />}
+                                <Stack screenOptions={{ headerShown: false }} />
+                                <StatusBar hidden />
+                              </View>
+                            </NavbarContext.Provider>
+                          </ProfileProvider>
+                        </FirstTimeProvider>
+                      </NotificationProvider>
+                    </MusicProvider>
+                  ) : (
                     <NotificationProvider>
                       <FirstTimeProvider>
                         <ProfileProvider>
@@ -256,32 +291,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         </ProfileProvider>
                       </FirstTimeProvider>
                     </NotificationProvider>
-                  </MusicProvider>
-                ) : (
-                  <NotificationProvider>
-                    <FirstTimeProvider>
-                      <ProfileProvider>
-                        <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-                          <View style={styles.container}>
-                            <NotificationDisplay />
-                            <OfflineNotice />
-                            {!hideNavbar && <Navbar />}
-                            <Stack screenOptions={{ headerShown: false }} />
-                            <StatusBar hidden />
-                          </View>
-                        </NavbarContext.Provider>
-                      </ProfileProvider>
-                    </FirstTimeProvider>
-                  </NotificationProvider>
-                )}
-              </ForegroundGate>
-            </MoneysProvider>
-          </PresenceWrapper>
-        </AuthProvider>
-      </InactivityHandler>
-  
-   
+                  )}
+                </ForegroundGate>
+              </MoneysProvider>
+            </PresenceWrapper>
+          </AuthProvider>
+        </InactivityHandler>
+      /*)}
+    </AnimatedSplashScreen> */
   );
+  
 }
 
 // Add back Animated Splash Screen ^^^
