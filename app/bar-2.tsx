@@ -283,6 +283,9 @@ useEffect(() => {
 
   const [tvOn, setTvOn] = useState(false);
 
+  const [deletionFlag, setDeletionFlag] = useState<'you'|'them'|null>(null); // who deleted
+  const [checkingDeletion, setCheckingDeletion] = useState(false);
+
   useEffect(() => {
     if (!videoRef.current) return;
     if (started && tvOn) {
@@ -340,6 +343,53 @@ useEffect(() => {
     });
     return () => unsub.forEach(f => f());
   }, [profiles]);
+
+ // When the profile modal opens, figure out if the chat was deleted by you/them
+ useEffect(() => {
+   let alive = true;
+   (async () => {
+     if (!modalVisible || !selectedProfile || !auth.currentUser) {
+       if (alive) setDeletionFlag(null);
+       return;
+     }
+     setCheckingDeletion(true);
+     const currentUid = auth.currentUser.uid;
+     const partnerId = selectedProfile.id;
+     const chatId = [currentUid, partnerId].sort().join("_");
+     try {
+       const chatRef = doc(firestore, "chats", chatId);
+       const snap = await getDoc(chatRef);
+       if (!snap.exists()) {
+         // no chat at all → no banner
+         if (alive) setDeletionFlag(null);
+       } else {
+         const data: any = snap.data();
+         const vf: string[] = Array.isArray(data?.visibleFor) ? data.visibleFor : [];
+         if (!vf.includes(partnerId)) {
+           // partner removed themselves → "They deleted this chat"
+           if (alive) setDeletionFlag('them');
+         } else if (!vf.includes(currentUid)) {
+           // we shouldn't be able to read in this case (rules), but guard anyway
+           if (alive) setDeletionFlag('you');
+         } else {
+           if (alive) setDeletionFlag(null);
+         }
+       }
+     } catch (e: any) {
+       // If rules blocked reading, caller isn't in visibleFor → "You deleted this chat"
+       if (e?.code === 'permission-denied') {
+         if (alive) setDeletionFlag('you');
+       } else {
+         console.error('checkDeletionStatus error:', e);
+       }
+     } finally {
+       if (alive) setCheckingDeletion(false);
+     }
+   })();
+   return () => { alive = false; };
+ }, [modalVisible, selectedProfile]);
+
+ const messagingBlocked = deletionFlag !== null;
 
   const onlineProfiles = profiles.filter(p => onlineStatus[p.id]);
 
@@ -405,6 +455,7 @@ useEffect(() => {
   
   
   const handleChatPress = async () => {
+    if (messagingBlocked) return;
     try {
       const currentUserId = auth.currentUser?.uid!;
       const partnerId = selectedProfile.id;
@@ -447,7 +498,8 @@ useEffect(() => {
   };
 
   const sendFirstMessage = async () => {
-    if (!firstMessageText.trim()) return;
+    if (!firstMessageText.trim() || messagingBlocked) return;
+
     setSendingFirstMessage(true);
 
     try {
@@ -737,6 +789,13 @@ useEffect(() => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+          {deletionFlag && (
+            <View style={styles.deletionBanner}>
+              <Text style={styles.deletionBannerText}>
+                {deletionFlag === 'you' ? 'You deleted this chat' : 'They deleted this chat'}
+              </Text>
+            </View>
+          )}
             <TouchableOpacity
               onPress={() => setModalVisible(false)}
               style={styles.closeButton}
@@ -787,6 +846,7 @@ useEffect(() => {
                     <TouchableOpacity
                       style={styles.modalChatButton}
                       onPress={handleChatPress}
+                      disabled={messagingBlocked}
                     >
                       <Text style={styles.modalChatButtonText}>Chat</Text>
                     </TouchableOpacity>
@@ -796,6 +856,7 @@ useEffect(() => {
                     <TouchableOpacity
                       style={styles.modalChatButton}
                       onPress={openChitChatModal}
+                      disabled={messagingBlocked}
                     >
                       <Text style={styles.modalChatButtonText}>Chit Chat</Text>
                     </TouchableOpacity>
@@ -922,6 +983,13 @@ useEffect(() => {
       <Modal visible={firstMessageModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.ccContainer}>
+          {deletionFlag && (
+            <View style={[styles.deletionBanner, { alignSelf: "flex-start" }]}>
+              <Text style={styles.deletionBannerText}>
+                {deletionFlag === 'you' ? 'You deleted this chat' : 'They deleted this chat'}
+              </Text>
+            </View>
+          )}
             <Text style={styles.ccLabel}>Send a Message</Text>
             <TextInput
               style={styles.replyInput}
@@ -933,7 +1001,7 @@ useEffect(() => {
             />
             <TouchableOpacity
               style={[styles.replyButton, sendingFirstMessage && { opacity: 0.5 }]}
-              disabled={sendingFirstMessage}
+              disabled={sendingFirstMessage || messagingBlocked}
               onPress={sendFirstMessage}
             >
               <Text style={styles.replyButtonText}>
@@ -1418,6 +1486,23 @@ const styles = StyleSheet.create({
     fontFamily: FontNames.MontserratBold,
     textAlign: "center",
   },
+  deletionBanner: {
+    position: "absolute",
+    top: 10,
+    left: "30%",
+    backgroundColor: "rgba(0,0,0,0.7)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#460b2a",
+    zIndex: 5,
+  },
+  deletionBannerText: {
+    color: "red",
+    fontSize: 12,
+    fontFamily: FontNames.MontserratRegular,
+  },  
   
 });
 

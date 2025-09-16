@@ -288,7 +288,7 @@ useEffect(() => {
       Alert.alert(
         `${partnerProfile?.name || "They"} deleted this conversation.`,
         "Time to move on!",
-        [{ text: "OK", onPress: () => router.replace("/chats") }]
+        [{ text: "OK", onPress: () => router.replace("/inbox") }]
       );
     }
   });
@@ -339,7 +339,7 @@ useEffect(() => {
       Alert.alert(
         `${partnerProfile?.name || "They"} disconnected.`,
         "",
-        [{ text: "OK", onPress: () => router.replace("/chats") }]
+        [{ text: "OK", onPress: () => router.replace("/inbox") }]
       );
     }
   };

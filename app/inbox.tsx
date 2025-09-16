@@ -157,6 +157,7 @@ export default function InboxScreen() {
           {conversations.map(conv => {
             const partnerUid = conv.users.find((u: string) => u !== currentUserId)!;
             const online = partnerStatus[partnerUid];
+            const partnerRemoved = !(conv.visibleFor || []).includes(partnerUid); // partner deleted on their side
             return (
               <TouchableOpacity
                 key={conv.id}
@@ -172,6 +173,11 @@ export default function InboxScreen() {
                   online={online}
                   currentUserId={currentUserId}
                 />
+                {partnerRemoved && (
+                  <View style={listStyles.banner}>
+                    <Text style={listStyles.bannerText}>They deleted this chat</Text>
+                  </View>
+                )}
                 <TouchableOpacity
                   style={online ? listStyles.trashOnline : listStyles.trashOffline}
                   onPress={() => handleTrashPress(conv.id)}
@@ -253,6 +259,20 @@ const listStyles = StyleSheet.create({
     bottom: 0,
     width: "100%",
   },
+  banner: {
+    position: "absolute",
+    top: 6,
+    left: 10,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  bannerText: {
+    color: "#fff",
+    fontSize: 12,
+  },
+    
 });
 
 const modalStyles = StyleSheet.create({
