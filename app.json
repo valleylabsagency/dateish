@@ -31,7 +31,9 @@
       "bundleIdentifier": "com.tylerjvalley.Dateish",
       "infoPlist": {
         "NSCameraUsageDescription": "Allow Dateish to use the camera so you can take a profile photo.",
-        "UIBackgroundModes": ["remote-notification"],
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
         "NSLocationWhenInUseUsageDescription": "Allow Dateish to use your location."
       }
     },
@@ -50,17 +52,35 @@
       "expo-font",
       "expo-web-browser",
       "expo-audio",
-      ["expo-notifications", {
-        "icon": "./assets/images/icon.png",
-        "color": "#460b2a",
-        "sounds": ["./assets/sounds/push_notif.wav"]  
-      }],
-      ["expo-location", {
-        "locationWhenInUsePermission": "Allow Dateish to use your location."
-      }],
-      ["expo-camera", {
-        "cameraPermission": "Allow Dateish to use the camera so you can take a profile photo."
-      }]
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#460b2a",
+          "sounds": [
+            "./assets/sounds/push_notif.wav"
+          ]
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Dateish to use your location."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Dateish to use the camera so you can take a profile photo."
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "android_app_id": "ca-app-pub-3940256099942544~3347511713",
+          "ios_app_id": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

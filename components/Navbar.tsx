@@ -19,6 +19,11 @@ import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 import { ProfileContext } from '../contexts/ProfileContext';
 import { MoneysContext } from "../contexts/MoneysContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { doc, updateDoc, increment } from "firebase/firestore";
+import { auth, firestore } from "@/firebase";
+import { showRewarded } from "@/services/ads";
+
 
 const { width, height } = Dimensions.get("window");
 const withoutBg = {
@@ -44,12 +49,64 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
   const { profile } = useContext(ProfileContext);
   const { activeDrops } = useContext(MoneysContext);
 
-   const isVip = !!profile?.isVip;
+  const isVip = !!profile?.isVip;
 
    const displayMoneys =
     typeof profile?.moneys === "number"
       ? profile!.moneys!
       : (isVip ? 300 : 100);
+
+  type RewardState = { remaining: number; resetAt: number };
+
+  const [rewardRemaining, setRewardRemaining] = useState<number>(5);
+  const [rewardLoading, setRewardLoading] = useState(false);
+
+  function computeNextResetAt(): number {
+    const d = new Date();
+    const reset = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 17, 0, 0, 0); // 17:00 today
+    if (Date.now() >= reset.getTime()) reset.setDate(reset.getDate() + 1);         // else, today 17:00
+    return reset.getTime();
+  }
+
+  async function ensureRewardState(): Promise<RewardState> {
+    const raw = await AsyncStorage.getItem("adRewardsState");
+    let state: RewardState | null = raw ? JSON.parse(raw) : null;
+    if (!state || Date.now() >= state.resetAt) {
+      state = { remaining: 5, resetAt: computeNextResetAt() };
+      await AsyncStorage.setItem("adRewardsState", JSON.stringify(state));
+    }
+    setRewardRemaining(state.remaining);
+    return state;
+  }
+  
+  async function saveRewardState(next: RewardState) {
+    setRewardRemaining(next.remaining);
+    await AsyncStorage.setItem("adRewardsState", JSON.stringify(next));
+  }
+  
+  async function grantTenMoneys() {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    await updateDoc(doc(firestore, "users", uid), { moneys: increment(10) });
+  }
+  
+  async function handleWatchReward() {
+    if (rewardRemaining <= 0 || rewardLoading) return;
+    setRewardLoading(true);
+    try {
+      const ok = await showRewarded();
+      if (ok) {
+        await grantTenMoneys();
+        const state = await ensureRewardState();
+        const next = { ...state, remaining: Math.max(0, state.remaining - 1) };
+        await saveRewardState(next);
+      }
+    } finally {
+      setRewardLoading(false);
+    }
+  }
+  
+      
 
 
   // Access the music context so we can toggle music or show loading
@@ -65,6 +122,12 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
 
   const [showPopup, setShowPopup] = useState(false);
   const [popupFlag, setPopupFlag] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (showPopup && popupFlag === "moneys") {
+      ensureRewardState();
+    }
+  }, [showPopup, popupFlag]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -213,27 +276,46 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
     </View>
 
     <PopUp
-      visible={showPopup}
-      flag={popupFlag || undefined}
-      title="Moneys"
-      onClose={() => setShowPopup(false)}
-    >
-      <View style={moneyStyles.container}>
-        <Text style={moneyStyles.note}>
-          Every day when the bar opens, your moneys will fill up to 100
-        </Text>
+  visible={showPopup}
+  flag={popupFlag || undefined}
+  onClose={() => setShowPopup(false)}
+>
+  {popupFlag === "moneys" && (
+    <View style={moneyStyles.wrap}>
+      <Text style={moneyStyles.note}>
+        Every day when the bar opens, your moneys will fill up to 100
+      </Text>
 
-        <TouchableOpacity
-          style={moneyStyles.shopBtn}
-          onPress={() => {
-            setShowPopup(false);
-            router.push("/mingles?open=shop"); // opens Shop popup automatically
-          }}
-        >
-          <Text style={moneyStyles.shopBtnText}>Go to Shop</Text>
-        </TouchableOpacity>
-      </View>
-    </PopUp>
+      <TouchableOpacity
+        style={[moneyStyles.rewardBtn, (rewardRemaining === 0 || rewardLoading) && { opacity: 0.6 }]}
+        onPress={handleWatchReward}
+        disabled={rewardRemaining === 0 || rewardLoading}
+        activeOpacity={0.85}
+      >
+        <Image
+          source={require("../assets/images/icons/ad.png")}
+          style={moneyStyles.adIcon}
+          resizeMode="contain"
+        />
+        <Text style={moneyStyles.rewardText}>
+          {rewardLoading ? "Loading…" : "Get 10 Moneys"}
+        </Text>
+        <Text style={moneyStyles.counter}>{rewardRemaining}/5</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={moneyStyles.shopBtn}
+        onPress={() => {
+          setShowPopup(false);
+          router.push("/mingles?open=shop");
+        }}
+      >
+        <Text style={moneyStyles.shopText}>Go to Shop</Text>
+      </TouchableOpacity>
+    </View>
+  )}
+</PopUp>
+
 
 </>
   );
@@ -317,25 +399,37 @@ const styles = StyleSheet.create({
 });
 
 const moneyStyles = StyleSheet.create({
-  container: { alignItems: "center", paddingVertical: 8, paddingHorizontal: 6 },
+  wrap: { alignItems: "center", paddingTop: 6 },
   note: {
-    fontSize: 18,
-    color: "#ffe3d0",
+    color: "#d8bfd8",
+    fontSize: 16,
     textAlign: "center",
     marginBottom: 12,
   },
-  shopBtn: {
+  rewardBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     backgroundColor: "#6e1944",
     borderWidth: 3,
     borderColor: "#460b2a",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+  },
+  adIcon: { width: 26, height: 26 },
+  rewardText: { color: "#ffe3d0", fontSize: 18, fontWeight: "600" },
+  counter: { color: "#ffe3d0", fontSize: 16, marginLeft: 8, opacity: 0.9 },
+  shopBtn: {
+    marginTop: 12,
+    borderWidth: 2,
+    borderColor: "#460b2a",
     paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 16,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
-  shopBtnText: {
-    color: "#ffe3d0",
-    fontSize: 16,
-    textTransform: "uppercase",
-  },
+  shopText: { color: "#ffe3d0", fontSize: 16 },
 });
+
 

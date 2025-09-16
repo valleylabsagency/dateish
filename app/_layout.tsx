@@ -33,6 +33,9 @@ import OfflineNotice from "../components/OfflineNotice";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 
+import { initAds } from "@/services/ads";
+
+
 // Firebase imports for global notifications
 import { auth, firestore } from "../firebase";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
@@ -189,6 +192,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     NavigationBar.setVisibilityAsync("hidden");
   }, []);
+
+  useEffect(() => { initAds(); }, []);
 
   const hideNavbar = [
     "/bathroom",

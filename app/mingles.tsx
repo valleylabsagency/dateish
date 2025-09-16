@@ -26,6 +26,11 @@ import { MoneysContext } from "../contexts/MoneysContext";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { auth, firestore } from "../firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as StoreReview from "expo-store-review";
+import { Linking, Platform } from "react-native";
+import { showInterstitial } from "@/services/ads";
+
 
 
 
@@ -61,6 +66,13 @@ export default function MinglesScreen() {
 
   const [showVipPopup, setShowVipPopup] = useState(false);
 
+  const [dontPressPressed, setDontPressPressed] = useState(false);
+
+  // rating prompts
+  const [showRatePrompt, setShowRatePrompt] = useState(false);
+  const [showNoThanks, setShowNoThanks] = useState(false);
+
+
 
   // toggles the drink‐speech bubble
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
@@ -79,6 +91,51 @@ export default function MinglesScreen() {
   useEffect(() => {
     setShowWcButton(true);
   }, [setShowWcButton]);
+
+  useEffect(() => {
+    (async () => {
+      const raw = await AsyncStorage.getItem("barVisitCount");
+      const n = (raw ? parseInt(raw, 10) : 0) + 1;
+      await AsyncStorage.setItem("barVisitCount", String(n));
+  
+      const prompted = await AsyncStorage.getItem("ratingPrompted");
+      if (n === 2 && !prompted) {
+        setShowRatePrompt(true);
+      }
+    })();
+  }, []);
+
+  const ANDROID_PKG = "com.yourapp";           // TODO: your package
+const IOS_APP_ID  = "id0000000000";          // TODO: your App Store ID
+
+async function handleRateYes() {
+  setShowRatePrompt(false);
+  await AsyncStorage.setItem("ratingPrompted", "1");
+
+  // Prefer native in-app review if available
+  if (await StoreReview.isAvailableAsync()) {
+    StoreReview.requestReview();
+    return;
+  }
+
+  const url = Platform.select({
+    ios: `itms-apps://itunes.apple.com/app/${IOS_APP_ID}?action=write-review`,
+    android: `market://details?id=${ANDROID_PKG}`,
+  });
+  if (url) Linking.openURL(url);
+}
+
+async function handleRateNo() {
+  setShowRatePrompt(false);
+  setShowNoThanks(true);
+  await AsyncStorage.setItem("ratingPrompted", "1");
+  setTimeout(async () => {
+    setShowNoThanks(false);
+    await showInterstitial();
+  }, 3000);
+}
+
+  
 
   // ─── Bubble messages ─────────────────────────
   const messages = [
@@ -305,6 +362,20 @@ export default function MinglesScreen() {
           onPress={handleTipJar}          
           activeOpacity={0.6}
         />
+        <TouchableOpacity
+          style={styles.dontPressHotspot}
+          disabled={dontPressPressed}
+          onPress={async () => {
+            const ok = await showInterstitial();
+            setDontPressPressed(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.dontPressText, dontPressPressed && styles.dontPressDisabled]}>
+            {dontPressPressed ? "Told you not to press…" : "Don’t Press Here"}
+          </Text>
+        </TouchableOpacity>
+
 
         {/* 6) USER DRINK ICON + SPEECH */}
         {profile?.drink && (
@@ -485,6 +556,39 @@ export default function MinglesScreen() {
         title="Tips"
         onClose={() => setShowPopupTips(false)}
       />
+      <PopUp
+        visible={showRatePrompt}
+        title="Mr. Mingles"
+        onClose={() => setShowRatePrompt(false)}
+      >
+        <View style={{ alignItems: "center" }}>
+          <Text style={{ color: "#ffe3d0", fontSize: 18, textAlign: "center", marginBottom: 12 }}>
+            If you’re a nice awesome person, rate us in the app store!
+          </Text>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <TouchableOpacity style={shopStyles.buyBtn} onPress={handleRateYes}>
+              <Text style={shopStyles.buyText}>Yeah I’m the best</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[shopStyles.buyBtn, { backgroundColor: "rgba(255,255,255,0.06)" }]}
+              onPress={handleRateNo}
+            >
+              <Text style={{ color: "#ffe3d0" }}>No I don’t wanna</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </PopUp>
+
+      <PopUp
+        visible={showNoThanks}
+        title="Mr. Mingles"
+        onClose={() => setShowNoThanks(false)}
+      >
+        <Text style={{ color: "#ffe3d0", fontSize: 18, textAlign: "center" }}>
+          Ok no worries… Oh btw completely unrelated, here’s an ad :)
+        </Text>
+      </PopUp>
+
     </>
   );
 }
@@ -671,7 +775,22 @@ const styles = StyleSheet.create({
     color: "#e78bbb",
     textAlign: "center",
     marginBottom: 10
-  }
+  },
+  dontPressHotspot: {
+    position: "absolute",
+    bottom: "20.5%",   // tweak to sit “on the bar next to the chalkboard”
+    right: "44%",
+    width: 160,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dontPressText: {
+    color: "#ffe3d0",
+    fontSize: 16,
+    fontFamily: FontNames.MontserratRegular,
+  },
+  dontPressDisabled: { opacity: 0.6 },
 });
 const drinkModalStyles = StyleSheet.create({
   modalOverlay: {
