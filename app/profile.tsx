@@ -11,6 +11,7 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  Alert
   // Dimensions (removed in favor of size-matters)
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -76,6 +77,11 @@ export default function ProfileScreen() {
 
   // Animated value for Mr. Mingles image
   const rollAnim = useRef(new Animated.Value(500)).current;
+
+  const isMounted = useRef(true);
+  useEffect(() => {
+    return () => { isMounted.current = false; };
+  }, []);
 
   // Pre-populate fields from context
   useEffect(() => {
@@ -184,26 +190,57 @@ export default function ProfileScreen() {
 
   // Get location
   const handleRequestLocation = async () => {
+    if (!isMounted.current) return;
     setLocationLoading(true);
-    let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      alert("Permission to access location was denied.");
-      setLocationLoading(false);
-      return;
-    }
     try {
-      let currentLocation = await Location.getCurrentPositionAsync({});
-      let geocode = await Location.reverseGeocodeAsync(currentLocation.coords);
-      if (geocode.length > 0) {
-        const { city, country } = geocode[0];
-        const displayCountry = country === "United States" ? "USA" : country;
-        setLocation(`${city}, ${displayCountry}`);
+      // 1) Make sure services are ON (avoids confusion/crash paths)
+      const services = await Location.hasServicesEnabledAsync();
+      if (!services) {
+        Alert.alert("Location is off", "Please enable Location Services in Settings.");
+        return;
       }
-    } catch (error) {
-      console.error("Error fetching location:", error);
-      alert("Unable to retrieve location.");
+  
+      // 2) Ask for permission (iOS will crash here if Info.plist string is missing)
+      const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission needed",
+          canAskAgain
+            ? "We need location permission to auto-fill your city."
+            : "Location permission is denied. Enable it in Settings > Dateish."
+        );
+        return;
+      }
+  
+      // 3) Get a quick, sane-accuracy fix with a timeout
+      const pos = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 12000)),
+      ]);
+  
+      // 4) Reverse geocode (guard empty results)
+      const geo = await Location.reverseGeocodeAsync(pos.coords);
+      if (geo && geo.length > 0) {
+        const { city, region, country } = geo[0];
+        const cityStr =
+          city?.trim() ||
+          region?.trim() ||
+          ""; // sometimes 'city' is missing; fall back to region
+        const countryStr = country === "United States" ? "USA" : (country || "").trim();
+        const pretty = [cityStr, countryStr].filter(Boolean).join(", ");
+        if (isMounted.current) setLocation(pretty || ""); // never crash on undefined
+      } else {
+        Alert.alert("Hmm…", "Couldn’t figure out your city. You can type it manually.");
+      }
+    } catch (e: any) {
+      if (e?.message === "timeout") {
+        Alert.alert("Slow GPS", "Couldn’t get a fix. Try again near a window.");
+      } else {
+        console.error("Location error:", e);
+        Alert.alert("Unable to retrieve location.");
+      }
     } finally {
-      setLocationLoading(false);
+      if (isMounted.current) setLocationLoading(false);
     }
   };
 

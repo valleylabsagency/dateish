@@ -30,7 +30,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.tylerjvalley.Dateish",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "NSCameraUsageDescription": "Allow Dateish to use the camera so you can take a profile photo.",
+        "UIBackgroundModes": ["remote-notification"],
+        "NSLocationWhenInUseUsageDescription": "Allow Dateish to use your location."
       }
     },
     "android": {
@@ -52,6 +54,12 @@
         "icon": "./assets/images/icon.png",
         "color": "#460b2a",
         "sounds": ["./assets/sounds/push_notif.wav"]  
+      }],
+      ["expo-location", {
+        "locationWhenInUsePermission": "Allow Dateish to use your location."
+      }],
+      ["expo-camera", {
+        "cameraPermission": "Allow Dateish to use the camera so you can take a profile photo."
       }]
     ],
     "experiments": {

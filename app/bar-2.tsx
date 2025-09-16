@@ -238,7 +238,7 @@ useEffect(() => {
 
   const videoRef = useRef<Video>(null);
 
-  const [tvOn, setTvOn] = useState(true);
+  const [tvOn, setTvOn] = useState(false);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -592,6 +592,7 @@ useEffect(() => {
                 isLooping
                 shouldPlay={started && tvOn}  // <- key line
                 useNativeControls={false}
+                isMuted
                 onError={e => console.warn("Video error:", e)}
               />
               {!tvOn && (

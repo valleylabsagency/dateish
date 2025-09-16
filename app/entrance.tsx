@@ -12,6 +12,7 @@ import {
   Animated,
   Easing,
   Modal,
+  Alert
 } from "react-native";
 import { Video } from "expo-av";
 import { useFonts } from "expo-font";
@@ -38,6 +39,37 @@ const withoutBg = {
   ),
 }
 
+
+
+function mapFirebaseAuthError(err: any): { title: string; message: string; code?: string } {
+  const code = err?.code || "";
+  switch (code) {
+    case "auth/invalid-email":
+      return { title: "Invalid Email", message: "That email looks invalid.", code };
+    case "auth/missing-password":
+      return { title: "Missing Password", message: "Please enter your password.", code };
+    case "auth/missing-email":
+      return { title: "Missing Email", message: "Please enter your email.", code };
+    case "auth/user-not-found":
+      return { title: "Account Not Found", message: "No account found. Try signing up or check your email.", code };
+    case "auth/wrong-password":
+      return { title: "Wrong Password", message: "That password didn’t match. Try again.", code };
+    case "auth/email-already-in-use":
+      return { title: "Email Already Registered", message: "This email is already registered. Try signing in.", code };
+    case "auth/too-many-requests":
+      return { title: "Too Many Attempts", message: "Please wait a bit and try again.", code };
+    case "auth/network-request-failed":
+      return { title: "Network Error", message: "Check your internet connection and try again.", code };
+    case "auth/operation-not-allowed":
+      return { title: "Sign-in Disabled", message: "This sign-in method is not enabled.", code };
+    case "auth/no-user-uid":
+      return { title: "Unexpected Error", message: "We couldn’t complete sign-in. Please try again.", code };
+    default:
+      return { title: "Authentication Failed", message: "Please try again.", code };
+  }
+}
+
+
 // Open 5pm (17) to 5am (05), local device time
 const OPEN_HOUR = 17; // 5pm
 const CLOSE_HOUR = 5; // 5am
@@ -45,7 +77,7 @@ const CLOSE_HOUR = 5; // 5am
 function isBarOpenNow(d = new Date()) {
 const h = d.getHours();
 // 17..23 or 0..4 => OPEN, exactly 05:00:00 and after => CLOSED
-return (h >= OPEN_HOUR) || (h < CLOSE_HOUR);
+return  true//(h >= OPEN_HOUR) || (h < CLOSE_HOUR);
 }
 
 
@@ -62,6 +94,7 @@ export default function EntranceScreen() {
   const [loadingAuth, setLoadingAuth] = useState(false);
   const [authError, setAuthError] = useState(false);
   const [authFlow, setAuthFlow] = useState<'normal' | 'vipGate'>('normal');
+  const [authErrorMsg, setAuthErrorMsg] = useState<string>("");
 
   const [textWidth, setTextWidth] = useState(0);
   const scrollX = useRef(new Animated.Value(width)).current;
@@ -191,32 +224,79 @@ export default function EntranceScreen() {
   const handleSignUpOrIn = async () => {
     setLoadingAuth(true);
     setAuthError(false);
+    setAuthErrorMsg("");
     try {
-      const user = firstTime
-        ? await signUp(username, password)
-        : await login(username, password);
+      // Trim inputs to avoid accidental spaces
+      const uname = username.trim();
+      const pwd = password;
+      if (!uname || !pwd) {
+        setLoadingAuth(false);
+        setAuthError(true);
+        const title = !uname && !pwd ? "Missing Email & Password"
+          : !uname ? "Missing Email/Username"
+          : "Missing Password";
+        const message = !uname && !pwd
+          ? "Please enter your email/username and password."
+          : !uname
+          ? "Please enter your email/username."
+          : "Please enter your password.";
+        setAuthErrorMsg(message);
+        Alert.alert(title, message);
+        return;
+      }
+  
+      const res = firstTime
+        ? await signUp(uname, pwd)
+        : await login(uname, pwd);
+  
+      // Support either UserCredential or User
+      const firebaseUser =
+        (res && (res as any).user) ? (res as any).user : (res as any);
+  
+      const uid: string | undefined = firebaseUser?.uid;
+      if (!uid) {
+        // If your service returns void/null on failure, make it an explicit error
+        throw { code: "auth/no-user-uid" };
+      }
   
       // Fetch VIP status
-      const ref = doc(firestore, USERS_COLLECTION, user.uid);
+      const ref = doc(firestore, "users", uid);
       const snap = await getDoc(ref);
       const vipNow = Boolean(snap.data()?.isVip);
   
       setShowAuth(false);
   
-      // If bar is closed and user isn't VIP -> show Mr. Mingles upsell
+      // Gate on bar open or VIP
       if (!isBarOpenNow() && !vipNow) {
         setNotVipVisible(true);
         return;
       }
   
-      // Otherwise proceed
-      router.replace("/entranceAnimation");
-    } catch {
+      router.replace("/bar-2");
+    } catch (err: any) {
+      console.error("Auth error:", err?.code, err?.message || err);
+      const { title, message, code } = mapFirebaseAuthError(err);
       setAuthError(true);
+      setAuthErrorMsg(message);
+
+   // Helpful branching flows
+   if (code === "auth/email-already-in-use" && firstTime) {
+     Alert.alert(title, message, [
+       { text: "Cancel", style: "cancel" },
+       { text: "Switch to Sign In", onPress: () => setFirstTime(false) },
+     ]);
+   } else if (code === "auth/user-not-found" && !firstTime) {
+     Alert.alert(title, "No account with that email. Want to sign up?", [
+       { text: "Cancel", style: "cancel" },
+       { text: "Sign Up", onPress: () => setFirstTime(true) },
+    ]);
+   } else {
+     Alert.alert(title, message);
+   }
     } finally {
       setLoadingAuth(false);
     }
-  };
+};
 
   async function becomeVipNow() {
     const u = auth.currentUser;
@@ -405,7 +485,7 @@ export default function EntranceScreen() {
                 onChangeText={setPassword}
                 editable={!loadingAuth}
               />
-              {authError && <Text style={authStyles.error}>Auth failed</Text>}
+              {authError && <Text style={authStyles.error}>{authErrorMsg || "Authentication failed."}</Text>}
               <TouchableOpacity
                 style={authStyles.button}
                 onPress={handleSignUpOrIn}

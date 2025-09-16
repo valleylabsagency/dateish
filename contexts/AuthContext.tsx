@@ -1,23 +1,25 @@
-import React, { ReactNode, useEffect } from "react";
+// contexts/AuthContext.tsx
+import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { auth } from "../firebase";
-import { useRouter } from "expo-router";
+import type { User } from "firebase/auth";
 
-interface AuthWrapperProps {
-  children: ReactNode;
-}
+type AuthValue = { user: User | null; authReady: boolean };
 
-const AuthWrapper = ({ children }: AuthWrapperProps): JSX.Element => {
-  const router = useRouter();
+const AuthContext = createContext<AuthValue>({ user: null, authReady: false });
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(() => {
-      // Always funnel to Entrance (signed in or not)
-      router.replace("/entrance");
+    const unsub = auth.onAuthStateChanged((u) => {
+      setUser(u);
+      setAuthReady(true);
     });
-    return () => unsubscribe();
-  }, [router]);
+    return unsub;
+  }, []);
 
-  return <>{children}</>;
-};
+  return <AuthContext.Provider value={{ user, authReady }}>{children}</AuthContext.Provider>;
+}
 
-export default AuthWrapper;
+export const useAuth = () => useContext(AuthContext);

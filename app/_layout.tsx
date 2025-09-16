@@ -20,7 +20,7 @@ import { MusicProvider, MusicContext } from "@/contexts/MusicContext";
 import { NotificationProvider, NotificationContext } from "@/contexts/NotificationContext";
 import InactivityHandler from "../components/InactivityHandler";
 import PresenceWrapper from "@/contexts/PresenceContext";
-import AuthWrapper from "../contexts/AuthContext";
+import { AuthProvider } from "../contexts/AuthContext";
 import ForegroundGate from "../contexts/ForegroundGate";
 import * as Updates from "expo-updates";
 import { getDatabase, ref, onValue } from "firebase/database";
@@ -233,9 +233,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AnimatedSplashScreen>
+   
       <InactivityHandler>
-        <AuthWrapper>
+        <AuthProvider>
           <PresenceWrapper>
             <MoneysProvider>
               <ForegroundGate>
@@ -277,9 +277,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </ForegroundGate>
             </MoneysProvider>
           </PresenceWrapper>
-        </AuthWrapper>
+        </AuthProvider>
       </InactivityHandler>
-    </AnimatedSplashScreen>
+  
    
   );
 }

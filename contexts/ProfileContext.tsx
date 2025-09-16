@@ -56,6 +56,7 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
       prof.photoUri
     );
   };
+  
 
   // 1) Track user changes via onAuthStateChanged.
   //    When a user logs in, update their document to online:true.

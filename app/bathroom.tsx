@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Linking
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -84,6 +85,11 @@ export default function BathroomScreen() {
   const ddRef = useRef<TextInput>(null);
   const mmRef = useRef<TextInput>(null);
   const yyyyRef = useRef<TextInput>(null);
+
+  const isMounted = useRef(true);
+    useEffect(() => {
+      return () => { isMounted.current = false; };
+    }, []);
 
   // determine if Next should be enabled on each step
   const nextEnabled =
@@ -179,54 +185,144 @@ export default function BathroomScreen() {
     return () => clearInterval(intervalId!);
   }, [modalVisible]);
 
-  // OPEN ONBOARDING when routed from bar welcome (onboard=true) and profile not complete
-  useEffect(() => {
-    if (params.onboard === "true" && !profileComplete) {
-      setOnboardingVisible(true);
-      setOnboardingStep(0);
-    }
-  }, [params.onboard, profileComplete]);
+  function isProfileCompleteLocal(p?: any) {
+    // Adjust the fields to match your "complete" definition
+    return Boolean(p?.name && p?.age && p?.location && p?.about && p?.photoUri);
+  }
+  
+
+  // OPEN ONBOARDING when routed from bar welcome (onboard=true) AND we *know* profile is incomplete
+useEffect(() => {
+  // Prefer the context flag if it’s reliable; otherwise fall back to local computed completeness
+  const effectiveComplete =
+    (typeof profileComplete === "boolean" ? profileComplete : undefined) ??
+    isProfileCompleteLocal(profile);
+
+  // Do nothing until we can actually tell (avoid false “incomplete” before load)
+  if (effectiveComplete === undefined) return;
+
+  const shouldOnboard = params.onboard === "true" && effectiveComplete === false;
+
+  if (shouldOnboard) {
+    setOnboardingStep(0);
+    setOnboardingVisible(true);
+  } else {
+    setOnboardingVisible(false);
+  }
+}, [params.onboard, profileComplete, profile]);
+
 
   // take photo
-  const handleTakePhoto = async () => {
-    const { status } = await Camera.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      alert("Camera permissions are required to take a photo.");
+  
+const handleTakePhoto = async () => {
+  try {
+    // Ask camera permission via expo-image-picker OR expo-camera (either works)
+    const camPerm = await ImagePicker.requestCameraPermissionsAsync();
+    if (camPerm.status !== "granted") {
+      Alert.alert(
+        "Camera permission needed",
+        camPerm.canAskAgain
+          ? "Please allow camera access to take a profile photo."
+          : "Camera access is denied. Enable it in Settings > Dateish."
+      );
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-      base64: true,
-    });
-    if (!result.canceled && result.assets[0].base64) {
-      setPhotoUri(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    const result = await Promise.race([
+      ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.6,
+        base64: true
+      }),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000))
+    ]);
+
+    // User canceled
+    if (!result || (result as any).canceled) return;
+
+    const asset = (result as any).assets?.[0];
+    if (!asset?.base64) {
+      Alert.alert("Hmm…", "No image captured. Try again.");
+      return;
     }
-  };
+
+    if (isMounted.current) {
+      setPhotoUri(`data:image/jpeg;base64,${asset.base64}`);
+    }
+  } catch (e: any) {
+    if (e?.message === "timeout") {
+      Alert.alert("Camera timed out", "Try again in better light or after closing other apps.");
+    } else {
+      console.error("Camera error:", e);
+      Alert.alert("Couldn’t open camera", "Please try again.");
+    }
+  }
+};
 
   // request location
   const handleRequestLocation = async () => {
+    if (!isMounted.current) return;
     setLocationLoading(true);
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      alert("Permission to access location was denied.");
-      setLocationLoading(false);
-      return;
-    }
     try {
-      const pos = await Location.getCurrentPositionAsync({});
-      const geo = await Location.reverseGeocodeAsync(pos.coords);
-      if (geo.length) {
-        const { city, country } = geo[0];
-        setLocation(`${city}, ${country === "United States" ? "USA" : country}`);
+      // 1) Services ON?
+      const services = await Location.hasServicesEnabledAsync();
+      if (!services) {
+        Alert.alert(
+          "Location is off",
+          "Please enable Location Services in Settings.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Open Settings", onPress: () => Linking.openSettings() },
+          ]
+        );
+        return;
       }
-    } catch {
-      alert("Unable to retrieve location.");
+  
+      // 2) Permission?
+      const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission needed",
+          canAskAgain
+            ? "We need location permission to auto-fill your city."
+            : "Location permission is denied. Enable it in Settings > Dateish.",
+          [
+            { text: "Not now", style: "cancel" },
+            { text: "Open Settings", onPress: () => Linking.openSettings() },
+          ]
+        );
+        return;
+      }
+  
+      // 3) Get position (with timeout)
+      const pos = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 12000)),
+      ]);
+  
+      // 4) Reverse geocode
+      const geo = await Location.reverseGeocodeAsync(pos.coords);
+      if (geo && geo.length > 0) {
+        const { city, region, country } = geo[0];
+        const cityStr = city?.trim() || region?.trim() || "";
+        const countryStr = country === "United States" ? "USA" : (country || "").trim();
+        const pretty = [cityStr, countryStr].filter(Boolean).join(", ");
+        if (isMounted.current) setLocation(pretty || "");
+      } else {
+        Alert.alert("Hmm…", "Couldn’t figure out your city. You can type it manually.");
+      }
+    } catch (e: any) {
+      if (e?.message === "timeout") {
+        Alert.alert("Slow GPS", "Couldn’t get a fix. Try again near a window.");
+      } else {
+        console.error("Location error:", e);
+        Alert.alert("Unable to retrieve location.");
+      }
     } finally {
-      setLocationLoading(false);
+      if (isMounted.current) setLocationLoading(false);
     }
   };
+  
 
   // submit/back handler
   const handleSubmit = async () => {
@@ -242,7 +338,7 @@ export default function BathroomScreen() {
       about === orig.about &&
       photoUri === orig.photoUri
     ) {
-      router.back();
+      router.replace("/bar-2");
       return;
     }
     setIsSaving(true);
@@ -254,7 +350,7 @@ export default function BathroomScreen() {
         "Pro tip",
         "Tired of ‘Hey’ and ‘Sup’? Check out the Chit Chats for prompts worth replying to!"
       );
-      router.back();
+      router.replace("/bar-2");
     } catch (e) {
       console.error(e);
     } finally {
@@ -412,20 +508,28 @@ export default function BathroomScreen() {
 
           {onboardingStep === 2 && (
             <>
-              <TouchableOpacity style={styles.editButton} onPress={handleLocationPrompt}>
-                <Text style={styles.editButtonText}>Allow & Fill Location</Text>
-              </TouchableOpacity>
-              <TextInput
-                style={[onboardStyles.input, { marginTop: verticalScale(8) }]}
-                placeholder="City, Country"
-                placeholderTextColor="#999"
-                value={location}
-                onChangeText={setLocation}
-              />
-              <Text style={onboardStyles.comment}>
-                You can always change this if you move around :)
+            <TouchableOpacity
+              style={[onboardStyles.primaryButton, locationLoading && { opacity: 0.6 }]}
+              onPress={handleLocationPrompt}
+              disabled={locationLoading}
+              accessibilityLabel="Allow and fill location"
+              testID="btnFillLocation"
+            >
+              <Text style={onboardStyles.primaryButtonText}>
+                {locationLoading ? "Getting Location…" : "Allow & Fill Location"}
               </Text>
-            </>
+            </TouchableOpacity>
+        
+            {!!location && (
+              <View style={onboardStyles.locationPill}>
+                <Text style={onboardStyles.locationPillText}>{location}</Text>
+              </View>
+            )}
+        
+            <Text style={onboardStyles.comment}>
+              You can always change this if you move around :)
+            </Text>
+          </>
           )}
 
           {onboardingStep === 3 && (
@@ -543,29 +647,34 @@ export default function BathroomScreen() {
           />
 
           <View style={styles.locationContainer}>
-            {locationLoading ? (
-              <LottieView
-                source={withoutBg}
-                autoPlay
-                loop
-                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-              />
-            ) : (
-              <TextInput
-                style={styles.input}
-                placeholder="Location"
-                placeholderTextColor="#999"
-                value={location}
-                onChangeText={setLocation}
-              />
-            )}
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={handleRequestLocation}
-            >
-              <Text style={styles.editButtonText}>Get Location</Text>
-            </TouchableOpacity>
-          </View>
+              <View style={styles.locationInputWrap}>
+                <TextInput
+                  style={[styles.input, locationLoading && styles.inputLoadingText]}
+                  placeholder="Location"
+                  placeholderTextColor="#999"
+                  value={location}
+                  onChangeText={setLocation}
+                  editable={!locationLoading}
+                />
+                {locationLoading && (
+                  <LottieView
+                    source={withoutBg}
+                    autoPlay
+                    loop
+                    style={styles.locationInlineLoader}
+                  />
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={handleRequestLocation}
+                disabled={locationLoading}
+              >
+                <Text style={styles.editButtonText}>
+                  {locationLoading ? "Getting…" : "Get Location"}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
           <View style={styles.photoContainer}>
             {photoUri ? (
@@ -698,6 +807,21 @@ const styles = StyleSheet.create({
   locationContainer: {
     alignItems: "center",
     paddingBottom: verticalScale(4)
+  },
+  locationInputWrap: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  inputLoadingText: {
+    color: "transparent", // hide text while loader shows "in its place"
+  },
+  locationInlineLoader: {
+    position: "absolute",
+    height: scale(100),
+    width: scale(100),
+    backgroundColor: "transparent",
   },
   editButton: {
     paddingHorizontal: scale(8),
@@ -975,5 +1099,43 @@ const onboardStyles = StyleSheet.create({
     color: "#fff",
     marginHorizontal: scale(6),
     fontSize: scale(22),
+  },
+  primaryButton: {
+    backgroundColor: "#6e1944",
+    borderWidth: 4,
+    borderColor: "#460b2a",
+    paddingVertical: verticalScale(8),
+    paddingHorizontal: scale(24),
+    borderRadius: 20,
+    alignSelf: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.7,
+    shadowRadius: 6,
+    elevation: 8,
+    marginTop: verticalScale(6),
+  },
+  primaryButtonText: {
+    fontSize: scale(16),
+    color: "#ffe3d0",
+    fontFamily: FontNames.MontserratBold,
+    textTransform: "uppercase",
+    textAlign: "center",
+  },
+  locationPill: {
+    marginTop: verticalScale(10),
+    paddingVertical: verticalScale(6),
+    paddingHorizontal: scale(12),
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#fff",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignSelf: "center",
+  },
+  locationPillText: {
+    color: "#fff",
+    fontSize: scale(14),
+    fontFamily: FontNames.MontserratRegular,
+    textAlign: "center",
   },
 });
