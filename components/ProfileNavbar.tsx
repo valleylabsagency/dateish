@@ -13,10 +13,13 @@ import { MusicContext } from "../contexts/MusicContext";
 import PopUp from "../components/PopUp";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
+import { useRouter } from "expo-router";
+
 
 
 interface ProfileNavbarProps {
   onBack: () => void;
+  showBack?: boolean;
 }
 const { width, height } = Dimensions.get("window");
 
@@ -27,7 +30,7 @@ const withoutBg = {
   ),
 }
 
-export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
+export default function ProfileNavbar({ onBack, showBack = true }: ProfileNavbarProps) {
   // Access the music context so we can toggle music or show loading
   const { isPlaying, soundLoading, toggleMusic } = useContext(MusicContext);
   
@@ -39,8 +42,10 @@ export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
 
   // We track whether lines are actually visible on screen at all
   const [linesVisible, setLinesVisible] = useState(false);
-   const [showPopup, setShowPopup] = useState(false);
-    const [popupFlag, setPopupFlag] = useState<string | null>(null);
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupFlag, setPopupFlag] = useState<string | null>(null);
+  const router = useRouter();
+
 
   useEffect(() => {
     if (isPlaying) {
@@ -85,13 +90,17 @@ export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
   return (
     <>
     <View style={profileNavbarStyles.navbar}>
-      <TouchableOpacity onPress={onBack}>
-        <Image
-          source={require("../assets/images/icons/back-arrow.png")}
-          style={profileNavbarStyles.navIcon}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
+    {showBack ? (
+          <TouchableOpacity onPress={onBack}>
+            <Image
+              source={require("../assets/images/icons/back-arrow.png")}
+              style={profileNavbarStyles.navIcon}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        ) : (
+          <View style={profileNavbarStyles.navPlaceholder} />
+        )}
 
       <View style={profileNavbarStyles.navSpacer} />
 
@@ -137,12 +146,28 @@ export default function ProfileNavbar({ onBack }: ProfileNavbarProps) {
       )}
     </View>
     <PopUp
-           visible={showPopup}
-           flag={popupFlag || undefined}
-           onClose={() => setShowPopup(false)}
-         >
-           
-       </PopUp>
+  visible={showPopup}
+  flag={popupFlag || undefined}
+  title="Moneys"
+  onClose={() => setShowPopup(false)}
+>
+  <View style={moneyStyles.container}>
+    <Text style={moneyStyles.note}>
+      Every day when the bar opens, your moneys will fill up to 100
+    </Text>
+
+    <TouchableOpacity
+      style={moneyStyles.shopBtn}
+      onPress={() => {
+        setShowPopup(false);
+        router.push("/mingles?open=shop");
+      }}
+    >
+      <Text style={moneyStyles.shopBtnText}>Go to Shop</Text>
+    </TouchableOpacity>
+  </View>
+</PopUp>
+
        </>
   );
 }
@@ -162,6 +187,7 @@ const profileNavbarStyles = StyleSheet.create({
     width: 50,
     height: 50,
   },
+  navPlaceholder: { width: 50, height: 50 },
   navSpacer: {
     flex: 1,
   },
@@ -208,3 +234,27 @@ const profileNavbarStyles = StyleSheet.create({
     position: "absolute",
   },
 });
+
+const moneyStyles = StyleSheet.create({
+  container: { alignItems: "center", paddingVertical: 8, paddingHorizontal: 6 },
+  note: {
+    fontSize: 18,
+    color: "#ffe3d0",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  shopBtn: {
+    backgroundColor: "#6e1944",
+    borderWidth: 3,
+    borderColor: "#460b2a",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+  },
+  shopBtnText: {
+    color: "#ffe3d0",
+    fontSize: 16,
+    textTransform: "uppercase",
+  },
+});
+

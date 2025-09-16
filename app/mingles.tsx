@@ -9,6 +9,7 @@ import {
   Dimensions,
   Image,
   Modal,
+  ScrollView
 } from "react-native";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
@@ -22,6 +23,11 @@ import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 import { spendMoneys } from '../services/moneys';
 import { MoneysContext } from "../contexts/MoneysContext";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { auth, firestore } from "../firebase";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+
+
 
 
 const { width, height } = Dimensions.get("window");
@@ -46,11 +52,28 @@ export default function MinglesScreen() {
   const [showPopupRules, setShowPopupRules] = useState(false);
   const [showPopupTips, setShowPopupTips] = useState(false);
   const [popupFlag, setPopupFlag] = useState<string | null>(null);
+  const [vipLoading, setVipLoading] = useState(false);
+
+
+  const router = useRouter();
+  const params = useLocalSearchParams<{ open?: string }>();
+  
+
+  const [showVipPopup, setShowVipPopup] = useState(false);
+
 
   // toggles the drink‐speech bubble
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
 
   const { triggerSpend } = useContext(MoneysContext);
+
+  useEffect(() => {
+    if (params.open === "shop") {
+      setPopupFlag("shop");
+      setShowPopupShop(true);
+    }
+  }, [params.open]);
+  
 
 
   useEffect(() => {
@@ -322,39 +345,139 @@ export default function MinglesScreen() {
         flag={popupFlag || undefined}
         title="Shop"
         onClose={() => setShowPopupShop(false)}
-      />
+      >
+        <ScrollView
+          style={shopStyles.scroll}
+          contentContainerStyle={shopStyles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          bounces
+        >
+          <View style={shopStyles.container}>
+            {[
+              { amount: 30,  price: "$1"  },
+              { amount: 100, price: "$3"  },
+              { amount: 300, price: "$5"  },
+              { amount: 1000,price: "$10" },
+            ].map((p) => (
+              <View key={p.amount} style={shopStyles.row}>
+                <Text style={shopStyles.amount}>{p.amount} moneys</Text>
+                <View style={shopStyles.right}>
+                  <Text style={shopStyles.price}>{p.price}</Text>
+                  <TouchableOpacity style={shopStyles.buyBtn} onPress={() => {}}>
+                    <Text style={shopStyles.buyText}>Buy</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
 
-<PopUp
-    visible={showPopupRules}
-    flag={popupFlag || undefined}
-    title="Bar Rules"
-    onClose={() => setShowPopupRules(false)}
-  >
-  <View style={styles.rulesContainer}>
-    <View style={styles.hoursContainer}>
-      <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
-      <Text style={styles.hours}>17:00–05:00</Text>
-    </View>
+            {profile?.isVip ? (
+              <View style={[shopStyles.row, shopStyles.vipActiveRow]}>
+                <Text style={shopStyles.vipActiveText}>You're a VIP</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[shopStyles.row, shopStyles.vipRow]}
+                onPress={() => setShowVipPopup(true)}
+                activeOpacity={0.9}
+              >
+                <Text style={shopStyles.vipText}>Become a VIP</Text>
+                <View style={shopStyles.right}>
+                  <Text style={shopStyles.price}>$5 / month</Text>
+                  <View style={shopStyles.badgeWrap}>
+                    <Text style={shopStyles.badge}>24/7 Bar</Text>
+                    <Text style={shopStyles.badge}>300/day</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )}
 
-    <View style={styles.hoursContainer}>
-      <Text style={styles.hoursText}>Happy Hour:{"\n"}</Text>
-      <Text style={styles.hours}>17:00–21:00</Text>
-    </View> 
 
-    <View style={styles.hoursContainer}>
-      <View style={styles.vipContainer}>
-      <Text style={styles.vipText}>VIP</Text>
-      <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
-      </View>
-     
-      <Text style={styles.hours}>All Day Erry Day</Text>
-    </View>
+            {/* spacer so last item isn’t tight to bottom edge */}
+            <View style={{ height: 8 }} />
+          </View>
+        </ScrollView>
+      </PopUp>
 
-    <Text style={styles.ruleText}>No Nude Pics</Text>
-    <Text style={[styles.hoursText, {marginBottom: 20}]}>No Links Allowed</Text>
-    <Text style={styles.ruleText}>Age 21 and Up</Text>
-  </View>
-</PopUp>
+      <PopUp
+        visible={showVipPopup}
+        title="Become a VIP"
+        onClose={() => setShowVipPopup(false)}
+      >
+        <ScrollView
+          style={shopStyles.vipScroll}
+          contentContainerStyle={shopStyles.vipScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={shopStyles.vipContainer}>
+            <Text style={shopStyles.vipLine}>$5 a month</Text>
+            <Text style={shopStyles.vipLine}>Bar is open 24/7</Text>
+            <Text style={shopStyles.vipLine}>300 moneys a day</Text>
+
+            <TouchableOpacity
+              style={[shopStyles.buyBtn, { marginTop: 14, opacity: vipLoading ? 0.6 : 1 }]}
+              disabled={vipLoading}
+              onPress={async () => {
+                try {
+                  setVipLoading(true);
+                  const uid = auth.currentUser?.uid;
+                  if (!uid) throw new Error("No user");
+                  await updateDoc(doc(firestore, "users", uid), {
+                    isVip: true,
+                    vipSince: serverTimestamp(),
+                  });
+                  // keep ProfileContext in sync immediately
+                  await saveProfile({ isVip: true });
+                  setShowVipPopup(false);
+                  setShowPopupShop(false);
+                  alert("Congrats! You’re a VIP of Dateish! You’re way cooler now.");
+                } catch (e) {
+                  console.error(e);
+                } finally {
+                  setVipLoading(false);
+                }
+              }}
+            >
+              <Text style={shopStyles.buyText}>{vipLoading ? "Subscribing…" : "Subscribe"}</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </PopUp>
+
+
+
+
+      <PopUp
+          visible={showPopupRules}
+          flag={popupFlag || undefined}
+          title="Bar Rules"
+          onClose={() => setShowPopupRules(false)}
+        >
+        <View style={styles.rulesContainer}>
+          <View style={styles.hoursContainer}>
+            <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
+            <Text style={styles.hours}>17:00–05:00</Text>
+          </View>
+
+          <View style={styles.hoursContainer}>
+            <Text style={styles.hoursText}>Happy Hour:{"\n"}</Text>
+            <Text style={styles.hours}>17:00–21:00</Text>
+          </View> 
+
+          <View style={styles.hoursContainer}>
+            <View style={styles.vipContainer}>
+            <Text style={styles.vipText}>VIP</Text>
+            <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
+            </View>
+          
+            <Text style={styles.hours}>All Day Erry Day</Text>
+          </View>
+
+          <Text style={styles.ruleText}>No Nude Pics</Text>
+          <Text style={[styles.hoursText, {marginBottom: 20}]}>No Links Allowed</Text>
+          <Text style={styles.ruleText}>Age 21 and Up</Text>
+        </View>
+      </PopUp>
 
       <PopUp
         visible={showPopupTips}
@@ -576,3 +699,98 @@ const drinkModalStyles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
   },
 });
+
+const shopStyles = StyleSheet.create({
+  container: { marginTop: 8, paddingHorizontal: 8 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderColor: "#460b2a",
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    marginBottom: 10,
+  },
+  amount: {
+    fontSize: 22,
+    color: "#e6c9d7",
+    fontFamily: FontNames.MontserratRegular,
+  },
+  right: { alignItems: "flex-end" },
+  price: {
+    fontSize: 18,
+    color: "#ffe3d0",
+    fontFamily: FontNames.MontserratRegular,
+    marginBottom: 6,
+  },
+  buyBtn: {
+    backgroundColor: "#6e1944",
+    borderWidth: 3,
+    borderColor: "#460b2a",
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+  },
+  buyText: {
+    color: "#ffe3d0",
+    fontSize: 16,
+    fontFamily: FontNames.MontserratRegular,
+    textTransform: "uppercase",
+  },
+  vipRow: {
+    borderColor: "#b51e64",
+    backgroundColor: "rgba(110,25,68,0.25)",
+  },
+  vipText: {
+    fontSize: 22,
+    color: "#e78bbb",
+    fontFamily: FontNames.MontserratRegular,
+  },
+  badgeWrap: { flexDirection: "row", gap: 6 },
+  badge: {
+    color: "#d8bfd8",
+    fontSize: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#fff",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    overflow: "hidden",
+  },
+  vipActiveRow: {
+    borderColor: "#FFD700",
+    backgroundColor: "rgba(255,215,0,0.12)",
+  },
+  vipActiveText: {
+    flex: 1,
+    textAlign: "center",
+    color: "#FFD700",
+    fontSize: 22,
+    fontFamily: FontNames.MontserratBold,
+  },
+  
+  vipScroll: { maxHeight: height * 0.5, width: "100%" },
+  vipScrollContent: { alignItems: "center", paddingHorizontal: 12, paddingBottom: 12 },
+  
+  vipContainer: {
+    alignItems: "center",
+    paddingVertical: 6,
+    width: "100%",
+  },
+  vipLine: {
+    fontSize: 18,
+    color: "#ffe3d0",
+    fontFamily: FontNames.MontserratRegular,
+    marginBottom: 6,
+    textAlign: "center",
+    paddingHorizontal: 8,
+  },
+  
+  scroll: { maxHeight: height * 0.6, width: "100%" },
+  scrollContent: { paddingHorizontal: 8, paddingBottom: 12 },
+});
+

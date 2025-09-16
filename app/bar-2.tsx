@@ -99,6 +99,9 @@ const WELCOME_MESSAGES = [
   "Alright, enough chit chat! Go to the bathroom and make yourself a profile."
 ];
 
+const POINTER_ASSET: any = null; // require('../assets/images/hand-tap.png');
+const LAST_WELCOME_INDEX = WELCOME_MESSAGES.length - 1;
+
 export default function Bar2Screen() {
   const router = useRouter();
   const { profileComplete } = useContext(ProfileContext);
@@ -141,6 +144,9 @@ export default function Bar2Screen() {
   const creepRollAnim = useRef(new Animated.Value(500)).current;
   const [creepTyped, setCreepTyped] = useState("");
   const CREEP_TEXT = "Wait for them to answer. Don't be a creep!";
+
+  const isLastWelcome = !profileComplete && welcomeIndex === LAST_WELCOME_INDEX;
+
 
 
 
@@ -250,9 +256,14 @@ useEffect(() => {
   };
 
   const skipWelcome = () => {
-    // Skip straight to profile creation
-    router.push("/bathroom?onboard=true");
+    // Jump to LAST message instead of navigating
+    const finalMsg = WELCOME_MESSAGES[LAST_WELCOME_INDEX];
+    setWelcomeIndex(LAST_WELCOME_INDEX);
+    setWelcomeTyping(false);
+    setWelcomeDisplayed(finalMsg);
+    setPointerTarget('bathroom');
   };
+  
 
   // --------------------------------------
   // Existing chat bar state
@@ -569,8 +580,7 @@ useEffect(() => {
     <>
     <Navbar
       bathroomRoute={!profileComplete ? "/bathroom?onboard=true" : "/bathroom"}
-      // or, if you want to run any local side-effects first, you can use:
-      // onBathroomPress={() => router.push(!profileComplete ? "/bathroom?onboard=true" : "/bathroom")}
+      lockNonBathroom={isLastWelcome}   // <- NEW
     />
       <ImageBackground
         source={require("../assets/images/bar-back.png")}
@@ -597,21 +607,30 @@ useEffect(() => {
             </View>
 
             <View
-              style={[styles.minglesContainer, { zIndex: 2 }]}
+              style={[styles.minglesContainer, { zIndex: 3 }]} // keep him below the bar-front (we’ll bump that to 10)
+              pointerEvents="box-none"
               collapsable={false}
               onLayout={e => {
                 const { x, y, width, height } = e.nativeEvent.layout;
                 setMinglesFrame({ x, y, width, height });
               }}
             >
-              <Pressable onPress={onMinglesPress} hitSlop={20}>
+              <Pressable
+                onPress={onMinglesPress}
+                hitSlop={20}
+                pointerEvents="box-only"
+                disabled={welcomeIndex === LAST_WELCOME_INDEX}
+                style={styles.minglesImage}            // <- pressable == exact image bounds
+              >
                 <Image
                   source={require("../assets/images/mr-mingles.png")}
-                  style={styles.minglesImage}
+                  style={{ width: "100%", height: "100%" }}
                   resizeMode="contain"
                 />
               </Pressable>
             </View>
+
+
             {/* Pointer → Mr. Mingles (after first line) */}
             {pointerTarget === 'mingles' && minglesFrame && (
               <Animated.View
@@ -619,36 +638,65 @@ useEffect(() => {
                 style={[
                   styles.pointerBase,
                   {
-                    top:  minglesFrame.y + minglesFrame.height * 0.25,
-                    left: minglesFrame.x + minglesFrame.width  * 0.60,
-                    transform: [{ rotate: '-90deg' }, { scale: pointerScale }],
+                    // put it on the OTHER side (left) of Mr. Mingles
+                    top:  minglesFrame.y + minglesFrame.height * 0.42,
+                    left: minglesFrame.x - 20, // slightly outside the left edge
+                    transform: [{ rotate: '15deg' }, { scale: pointerScale }],
+                    zIndex: 30,
                   },
                 ]}
               >
-                <MaterialIcons name="touch-app" size={48} color="#fff" />
+                {POINTER_ASSET ? (
+                  <Image source={POINTER_ASSET} style={{ width: 58, height: 58 }} />
+                ) : (
+                  // fallback if you haven't added a hand image yet
+                  <MaterialIcons name="pan-tool-alt" size={48} color="#ffe3d0" />
+                )}
               </Animated.View>
             )}
 
-            {/* Pointer → Bathroom (on final line). Adjust top/left if your icon lives elsewhere */}
+            
+
+
+
+            {/* Pointer → Bathroom (on final line) */}
             {pointerTarget === 'bathroom' && (
               <Animated.View
                 pointerEvents="none"
                 style={[
                   styles.pointerBase,
                   styles.pointerBathroom,
-                  { transform: [{ rotate: '-25deg' }, { scale: pointerScale }] },
+                  { transform: [{ rotate: '-15deg' }, { scale: pointerScale }], zIndex: 30 },
                 ]}
               >
-                <MaterialIcons name="touch-app" size={48} color="#fff" />
+                {POINTER_ASSET ? (
+                  <Image source={POINTER_ASSET} style={{ width: 58, height: 58 }} />
+                ) : (
+                  <MaterialIcons name="pan-tool-alt" size={48} color="#fff" />
+                )}
               </Animated.View>
             )}
 
-            {/* Skip button */}
+
+           {/* Skip button (hidden on last message) */}
+            {!profileComplete && welcomeIndex < LAST_WELCOME_INDEX && (
             <TouchableOpacity style={styles.skipButton} onPress={skipWelcome}>
               <Text style={styles.skipText}>Skip</Text>
             </TouchableOpacity>
+          )}
           </View>
         )}
+        {/* Shield: during welcome messages, swallow any stray taps */}
+        {!profileComplete && (
+          <View
+            style={styles.touchShield}
+            onStartShouldSetResponder={() => true}
+            onResponderRelease={() => {}}
+          />
+        )}
+
+        
+
 
         {/* ─── START CHAT SCREEN (profile complete, not started) ───────── */}
         {profileComplete && !started && (
@@ -1062,9 +1110,11 @@ useEffect(() => {
       )}
 
 
-      <View style={styles.bottomNavbarContainer}>
-        <BottomNavbar selectedTab="bar-2" />
-      </View>
+      {profileComplete && (
+        <View style={styles.bottomNavbarContainer}>
+          <BottomNavbar selectedTab="bar-2" />
+        </View>
+      )}
 
     </>
   );
@@ -1105,6 +1155,12 @@ const styles = StyleSheet.create({
     bottom: 10,
   },
 
+  touchShield: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 2, // below Mr. Mingles (zIndex 5) and Skip (zIndex 6), above background
+  },
+
   // ─── Mr. Mingles ──────────────────────────────
   minglesContainer: {
     position: "absolute",
@@ -1118,6 +1174,7 @@ const styles = StyleSheet.create({
   minglesImage: {
     width: width * 0.8,
     height: height * 0.75,
+    alignSelf: "center"
   },
 
   // Skip (welcome)
@@ -1191,7 +1248,7 @@ const styles = StyleSheet.create({
     width: "90%",
     height: 65,
     borderRadius: 20,
-    zIndex: 10,
+    zIndex: 20,
     paddingTop: 8,
     boxShadow: "0px 9px 0px rgba(0,0,0,.3)", 
    
@@ -1215,7 +1272,7 @@ const styles = StyleSheet.create({
     top: "55%",
     right: 0,
     width: "100%",
-    zIndex: 5,
+    zIndex: 25,
   },
   avatarImage: {
     width: "100%",
@@ -1228,7 +1285,7 @@ const styles = StyleSheet.create({
     bottom: "-5%",
     width: "100%",
     alignItems: "center",
-    zIndex: 2,
+    zIndex: 10,
   },
   barFront: {
     width: "100%",

@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   Animated,
   Platform,
-  Dimensions
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { NavbarContext } from "../contexts/NavbarContext";
@@ -33,10 +33,11 @@ type NavbarProps = {
   onBathroomPress?: () => void;
   /** If provided (and onBathroomPress is not), this route is used instead of "/bathroom". */
   bathroomRoute?: string; // e.g. "/bathroom?onboard=true"
+  lockNonBathroom?: boolean;
 };
 
 
-export default function Navbar({ onBathroomPress, bathroomRoute }: NavbarProps) {
+export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom }: NavbarProps) {
   const router = useRouter();
   const { showWcButton } = useContext(NavbarContext);
 
@@ -140,7 +141,10 @@ export default function Navbar({ onBathroomPress, bathroomRoute }: NavbarProps) 
       <View style={styles.navSpacer} />
       <TouchableOpacity 
         style={styles.moneysBar}
+        disabled={!!lockNonBathroom}
+        pointerEvents={lockNonBathroom ? "none" : "auto"}
         onPress={() => {
+          if (lockNonBathroom) return;
           setPopupFlag("moneys");
           setShowPopup(true);
         }}
@@ -177,7 +181,15 @@ export default function Navbar({ onBathroomPress, bathroomRoute }: NavbarProps) 
                 style={{ width: 600, height: 600, backgroundColor: "transparent" }}
                />
       ) : (
-        <TouchableOpacity onPress={toggleMusic} style={styles.speakerWrapper}>
+        <TouchableOpacity
+        onPress={() => {
+          if (lockNonBathroom) return;
+          toggleMusic();
+        }}
+        style={styles.speakerWrapper}
+        disabled={!!lockNonBathroom}
+        pointerEvents={lockNonBathroom ? "none" : "auto"}
+      >
           {/* speaker-no-lines is always there */}
           <Image
             source={require("../assets/images/icons/speaker-no-lines.png")}
@@ -200,13 +212,29 @@ export default function Navbar({ onBathroomPress, bathroomRoute }: NavbarProps) 
       )}
     </View>
 
-<PopUp
-       visible={showPopup}
-       flag={popupFlag || undefined}
-       onClose={() => setShowPopup(false)}
-     >
-       
-   </PopUp>
+    <PopUp
+      visible={showPopup}
+      flag={popupFlag || undefined}
+      title="Moneys"
+      onClose={() => setShowPopup(false)}
+    >
+      <View style={moneyStyles.container}>
+        <Text style={moneyStyles.note}>
+          Every day when the bar opens, your moneys will fill up to 100
+        </Text>
+
+        <TouchableOpacity
+          style={moneyStyles.shopBtn}
+          onPress={() => {
+            setShowPopup(false);
+            router.push("/mingles?open=shop"); // opens Shop popup automatically
+          }}
+        >
+          <Text style={moneyStyles.shopBtnText}>Go to Shop</Text>
+        </TouchableOpacity>
+      </View>
+    </PopUp>
+
 </>
   );
 }
@@ -286,5 +314,28 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-
 });
+
+const moneyStyles = StyleSheet.create({
+  container: { alignItems: "center", paddingVertical: 8, paddingHorizontal: 6 },
+  note: {
+    fontSize: 18,
+    color: "#ffe3d0",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  shopBtn: {
+    backgroundColor: "#6e1944",
+    borderWidth: 3,
+    borderColor: "#460b2a",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+  },
+  shopBtnText: {
+    color: "#ffe3d0",
+    fontSize: 16,
+    textTransform: "uppercase",
+  },
+});
+

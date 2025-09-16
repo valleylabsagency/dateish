@@ -78,6 +78,9 @@ export default function BathroomScreen() {
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0);
 
+  const [hasSavedInSession, setHasSavedInSession] = useState(!!profileComplete);
+
+
   // DOB step fields + refs for auto-advance
   const [dobDD, setDobDD] = useState("");
   const [dobMM, setDobMM] = useState("");
@@ -92,11 +95,19 @@ export default function BathroomScreen() {
     }, []);
 
   // determine if Next should be enabled on each step
-  const nextEnabled =
-    onboardingStep === 0 ? name.trim().length > 0
-    : onboardingStep === 1 ? dobDD.length === 2 && dobMM.length === 2 && dobYYYY.length === 4 && isValidAdult(dobDD, dobMM, dobYYYY)
-    : onboardingStep === 2 ? location.trim().length > 0
-    : true;
+  // replace your nextEnabled with this:
+const nextEnabled =
+  onboardingStep === 0 ? name.trim().length > 0
+  : onboardingStep === 1
+    ? dobDD.length === 2 &&
+      dobMM.length === 2 &&
+      dobYYYY.length === 4 &&
+      isValidAdult(dobDD, dobMM, dobYYYY) &&
+      isMinYearOk(dobYYYY)                 // <- block pre-1945
+    : onboardingStep === 2
+      ? location.trim().length > 0
+      : true;
+
 
   // show animation only on first and last step
   const showAnimatedMM = onboardingVisible && (onboardingStep === 0 || onboardingStep === 3);
@@ -105,6 +116,11 @@ export default function BathroomScreen() {
   const userDocRef = auth.currentUser
     ? doc(firestore, 'users', auth.currentUser.uid)
     : null
+
+  function isMinYearOk(yyyy: string) {
+    const y = parseInt(yyyy, 10);
+    return !isNaN(y) && y >= 1945;
+  }
 
   useEffect(() => {
     if (!userDocRef) return
@@ -357,6 +373,7 @@ const handleTakePhoto = async () => {
     try {
       await saveProfile({ name, age, location, about, photoUri });
       setProfileComplete(true);
+      setHasSavedInSession(true);
       // Post-save nudge about Chit Chats
       Alert.alert(
         "Pro tip",
@@ -510,11 +527,19 @@ const handleTakePhoto = async () => {
               <Text style={onboardStyles.comment}>
                 You won’t be able to change it after.
               </Text>
+
               {dobDD && dobMM && dobYYYY && computeAgeFromDob(dobDD, dobMM, dobYYYY) < 21 && (
                 <Text style={onboardStyles.errorText}>
                   Dateish is age 21 and up. Sorry! Hopefully see you again when you’re older. :)
                 </Text>
               )}
+
+              {dobYYYY.length === 4 && parseInt(dobYYYY, 10) < 1945 && (
+                <Text style={onboardStyles.errorText}>
+                  Are you lost? Do you need me to call your nurse?
+                </Text>
+              )}
+         
             </>
           )}
 
@@ -639,13 +664,17 @@ const handleTakePhoto = async () => {
         resizeMode="stretch"
         imageStyle={{ marginTop: moderateScale(50) }}
       >
-        <ProfileNavbar onBack={handleSubmit} />
+        <ProfileNavbar
+          onBack={() => router.replace("/bar-2")}
+          showBack={hasSavedInSession}       
+        />
         <View style={styles.formContainer}>
           <TextInput
             style={styles.input}
             placeholder="Name"
             placeholderTextColor="#999"
             value={name}
+            editable={false}           
             onChangeText={setName}
           />
 
@@ -654,6 +683,7 @@ const handleTakePhoto = async () => {
             placeholder="Age"
             placeholderTextColor="#999"
             value={age}
+            editable={false}           
             onChangeText={setAge}
             keyboardType="numeric"
           />
@@ -665,8 +695,8 @@ const handleTakePhoto = async () => {
                   placeholder="Location"
                   placeholderTextColor="#999"
                   value={location}
-                  onChangeText={setLocation}
-                  editable={!locationLoading}
+                  onChangeText={setLocation}    
+                  editable={false}
                 />
                 {locationLoading && (
                   <LottieView
@@ -754,10 +784,12 @@ const handleTakePhoto = async () => {
           </View>
         </Modal>
 
-        <TouchableOpacity
-          style={styles.hitbox}
-          onPress={() => router.push('/settings')}
-        />
+        {hasSavedInSession && (
+          <TouchableOpacity
+            style={styles.hitbox}
+            onPress={() => router.push('/settings')}
+          />
+        )}
         <TouchableOpacity
           style={styles.hitboxChats}
           onPress={() => setShowChitChats(true)}
@@ -784,6 +816,11 @@ const handleTakePhoto = async () => {
               style={{ width: 600, height: 600, backgroundColor: "transparent" }}
             />
           </View>
+        )}
+        {!hasSavedInSession && (
+          <TouchableOpacity style={styles.saveBtn} onPress={() => handleSubmit()}>
+            <Text style={styles.saveBtnText}>Save Profile</Text>
+          </TouchableOpacity>
         )}
       </ImageBackground>
     </>
@@ -898,6 +935,34 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  inputLocked: {
+    color: "#6f6d8a",        // dimmed look
+    opacity: 0.8,
+  },
+  saveBtn: {
+    position: "absolute",
+    bottom: verticalScale(60),
+    alignSelf: "center",
+    backgroundColor: "#6e1944",
+    borderWidth: 4,
+    borderColor: "#460b2a",
+    paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(28),
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.7,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  saveBtnText: {
+    color: "#ffe3d0",
+    fontSize: scale(18),
+    fontFamily: FontNames.MontserratBold,
+    textTransform: "uppercase",
+    textAlign: "center",
+  },
+  
 });
 
 const editorStyles = StyleSheet.create({
@@ -980,6 +1045,7 @@ const modalStyles = StyleSheet.create({
     padding: verticalScale(20),
     alignItems: "center",
     position: "relative",
+    overflow: "visible",      // <- allow MM to hang out of the box
   },
   modalText: {
     color: "#eceded",
@@ -1022,12 +1088,13 @@ const modalStyles = StyleSheet.create({
     borderTopColor: "#020621",
   },
   mrMingles: {
-    width: scale(350),
-    height: scale(420),
+    width: scale(380),        
+    height: scale(460),
     position: "absolute",
-    bottom: scale(-250),
-    right: scale(-140),
-    zIndex: 100
+    bottom: -verticalScale(260),
+    right: -scale(120),
+    zIndex: 100,
+    pointerEvents: "none",
   },
 });
 
