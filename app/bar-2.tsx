@@ -37,6 +37,11 @@ import { MaterialIcons } from "@expo/vector-icons";
 import Navbar from "@/components/Navbar";
 import { spendMoneys, getMessageCost } from '../services/moneys';
 import { MoneysContext } from "../contexts/MoneysContext";
+// at top with other imports
+import PopUp from "../components/PopUp";
+import { ScaledSheet } from "react-native-size-matters";
+
+
 
 const steamboat = require('../assets/videos/steamboatwillie.mp4');
 
@@ -101,6 +106,7 @@ export default function Bar2Screen() {
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
     [FontNames.MontserratBold]: require("../assets/fonts/Montserrat-Bold.ttf"),
+    [FontNames.MontserratExtraLight]: require("../assets/fonts/Montserrat-ExtraLight.ttf"),
   });
 
   const [bgFrame, setBgFrame] = useState<{ x:number, y:number, w:number, h:number } | null>(null);
@@ -125,6 +131,18 @@ export default function Bar2Screen() {
   const pulse = useRef(new Animated.Value(0)).current;
 
   const { triggerSpend } = useContext(MoneysContext);
+
+  // toast for “message sent”
+  const [sentToast, setSentToast] = useState(false);
+
+  // “don’t be a creep” popup
+  // --- "Don't be a creep" modal state (same behavior as ChatScreen) ---
+  const [creepVisible, setCreepVisible] = useState(false);
+  const creepRollAnim = useRef(new Animated.Value(500)).current;
+  const [creepTyped, setCreepTyped] = useState("");
+  const CREEP_TEXT = "Wait for them to answer. Don't be a creep!";
+
+
 
   useEffect(() => {
     if (!pointerTarget) {
@@ -157,6 +175,31 @@ useEffect(() => {
     setPointerTarget(null);             // middle lines
   }
 }, [welcomeTyping, welcomeIndex, profileComplete]);
+
+useEffect(() => {
+  Animated.timing(creepRollAnim, {
+    toValue: creepVisible ? 0 : 500,
+    duration: creepVisible ? 1000 : 0,
+    useNativeDriver: true,
+  }).start();
+}, [creepVisible]);
+
+useEffect(() => {
+  let id: NodeJS.Timeout | undefined;
+  if (creepVisible) {
+    setCreepTyped("");
+    let i = 0;
+    id = setInterval(() => {
+      i++;
+      setCreepTyped(CREEP_TEXT.substring(0, i));
+      if (i >= CREEP_TEXT.length) clearInterval(id);
+    }, 30);
+  } else {
+    setCreepTyped("");
+  }
+  return () => id && clearInterval(id);
+}, [creepVisible]);
+
   
 
   useEffect(() => {
@@ -353,29 +396,49 @@ useEffect(() => {
   };
   
   const openChitChatModal = () => {
+    setCcStep('choose');
+    setSelectedCc(null);
+    setReplyText('');
     setModalVisible(false);
     setTimeout(() => setChitChatModalVisible(true), 50);
   };
   
+  
   const handleChatPress = async () => {
-    const currentUserId = auth.currentUser?.uid!;
-    const partnerId = selectedProfile.id;
-    const chatId = [currentUserId, partnerId].sort().join("_");
-
-    // look for any existing message
-    const msgsSnap = await getDocs(
-      query(
-        collection(firestore, "chats", chatId, "messages"),
-        limit(1)
-      )
-    );
-
-    if (msgsSnap.empty) {
+    try {
+      const currentUserId = auth.currentUser?.uid!;
+      const partnerId = selectedProfile.id;
+      const chatId = [currentUserId, partnerId].sort().join("_");
+      const chatDocRef = doc(firestore, "chats", chatId);
+  
+      // Does the parent chat exist?
+      const chatSnap = await getDoc(chatDocRef);
+      if (!chatSnap.exists()) {
+        // brand new → first message flow
+        openFirstMessageModal();
+        return;
+      }
+  
+      // If *any* message exists, treat this as "already messaged" from browse
+      const msgsSnap = await getDocs(
+        query(collection(firestore, "chats", chatId, "messages"), limit(1))
+      );
+  
+      if (msgsSnap.empty) {
+        // chat doc exists but no messages (rare) → let them send one
+        openFirstMessageModal();
+      } else {
+        // EXACT requirement: show the "don't be a creep" Mingles modal instead of navigating
+        setCreepVisible(true);
+      }
+    } catch (err) {
+      console.error("handleChatPress failed:", err);
+      // fallback to first message if something weird happens
       openFirstMessageModal();
-    } else {
-      router.push(`/chat?partner=${partnerId}`);
     }
   };
+  
+  
 
   const onMinglesPress = () => {
     if (welcomeTyping) return;   // don't advance mid-typing
@@ -425,10 +488,17 @@ useEffect(() => {
         }
       );
 
-      Alert.alert("Sent!", "Your message was delivered.");
+     // REPLACE the success branch (remove the Alert.alert and navigation)
+      Alert.alert("Sent!", "Your message was delivered."); // <- remove this line
+
       setFirstMessageText("");
       setFirstMessageModalVisible(false);
       setModalVisible(false);
+
+      // show a 2s toast instead of a blocking alert
+      setSentToast(true);
+      setTimeout(() => setSentToast(false), 2000);
+
       // router.push(`/chat?partner=${partnerId}`);
     } catch (err: any) {
        // Friendly handling for “not enough moneys”
@@ -738,7 +808,20 @@ useEffect(() => {
       </Modal>
 
       {selectedProfile && (
-        <Modal visible={chitChatModalVisible} transparent animationType="fade">
+        <Modal
+        visible={chitChatModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (ccStep === 'show') {
+            setCcStep('choose');
+            setSelectedCc(null);
+            setReplyText('');
+          } else {
+            setChitChatModalVisible(false);
+          }
+        }}
+      >
           <View style={styles.overlay}>
             <View style={styles.ccContainer}>
               {profileChats.length === 0 ? (
@@ -819,10 +902,14 @@ useEffect(() => {
               <TouchableOpacity
                 style={styles.ccCloseButton}
                 onPress={() => {
-                  setChitChatModalVisible(false)
-                  setCcStep('choose')
-                  setSelectedCc(null)
-                  setReplyText('')
+                  if (ccStep === 'show') {
+                    // go back to the list instead of closing the whole modal
+                    setCcStep('choose');
+                    setSelectedCc(null);
+                    setReplyText('');
+                  } else {
+                    setChitChatModalVisible(false);
+                  }
                 }}
               >
                 <Image source={closeIcon} style={styles.closeIcon} />
@@ -863,10 +950,54 @@ useEffect(() => {
           </View>
         </View>
       </Modal>
+      {/* “Don’t be a creep” popup */}
+      <Modal
+  visible={creepVisible}
+  animationType="slide"
+  transparent
+  onRequestClose={() => setCreepVisible(false)}
+>
+  <View style={creepStyles.mingModalOverlay}>
+    <View style={creepStyles.mingModalContainer}>
+      <TouchableOpacity
+        style={creepStyles.mingModalCloseButton}
+        onPress={() => setCreepVisible(false)}
+      >
+        <Text style={creepStyles.mingModalCloseButtonText}>X</Text>
+      </TouchableOpacity>
+
+      <Text style={creepStyles.mingModalText}>{creepTyped}</Text>
+
+      <View style={creepStyles.mingTriangleContainer}>
+        <View style={creepStyles.mingOuterTriangle} />
+        <View style={creepStyles.mingInnerTriangle} />
+      </View>
+
+      <Animated.Image
+        source={require("../assets/images/mr-mingles.png")}
+        style={[
+          creepStyles.mingMrMingles,
+          { transform: [{ translateX: creepRollAnim }] },
+        ]}
+        resizeMode="contain"
+      />
+    </View>
+  </View>
+</Modal>
+
+
+      {/* 2s toast for “Message sent” */}
+      {sentToast && (
+        <View style={styles.toast}>
+          <Text style={styles.toastText}>Message sent</Text>
+        </View>
+      )}
+
 
       <View style={styles.bottomNavbarContainer}>
         <BottomNavbar selectedTab="bar-2" />
       </View>
+
     </>
   );
 }
@@ -990,17 +1121,17 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: "#460b2a",
     width: "90%",
-    height: 70,
+    height: 65,
     borderRadius: 20,
     zIndex: 10,
-    paddingTop: 10,
+    paddingTop: 8,
     boxShadow: "0px 9px 0px rgba(0,0,0,.3)", 
    
 
   },
   
   startButtonText: {
-    fontSize: 38,
+    fontSize: 36,
     lineHeight: 38,
     fontFamily: FontNames.MontSerratSemiBold,
     textTransform: "uppercase",
@@ -1013,7 +1144,7 @@ const styles = StyleSheet.create({
   // ─── ONLINE ROW ──────────────────────────────
   onlineRow: {
     position: "absolute",
-    top: "60%",
+    top: "55%",
     right: 0,
     width: "100%",
     zIndex: 5,
@@ -1269,7 +1400,109 @@ const styles = StyleSheet.create({
     fontFamily: FontNames.MontserratRegular,
     textAlign: "center",
   },
+  toast: {
+    position: "absolute",
+    bottom: height * 0.18, // sits above BottomNavbar
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.85)",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#460b2a",
+    zIndex: 999,
+  },
+  toastText: {
+    color: "#ffe3d0",
+    fontSize: 16,
+    fontFamily: FontNames.MontserratBold,
+    textAlign: "center",
+  },
+  
 });
+
+const creepStyles = ScaledSheet.create({
+  mingModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  mingModalContainer: {
+    width: "90%",
+    height: "400@vs",
+    backgroundColor: "#020621",
+    borderWidth: "4@ms",
+    borderColor: "#fff",
+    borderRadius: "20@ms",
+    paddingVertical: "50@ms",
+    paddingHorizontal: "8@ms",
+    alignItems: "center",
+    position: "relative",
+    bottom: "18%",
+  },
+  mingModalCloseButton: {
+    position: "absolute",
+    top: "2%",
+    right: "5%",
+    zIndex: 100,
+  },
+  mingModalCloseButtonText: {
+    color: "#fff",
+    fontSize: "32@ms",
+    fontFamily: FontNames.MontserratExtraLight,
+  },
+  mingModalText: {
+    color: "#eceded",
+    fontSize: "32@ms",
+    textAlign: "center",
+    marginBottom: "20@ms",
+    fontWeight: "400",
+    fontFamily: FontNames.MontserratExtraLight,
+  },
+  mingTriangleContainer: {
+    position: "absolute",
+    bottom: "-24@ms",
+    right: "24@ms",
+    width: 0,
+    height: 0,
+  },
+  mingOuterTriangle: {
+    width: 5,
+    height: 5,
+    borderLeftWidth: "26@ms",
+    borderRightWidth: "26@ms",
+    borderTopWidth: "24@ms",
+    position: "absolute",
+    left: "-44@ms",
+    top: "-24@ms",
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#fff",
+  },
+  mingInnerTriangle: {
+    position: "absolute",
+    top: "-25@ms",
+    left: "-40@ms",
+    width: 0,
+    height: 0,
+    borderLeftWidth: "22@ms",
+    borderRightWidth: "22@ms",
+    borderTopWidth: "22@ms",
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#020621",
+  },
+  mingMrMingles: {
+    width: "350@ms",
+    height: "420@ms",
+    position: "absolute",
+    bottom: "-95%",
+    right: "-20%",
+  },
+});
+
 
 export { Bar2Screen };
 
