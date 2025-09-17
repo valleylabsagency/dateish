@@ -16,12 +16,9 @@ import {
   Linking
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-import { Camera } from "expo-camera";
 import * as Location from "expo-location";
 import { useFonts } from "expo-font";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import BottomNavbar from "../components/BottomNavbar";
 import ProfileNavbar from "../components/ProfileNavbar";
 import { ProfileContext } from "../contexts/ProfileContext";
 import { scale, verticalScale, moderateScale } from "react-native-size-matters";
@@ -32,6 +29,9 @@ import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 import closeIcon from '../assets/images/x.png'
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
+import { Camera, useCameraDevice } from "react-native-vision-camera";
+import FaceDetector from "@react-native-ml-kit/face-detection";
+
 
 // resolve the asset to get its intrinsic size
 const bathroomImg = require("../assets/images/bathroom.png");
@@ -62,6 +62,14 @@ export default function BathroomScreen() {
   const [showChitChats, setShowChitChats] = useState(false);
   const [popupFlag, setPopupFlag] = useState<string | null>(null);
   const [mustAnswer, setMustAnswer] = useState(false)
+
+  const [cameraVisible, setCameraVisible] = useState(false);
+  const cameraRef = useRef<Camera>(null);
+  const device = useCameraDevice("front");
+  const [noFaceVisible, setNoFaceVisible] = useState(false);
+  const [validating, setValidating] = useState(false);
+
+
 
   // editing-about modal
   const [editingAbout, setEditingAbout] = useState(false);
@@ -121,6 +129,21 @@ const nextEnabled =
     const y = parseInt(yyyy, 10);
     return !isNaN(y) && y >= 1945;
   }
+
+  // --- Post-capture validator (ML Kit) ---
+  async function validateFace(path: string) {
+    try {
+      // primary API used by this lib:
+      const faces = await (FaceDetector as any).detectFromFile?.(path);
+      // some versions expose processImage instead — keep a fallback:
+      const result = faces ?? (await (FaceDetector as any).processImage?.(path)) ?? [];
+      return Array.isArray(result) && result.length > 0;
+    } catch (e) {
+      console.warn("Face detection failed:", e);
+      return false;
+    }
+  }
+  
 
   useEffect(() => {
     if (!userDocRef) return
@@ -242,50 +265,37 @@ useEffect(() => {
 
   // take photo
   
-const handleTakePhoto = async () => {
-  try {
-    // Ask camera permission via expo-image-picker OR expo-camera (either works)
-    const camPerm = await ImagePicker.requestCameraPermissionsAsync();
-    if (camPerm.status !== "granted") {
-      Alert.alert(
-        "Camera permission needed",
-        camPerm.canAskAgain
-          ? "Please allow camera access to take a profile photo."
-          : "Camera access is denied. Enable it in Settings > Dateish."
-      );
+  const handleTakePhoto = async () => {
+    const status = await Camera.requestCameraPermission();
+    if (status !== "granted") {
+      Alert.alert("Camera permission needed", "Please allow camera access to take a profile photo.");
       return;
     }
-    const result = await Promise.race([
-      ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.6,
-        base64: true
-      }),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000))
-    ]);
+    setCameraVisible(true);
+  };
 
-    // User canceled
-    if (!result || (result as any).canceled) return;
-
-    const asset = (result as any).assets?.[0];
-    if (!asset?.base64) {
-      Alert.alert("Hmm…", "No image captured. Try again.");
-      return;
+  const captureAndValidate = async () => {
+    if (!cameraRef.current) return;
+    try {
+      setValidating(true);
+      const photo = await cameraRef.current.takePhoto({
+        flash: "off",
+        enableShutterSound: true,
+      });
+  
+      const path = Platform.OS === "android" ? `file://${photo.path}` : photo.path;
+      const ok = await validateFace(path);
+      if (ok) setPhotoUri(path);
+      else setNoFaceVisible(true); // show Mr. Mingles popup
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Couldn’t capture", "Please try again.");
+    } finally {
+      setValidating(false);
+      setCameraVisible(false);
     }
-
-    if (isMounted.current) {
-      setPhotoUri(`data:image/jpeg;base64,${asset.base64}`);
-    }
-  } catch (e: any) {
-    if (e?.message === "timeout") {
-      Alert.alert("Camera timed out", "Try again in better light or after closing other apps.");
-    } else {
-      console.error("Camera error:", e);
-      Alert.alert("Couldn’t open camera", "Please try again.");
-    }
-  }
-};
+  };
+  
 
   // request location
   const handleRequestLocation = async () => {
@@ -783,6 +793,80 @@ const handleTakePhoto = async () => {
             {renderOnboardingContent()}
           </View>
         </Modal>
+
+        <Modal visible={cameraVisible} animationType="slide" transparent={false}>
+          <View style={{ flex: 1, backgroundColor: "black" }}>
+            {device ? (
+              <Camera
+                ref={cameraRef}
+                style={{ flex: 1 }}
+                device={device}
+                isActive={cameraVisible}
+                photo={true}
+              />
+            ) : (
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ color: "#fff" }}>Loading camera…</Text>
+              </View>
+            )}
+
+            {/* Overlay controls */}
+            <View style={{ position: "absolute", bottom: 30, left: 0, right: 0, alignItems: "center" }}>
+              <Text style={{ color: "#fff", marginBottom: 8 }}>
+                Center your pretty face in the frame
+              </Text>
+              <TouchableOpacity
+                onPress={captureAndValidate}
+                style={{
+                  backgroundColor: "#6e1944",
+                  borderWidth: 4,
+                  borderColor: "#460b2a",
+                  paddingVertical: 10,
+                  paddingHorizontal: 24,
+                  borderRadius: 28,
+                }}
+              >
+                <Text style={{ color: "#ffe3d0", fontWeight: "700" }}>
+                  {validating ? "Checking…" : "Capture"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setCameraVisible(false)}
+                style={{ marginTop: 10, padding: 8 }}
+              >
+                <Text style={{ color: "#ddd" }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* No-face “Mr. Mingles” popup */}
+        <Modal transparent visible={noFaceVisible} animationType="fade">
+          <View style={modalStyles.modalOverlay}>
+            <TouchableOpacity
+              style={modalStyles.closeButton}
+              onPress={() => setNoFaceVisible(false)}
+            >
+              <Image source={closeIcon} style={styles.closeIcon} />
+            </TouchableOpacity>
+            <View style={modalStyles.modalContainer}>
+              <Text style={modalStyles.modalText}>
+                You need to take a picture that includes your pretty face.
+              </Text>
+              <View style={modalStyles.triangleContainer}>
+                <View style={modalStyles.outerTriangle} />
+                <View style={modalStyles.innerTriangle} />
+              </View>
+              <Animated.Image
+                source={require("../assets/images/mr-mingles.png")}
+                style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
+                resizeMode="contain"
+              />
+            </View>
+          </View>
+        </Modal>
+
 
         {hasSavedInSession && (
           <TouchableOpacity

@@ -12,7 +12,8 @@ import {
   Animated,
   Easing,
   Modal,
-  Alert
+  Alert,
+  Linking
 } from "react-native";
 import { Video } from "expo-av";
 import { useFonts } from "expo-font";
@@ -28,6 +29,9 @@ import { onAuthStateChanged } from "firebase/auth";
 import { getDoc, setDoc, updateDoc, doc, onSnapshot, serverTimestamp, setLogLevel } from "firebase/firestore";
 import { auth, firestore } from "../firebase";
 import ConfettiCannon from 'react-native-confetti-cannon';
+import { AntDesign } from "@expo/vector-icons";     // Google
+import { FontAwesome } from "@expo/vector-icons";   // Meta (Facebook)
+import { Ionicons } from "@expo/vector-icons";   
 
 const { width, height } = Dimensions.get("window");
 const MESSAGE = "Happy Hour daily! ";
@@ -111,6 +115,59 @@ export default function EntranceScreen() {
   const [vipTypedText, setVipTypedText] = useState("");
   const vipRollAnim = useRef(new Animated.Value(500)).current; // slide-in from right
 
+
+  // Email code flow (dev/test OTP)
+  const [email, setEmail] = useState("");
+  const [codePhase, setCodePhase] = useState<"idle" | "sent">("idle");
+  const [sentCode, setSentCode] = useState<string | null>(null);
+  const [enteredCode, setEnteredCode] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+
+  // ── Clipboard wizard state ───────────────────────────────────────────────
+  type AuthStep = 1 | 2 | 3 | 4;
+  type AuthMethod = "google" | "meta" | "apple" | "email" | "username" | null;
+
+  const [authStep, setAuthStep] = useState<AuthStep>(1);
+  const [authMethod, setAuthMethod] = useState<AuthMethod>(null);
+  const [newAccount, setNewAccount] = useState<boolean>(firstTime);
+
+  // inputs per path
+  const [emailAddr, setEmailAddr] = useState("");
+  const [userHandle, setUserHandle] = useState("");
+  const [pwd1, setPwd1] = useState("");
+  const [pwd2, setPwd2] = useState("");
+
+  // legal (step 4)
+  const [agreeLegal, setAgreeLegal] = useState(false);
+  const [agree21, setAgree21] = useState(false);
+  const [legalError, setLegalError] = useState(false);
+
+  // small helpers
+  const IDENT = authMethod === "email" ? emailAddr.trim() : userHandle.trim(); // what we sign in/up with
+  const termsUrl = "https://dateishoffice.wixsite.com/dateish";
+
+  function resetClipboard() {
+    setAuthStep(1);
+    setAuthMethod(null);
+    setNewAccount(firstTime);
+    setEmailAddr("");
+    setUserHandle("");
+    setPwd1("");
+    setPwd2("");
+    setAgreeLegal(false);
+    setAgree21(false);
+    setLegalError(false);
+    setAuthError(false);
+    setAuthErrorMsg("");
+  }
+
+  function openClipboard() {
+    resetClipboard();
+    setShowAuth(true);
+}
+
+
   const signSrc = isBarOpen
   ? require("../assets/images/open-sign.png")
   : require("../assets/images/closed-sign.png");
@@ -130,6 +187,64 @@ export default function EntranceScreen() {
 
   
   const USERS_COLLECTION = "users";
+
+  function ensureLegalOrWarn(action: () => void) {
+    if (!agreedLegal || !confirmed21) {
+      setLegalError(true);
+      return;
+    }
+    setLegalError(false);
+    action();
+  }
+  
+  const openLegalLink = () =>
+    Linking.openURL("https://dateishoffice.wixsite.com/dateish");
+  
+  // Dev/test OTP sender (no email backend yet)
+  async function sendEmailCode() {
+    if (!email.trim()) {
+      Alert.alert("Email required", "Please enter your email address.");
+      return;
+    }
+    // super bare email sanity check
+    const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    if (!ok) {
+      Alert.alert("Invalid email", "Please enter a valid email address.");
+      return;
+    }
+  
+    setSendingCode(true);
+    try {
+      const code = String(Math.floor(100000 + Math.random() * 900000)); // 6 digits
+      setSentCode(code);
+      setCodePhase("sent");
+      setEnteredCode("");
+      // In real prod, you'd send this via email provider / Firebase extension.
+      Alert.alert("Dev code sent", `For now, enter this test code: ${code}`);
+    } finally {
+      setSendingCode(false);
+    }
+  }
+  
+  async function verifyEmailCode() {
+    if (!sentCode) return;
+    setVerifyingCode(true);
+    try {
+      if (enteredCode.trim() === sentCode) {
+        // Approved → Entrance Animation
+        setShowAuth(false);
+        router.replace("/entranceAnimation");
+      } else {
+        Alert.alert(
+          "Authentication couldn’t finish successfully.",
+          "Please double-check your code and try again."
+        );
+      }
+    } finally {
+      setVerifyingCode(false);
+    }
+  }
+  
 
   useEffect(() => {
     let unsubUserDoc: (() => void) | undefined;
@@ -298,6 +413,98 @@ export default function EntranceScreen() {
     }
 };
 
+  async function handleReturningGoIn() {
+    setLoadingAuth(true);
+    setAuthError(false);
+      setAuthErrorMsg("");
+      try {
+        if (!IDENT || !pwd1) {
+          setAuthError(true);
+          setAuthErrorMsg("Please fill everything.");
+          return;
+      }
+        const res = await login(IDENT, pwd1);
+        const user = (res as any)?.user ?? res;
+        if (!user?.uid) throw { code: "auth/no-user-uid" };
+  
+        setShowAuth(false);
+        // keep your existing bar-open/VIP gating
+        if (!isBarOpenNow() && !isVip) {
+          setNotVipVisible(true);
+          return;
+        }
+        router.replace("/bar-2");
+      } catch (err: any) {
+        const { title, message } = mapFirebaseAuthError(err);
+        setAuthError(true);
+        setAuthErrorMsg(message);
+        Alert.alert(title, message);
+      } finally {
+        setLoadingAuth(false);
+      }
+    }
+  
+    async function handleNewGoIn() {
+      // step 4 gate
+      if (!agreeLegal || !agree21) {
+        setLegalError(true);
+        return;
+      }
+      setLegalError(false);
+  
+    setLoadingAuth(true);
+      setAuthError(false);
+      setAuthErrorMsg("");
+      try {
+        if (!IDENT || !pwd1) {
+          setAuthError(true);
+          setAuthErrorMsg("Please fill everything.");
+        return;
+      }
+        if (pwd1.length < 6) {
+          setAuthError(true);
+          setAuthErrorMsg("Password must be at least 6 characters.");
+          return;
+      }
+        if (pwd1 !== pwd2) {
+          setAuthError(true);
+          setAuthErrorMsg("Passwords do not match.");
+          return;
+        }
+        const res = await signUp(IDENT, pwd1);
+        const user = (res as any)?.user ?? res;
+        if (!user?.uid) throw { code: "auth/no-user-uid" };
+  
+        setShowAuth(false);
+        // keep your existing gating/animation
+        if (!isBarOpenNow() && !isVip) {
+          setNotVipVisible(true);
+          return;
+        }
+        router.replace("/bar-2");
+      } catch (err: any) {
+        const { title, message } = mapFirebaseAuthError(err);
+        setAuthError(true);
+        setAuthErrorMsg(message);
+        Alert.alert(title, message);
+      } finally {
+        setLoadingAuth(false);
+      }
+    }
+
+    function chooseMethod(m: AuthMethod) {
+      setAuthMethod(m);
+      // Skip step 2 for socials (you’ll plug real OAuth later)
+      if (m === "google" || m === "meta" || m === "apple") {
+        // For now: just show a toast and stay on step 1 so you can implement later
+        Alert.alert("Coming soon", "Social sign-in is coming soon. Use Email or Username today.");
+        return;
+        // If you wire OAuth, you'd do: setAuthStep(newAccount ? 4 : 3);
+      }
+      setAuthStep(2);
+    }
+    
+
   async function becomeVipNow() {
     const u = auth.currentUser;
     if (!u) {
@@ -462,56 +669,232 @@ export default function EntranceScreen() {
              onPress={() => setShowAuth(false)}
            >
              <Image source={closeIcon} style={styles.closeIcon} />
-           </TouchableOpacity>
-            <View style={authStyles.sheet}>
-              <Text style={authStyles.title}>
-                {firstTime ? "Sign Up" : "Sign In"}
-              </Text>
-              <TextInput
-                style={authStyles.input}
-                placeholder="Username"
-                placeholderTextColor="#999"
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-                editable={!loadingAuth}
-              />
-              <TextInput
-                style={authStyles.input}
-                placeholder="Password"
-                placeholderTextColor="#999"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-                editable={!loadingAuth}
-              />
-              {authError && <Text style={authStyles.error}>{authErrorMsg || "Authentication failed."}</Text>}
-              <TouchableOpacity
-                style={authStyles.button}
-                onPress={handleSignUpOrIn}
-                disabled={loadingAuth}
-              >
-                {loadingAuth
-                  ? <LottieView
-                          source={withoutBg}
-                          autoPlay
-                          loop
-                          style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-                         />
-                  : <Text style={authStyles.buttonText}>GO IN!</Text>
-                }
-              </TouchableOpacity>
-              <View style={authStyles.bottomRow}>
-                <TouchableOpacity
-                  onPress={() => setFirstTime(!firstTime)}
-                  style={authStyles.checkbox}
-                  disabled={loadingAuth}
-                >
-                  {firstTime && <Text style={authStyles.checkmark}>✓</Text>}
-                </TouchableOpacity>
-                <Text style={authStyles.checkboxLabel}>It's my first time here</Text>
-              </View>
-            </View>
+          </TouchableOpacity>
+          <View style={authStyles.sheet}>
+            {/* Title switches by step */}
+            <Text style={authStyles.title}>
+              {authStep === 1 && (newAccount ? "Create your account" : "Welcome back")}
+              {authStep === 2 && (authMethod === "email" ? "Your Email" : "Your Username")}
+              {authStep === 3 && (newAccount ? "Create a password" : "Enter your password")}
+              {authStep === 4 && "One last thing…"}
+            </Text>
+
+            {/* STEP 1 — Choose path */}
+            {authStep === 1 && (
+              <>
+                <Text style={authStyles.subtitle}>Continue with socials</Text>
+                <View style={authStyles.socialRow}>
+                  <TouchableOpacity style={authStyles.socialBtn} onPress={() => chooseMethod("google")}>
+                    <AntDesign name="google" size={28} color="#DB4437" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={authStyles.socialBtn} onPress={() => chooseMethod("meta")}>
+                    <FontAwesome name="facebook-square" size={28} color="#1877F2" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={authStyles.socialBtn} onPress={() => chooseMethod("apple")}>
+                    <Ionicons name="logo-apple" size={30} color="#000" />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={authStyles.orText}>or</Text>
+
+                <View style={{ gap: 10, width: "100%", alignItems: "center" }}>
+                  <TouchableOpacity style={authStyles.primaryBtn} onPress={() => chooseMethod("email")}>
+                    <Text style={authStyles.primaryBtnText}>Use Email</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={authStyles.secondaryBtn} onPress={() => chooseMethod("username")}>
+                    <Text style={authStyles.secondaryBtnText}>Use Username</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={authStyles.modeRow}>
+                  <Text style={authStyles.modeText}>
+                    {newAccount ? "Already have an account?" : "New here?"}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => { setNewAccount(!newAccount); setFirstTime(!newAccount); }}
+                  >
+                    <Text style={authStyles.modeLink}>
+                      {newAccount ? "Sign in" : "Create account"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* STEP 2 — Identifier */}
+            {authStep === 2 && (
+              <>
+                {authMethod === "email" ? (
+                  <TextInput
+                    style={authStyles.input}
+                    placeholder="Email address"
+                    placeholderTextColor="#999"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={emailAddr}
+                    onChangeText={setEmailAddr}
+                    editable={!loadingAuth}
+                  />
+                ) : (
+                  <TextInput
+                    style={authStyles.input}
+                    placeholder="Username"
+                    placeholderTextColor="#999"
+                    autoCapitalize="none"
+                    value={userHandle}
+                    onChangeText={setUserHandle}
+                    editable={!loadingAuth}
+                  />
+                )}
+
+                {authError ? <Text style={authStyles.error}>{authErrorMsg}</Text> : null}
+
+                <View style={authStyles.navRow}>
+                  <TouchableOpacity onPress={() => setAuthStep(1)}>
+                    <Text style={authStyles.navLink}>Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[authStyles.primaryBtn, { opacity: IDENT ? 1 : 0.6 }]}
+                    disabled={!IDENT || loadingAuth}
+                    onPress={() => setAuthStep(3)}
+                  >
+                    <Text style={authStyles.primaryBtnText}>Continue</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* STEP 3 — Password (create or enter) */}
+            {authStep === 3 && (
+              <>
+                {/* Static identifier above password(s) */}
+                {!!IDENT && (
+                  <View style={authStyles.staticInput}>
+                    <Text style={authStyles.staticInputText}>{IDENT}</Text>
+                  </View>
+                )}
+
+                {newAccount ? (
+                  <>
+                    <TextInput
+                      style={authStyles.input}
+                      placeholder="Create password"
+                      placeholderTextColor="#999"
+                      secureTextEntry
+                      value={pwd1}
+                      onChangeText={setPwd1}
+                      editable={!loadingAuth}
+                    />
+                    <TextInput
+                      style={authStyles.input}
+                      placeholder="Confirm password"
+                      placeholderTextColor="#999"
+                      secureTextEntry
+                      value={pwd2}
+                      onChangeText={setPwd2}
+                      editable={!loadingAuth}
+                    />
+                    {authError ? <Text style={authStyles.error}>{authErrorMsg}</Text> : null}
+                    <View style={authStyles.navRow}>
+                      <TouchableOpacity onPress={() => setAuthStep(2)}>
+                        <Text style={authStyles.navLink}>Back</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[authStyles.primaryBtn, { opacity: pwd1 && pwd2 ? 1 : 0.6 }]}
+                        disabled={!pwd1 || !pwd2 || loadingAuth}
+                        onPress={() => setAuthStep(4)}
+                      >
+                        <Text style={authStyles.primaryBtnText}>Continue</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <TextInput
+                      style={authStyles.input}
+                      placeholder="Password"
+                      placeholderTextColor="#999"
+                      secureTextEntry
+                      value={pwd1}
+                      onChangeText={setPwd1}
+                      editable={!loadingAuth}
+                    />
+                    {authError ? <Text style={authStyles.error}>{authErrorMsg}</Text> : null}
+                    <View style={authStyles.navRow}>
+                      <TouchableOpacity onPress={() => setAuthStep(2)}>
+                        <Text style={authStyles.navLink}>Back</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[authStyles.primaryBtn, { opacity: pwd1 ? 1 : 0.6 }]}
+                        disabled={!pwd1 || loadingAuth}
+                        onPress={handleReturningGoIn}  // GO IN here for returning users
+                      >
+                        {loadingAuth ? (
+                          <LottieView source={withoutBg} autoPlay loop style={{ width: 80, height: 80, backgroundColor: "transparent" }} />
+                        ) : (
+                          <Text style={authStyles.primaryBtnText}>GO IN!</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* STEP 4 — Legal gates (new users only) */}
+            {authStep === 4 && (
+              <>
+                <View style={authStyles.checkboxRow}>
+                  <TouchableOpacity
+                    style={[authStyles.checkbox, agreeLegal && authStyles.checkboxChecked]}
+                    onPress={() => setAgreeLegal(v => !v)}
+                  >
+                    {agreeLegal ? <Text style={authStyles.checkmark}>✓</Text> : null}
+                  </TouchableOpacity>
+                  <Text style={authStyles.legalText}>
+                    I have read and agree to the{" "}
+                    <Text style={authStyles.link} onPress={() => Linking.openURL(termsUrl)}>Terms & Conditions</Text>
+                    {" "}and{" "}
+                    <Text style={authStyles.link} onPress={() => Linking.openURL(termsUrl)}>Privacy Policy</Text>.
+                  </Text>
+                </View>
+
+                <View style={authStyles.checkboxRow}>
+                  <TouchableOpacity
+                    style={[authStyles.checkbox, agree21 && authStyles.checkboxChecked]}
+                    onPress={() => setAgree21(v => !v)}
+                  >
+                    {agree21 ? <Text style={authStyles.checkmark}>✓</Text> : null}
+                  </TouchableOpacity>
+                  <Text style={authStyles.legalText}>I confirm that I am at least 21 years old.</Text>
+                </View>
+
+                {legalError && (
+                  <Text style={authStyles.legalError}>You have to agree to the legal stuff first.</Text>
+                )}
+                {authError ? <Text style={authStyles.error}>{authErrorMsg}</Text> : null}
+
+                <View style={authStyles.navRow}>
+                  <TouchableOpacity onPress={() => setAuthStep(3)}>
+                    <Text style={authStyles.navLink}>Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={authStyles.primaryBtn}
+                    onPress={handleNewGoIn}    // GO IN here for new users
+                    disabled={loadingAuth}
+                  >
+                    {loadingAuth ? (
+                      <LottieView source={withoutBg} autoPlay loop style={{ width: 80, height: 80, backgroundColor: "transparent" }} />
+                    ) : (
+                      <Text style={authStyles.primaryBtnText}>GO IN!</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+
+          
             
           </ImageBackground>
         </View>
@@ -809,7 +1192,6 @@ const authStyles = StyleSheet.create({
   sheet:          { width: 320, padding: 20, alignItems: "center" },
   title:          { fontSize: 27, fontFamily: FontNames.MontserratBold, marginBottom: 10 },
   input:          { width: width * 0.6, borderBottomWidth: 1, borderColor: "#000", marginVertical: 8, fontSize: 18, padding: 5, color: "#000" },
-  error:          { color: "red", marginTop: 5 },
   button:         { width: 200, height: 60, backgroundColor: "#610e14", borderWidth: 5, borderColor: "#4a0a0f", borderRadius: 30, alignItems: "center", justifyContent: "center", marginTop: 10 },
   buttonText:     { fontSize: 32, color: "#fff", fontFamily: FontNames.MontserratRegular },
   bottomRow:      { flexDirection: "row", alignItems: "center", marginTop: 15 },
@@ -829,6 +1211,45 @@ const authStyles = StyleSheet.create({
     color: "#000",
     fontFamily: FontNames.MontserratBold,
   },
+  legalWrap: { width: "100%", marginTop: 4, marginBottom: 6 },
+  legalRow: { flexDirection: "row", alignItems: "center" },
+  legalText: { flex: 1, color: "#000", fontFamily: FontNames.MontserratRegular, fontSize: 14 },
+  link: { color: "#2563eb", textDecorationLine: "underline" },
+  legalError: {
+    marginTop: 6,
+    color: "red",
+    fontFamily: FontNames.MontserratRegular,
+    fontSize: 14,
+  },
+  socialWrap: { width: "100%", marginTop: 10, gap: 8 },
+  socialText: { color: "#000", fontFamily: FontNames.MontserratBold, fontSize: 14 },
+  google: {},
+  meta: {},
+  apple: {},
+
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+  divider: { flex: 1, height: 1, backgroundColor: "#000" },
+  dividerText: { color: "#000", fontFamily: FontNames.MontserratRegular, fontSize: 12, marginTop: -2 },
+
+  sectionTitle: { color: "#000", fontFamily: FontNames.MontserratBold, fontSize: 16, marginTop: 4 },
+  checkboxChecked: { backgroundColor: "#d1fae5" },
+  subtitle:       { fontSize: 16, color: "#333", marginTop: 2, marginBottom: 10, fontFamily: FontNames.MontserratRegular },
+  socialRow:      { flexDirection: "row", gap: 12, marginBottom: 8 },
+  socialBtn:      { width: 54, height: 54, borderRadius: 27, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#000" },
+  orText:         { marginVertical: 8, color: "#444", fontFamily: FontNames.MontserratRegular },
+  primaryBtn:     { minWidth: 200, height: 48, backgroundColor: "#610e14", borderWidth: 4, borderColor: "#4a0a0f", borderRadius: 24, alignItems: "center", justifyContent: "center" },
+  primaryBtnText: { color: "#fff", fontSize: 16, fontFamily: FontNames.MontserratBold },
+  secondaryBtn:   { minWidth: 200, height: 48, borderWidth: 2, borderColor: "#000", borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.85)" },
+  secondaryBtnText:{ color: "#000", fontSize: 16, fontFamily: FontNames.MontserratRegular },
+  modeRow:        { flexDirection: "row", gap: 6, marginTop: 12, alignItems: "center" },
+  modeText:       { color: "#000", fontFamily: FontNames.MontserratRegular },
+  modeLink:       { color: "#610e14", fontFamily: FontNames.MontserratBold, textDecorationLine: "underline" },
+  staticInput:    { width: width * 0.6, paddingVertical: 10, borderBottomWidth: 1, borderColor: "#000", marginBottom: 6 },
+  staticInputText:{ fontSize: 16, color: "#000", fontFamily: FontNames.MontserratRegular },
+  error:          { color: "red", marginTop: 5 },
+  navRow:         { width: "100%", marginTop: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  navLink:        { color: "#610e14", fontFamily: FontNames.MontserratBold, textDecorationLine: "underline" },
+  checkboxRow:    { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 10, paddingHorizontal: 4 },
 });
 
 const mmStyles = StyleSheet.create({
