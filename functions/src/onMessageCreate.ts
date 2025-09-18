@@ -1,6 +1,5 @@
 // functions/src/onMessageCreate.ts
 import * as functions from "firebase-functions/v2/firestore";
-import fetch from "node-fetch";
 import { getFirestore } from "firebase-admin/firestore";
 import { initializeApp } from "firebase-admin/app";
 

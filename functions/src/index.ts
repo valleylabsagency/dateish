@@ -6,7 +6,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as admin from "firebase-admin";
-import fetch from "node-fetch";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {onValueWritten} from "firebase-functions/v2/database";
 import {onCall, HttpsError, onRequest} from "firebase-functions/v2/https";

@@ -1,5 +1,4 @@
 // send-push.ts
-import fetch from "node-fetch";
 
 async function send(to: string, title: string, body: string, data: any = {}) {
   const res = await fetch("https://exp.host/--/api/v2/push/send", {
