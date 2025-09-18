@@ -38,10 +38,9 @@
       }
     },
     "android": {
-      "package": "com.tylerjvalley.Dateish",
-      "icon": "./assets/images/icon.png",
-      "googleServicesFile": "./google-services.json"
-    },
+     "package": "com.tylerjvalley.Dateish",
+     "icon": "./assets/images/icon.png"
+   },
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -53,6 +52,7 @@
       "expo-font",
       "expo-web-browser",
       "expo-audio",
+      ["expo-firebase-core", { "androidGoogleServicesFile": "./google-services.json" }],
       [
         "expo-notifications",
         {
