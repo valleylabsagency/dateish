@@ -386,6 +386,14 @@ useEffect(() => {
               ? drinkMapping[partnerProfile.drink.toLowerCase()]
               : drinkMapping["water"],
         });
+        await addDoc(collection(firestore, "chats", chatId, "messages"), {
+          text: inputMessage,
+          sender: currentUserId,
+          senderName: profile?.name ?? "",   
+          chatId,                             
+          createdAt: serverTimestamp(),
+        });
+        
       } else {
         await updateDoc(chatDocRef, {
           updatedAt: serverTimestamp(),

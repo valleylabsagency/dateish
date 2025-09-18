@@ -157,6 +157,69 @@ export const onNewMessage = onDocumentCreated(
   }
 );
 
+export const pushOnNewMessage = onDocumentCreated(
+  "chats/{chatId}/messages/{msgId}",
+  async (event) => {
+    const msg = event.data?.data() as any;
+    if (!msg) return;
+
+    const chatId = event.params.chatId as string;
+
+    // Load chat doc to get participants (and respect "visibleFor" soft-delete)
+    const chatSnap = await db.doc(`chats/${chatId}`).get();
+    if (!chatSnap.exists) return;
+    const chat = chatSnap.data() as any;
+
+    const allUsers: string[] = Array.isArray(chat.users) ? chat.users : [];
+    const recipients = allUsers.filter((uid) => uid !== msg.sender);
+
+    // Optional: don't notify people who hid this chat
+    const visibleFor: string[] = Array.isArray(chat.visibleFor)
+      ? chat.visibleFor
+      : recipients;
+    const targets = recipients.filter((uid) => visibleFor.includes(uid));
+    if (!targets.length) return;
+
+    // Fetch Expo push tokens
+    const userSnaps = await Promise.all(
+      targets.map((uid) => db.doc(`users/${uid}`).get())
+    );
+    const tokens = userSnaps
+      .map((s) => s.data()?.expoPushToken)
+      .filter(
+        (t: any) => typeof t === "string" && t.startsWith("ExponentPushToken[")
+      );
+
+    if (!tokens.length) return;
+
+    const title = msg.senderName || "New message";
+    const body = String(msg.text || "").slice(0, 140);
+
+    // Send using Expo Push API (Node 18 has global fetch)
+    const payload = tokens.map((to) => ({
+      to,
+      sound: "default", // Android channel picks up your custom sound
+      title,
+      body,
+      data: {
+        chatId,
+        partnerId: msg.sender,
+        senderName: msg.senderName || "",
+      },
+      priority: "high",
+    }));
+
+    const res = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await res.json();
+    console.log("Expo push result:", JSON.stringify(json));
+  }
+);
+
 // 2️⃣ "Bar is getting full" (Realtime DB v2)
 export const onStatusChange = onValueWritten(
   "/status/{userId}/online",

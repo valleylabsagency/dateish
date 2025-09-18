@@ -34,6 +34,7 @@ import OfflineNotice from "../components/OfflineNotice";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import PushNavBridge from './PushNavBridge';
 
 //import { initAds } from "@/services/ads";
 
@@ -102,7 +103,7 @@ function SplashVideo({ onLoaded, onFinish }: { onLoaded: () => void; onFinish: (
 /**
  * Wraps children with animated fade-out after splash video and app load
  */
-function AnimatedSplashScreen({ children }: { children: React.ReactNode }) {
+function AnimatedSplashScreen() {
   const animation = useMemo(() => new Animated.Value(1), []);
   const [isAppReady, setAppReady] = useState(false);
   const [isSplashVideoComplete, setVideoComplete] = useState(false);
@@ -156,7 +157,7 @@ function AnimatedSplashScreen({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout() {
   const [showWcButton, setShowWcButton] = useState(false);
   const pathname = usePathname();
   const { partner } = useLocalSearchParams<{ partner?: string }>();
@@ -240,51 +241,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    /*
     <AnimatedSplashScreen>
-      {demoAllowed === null ? (
-        // While we don't know yet, render a blank screen behind the splash.
-        <View style={styles.centered} />
-      ) : demoAllowed === false ? (
-        // Demo ended page (this will still be hidden by the splash overlay until it fades)
-        <ImageBackground
-          source={require("../assets/images/chat-background.png")}
-          style={styles.background}
-          resizeMode="cover"
-        >
-          <View style={styles.centered}>
-            <Text style={styles.message}>
-              Demo trial is over, thanks for participating!
-            </Text>
-          </View>
-        </ImageBackground>
-      ) : (*/
-        // Normal app
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <InactivityHandler>
-            <AuthProvider>
-              <PresenceWrapper>
-                <MoneysProvider>
-                  <ForegroundGate>
-                    {shouldWrapMusic ? (
-                      <MusicProvider>
-                        <NotificationProvider>
-                          <FirstTimeProvider>
-                            <ProfileProvider>
-                              <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-                                <View style={styles.container}>
-                                  <NotificationDisplay />
-                                  <OfflineNotice />
-                                  {!hideNavbar && <Navbar />}
-                                  <Stack screenOptions={{ headerShown: false }} />
-                                  <StatusBar hidden />
-                                </View>
-                              </NavbarContext.Provider>
-                            </ProfileProvider>
-                          </FirstTimeProvider>
-                        </NotificationProvider>
-                      </MusicProvider>
-                    ) : (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <InactivityHandler>
+          <AuthProvider>
+            <PresenceWrapper>
+              <MoneysProvider>
+                <ForegroundGate>
+                  {shouldWrapMusic ? (
+                    <MusicProvider>
                       <NotificationProvider>
                         <FirstTimeProvider>
                           <ProfileProvider>
@@ -300,20 +265,36 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           </ProfileProvider>
                         </FirstTimeProvider>
                       </NotificationProvider>
-                    )}
-                  </ForegroundGate>
-                </MoneysProvider>
-              </PresenceWrapper>
-            </AuthProvider>
-          </InactivityHandler>
-        </GestureHandlerRootView>
-      /*)}
-    </AnimatedSplashScreen> */
+                    </MusicProvider>
+                  ) : (
+                    <NotificationProvider>
+                      <FirstTimeProvider>
+                        <ProfileProvider>
+                          <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
+                            <View style={styles.container}>
+                              <NotificationDisplay />
+                              <PushNavBridge />
+                              <OfflineNotice />
+                              {!hideNavbar && <Navbar />}
+                              <Stack screenOptions={{ headerShown: false }} />
+                              <StatusBar hidden />
+                            </View>
+                          </NavbarContext.Provider>
+                        </ProfileProvider>
+                      </FirstTimeProvider>
+                    </NotificationProvider>
+                  )}
+                </ForegroundGate>
+              </MoneysProvider>
+            </PresenceWrapper>
+          </AuthProvider>
+        </InactivityHandler>
+      </GestureHandlerRootView>
+    </AnimatedSplashScreen>
   );
   
+  
 }
-
-// Add back Animated Splash Screen ^^^
 
 function NotificationDisplay() {
   const { visible, message, partnerId, senderName, hideNotification } = useContext(NotificationContext);

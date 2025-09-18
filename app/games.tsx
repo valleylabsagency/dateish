@@ -39,19 +39,13 @@ export default function GamesScreen() {
     if (paying) return; // debounce
     setPaying(which);
     try {
-      // Games cost a flat 2 moneys
       await spendMoneys({ amount: 2, reason: `game-${which}` });
-      triggerSpend(2); // animate "-2" in the navbar
+      triggerSpend(2);
 
-      // Close the right modal
-      
-      if (which === "darts") {
-        setShowPopupDarts(false);
-        router.push("/darts");  
-      } else {
-        setShowPopupArcade(false);
-        // router.push("/arcade")      // (Arcade)
-      }
+      if (which === "darts") setShowPopupDarts(false);
+      if (which === "arcade") setShowPopupArcade(false);
+
+    router.push(which === "darts" ? "/darts" : "/lyd");
       
     } catch (e: any) {
       // Friendly error for low balance

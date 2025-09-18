@@ -433,7 +433,7 @@ export default function EntranceScreen() {
           setNotVipVisible(true);
           return;
         }
-        router.replace("/bar-2");
+        router.replace("/entranceAnimation");
       } catch (err: any) {
         const { title, message } = mapFirebaseAuthError(err);
         setAuthError(true);
@@ -481,7 +481,7 @@ export default function EntranceScreen() {
           setNotVipVisible(true);
           return;
         }
-        router.replace("/bar-2");
+        router.replace("/entranceAnimation");
       } catch (err: any) {
         const { title, message } = mapFirebaseAuthError(err);
         setAuthError(true);
@@ -555,7 +555,7 @@ export default function EntranceScreen() {
     const user = auth.currentUser;
     if (isBarOpen) {
       if (user) {
-        router.replace("/bar-2");
+        router.replace("/entranceAnimation");
       } else {
         setShowAuth(true);
       }

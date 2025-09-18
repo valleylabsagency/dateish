@@ -39,7 +39,8 @@
     },
     "android": {
       "package": "com.tylerjvalley.Dateish",
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",

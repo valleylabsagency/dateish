@@ -21,7 +21,8 @@ import {
   setDoc,
 } from 'firebase/firestore';
 
-// Configure how notifications are displayed when app is foregrounded
+
+const PROJECT_ID = "91d81c7f-935a-4bb4-8f75-062721f369ba";
 
 Notifications.setNotificationHandler({
   handleNotification: async (): Promise<Notifications.NotificationBehavior> => ({
@@ -79,40 +80,55 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     (async () => {
       if (!Constants.isDevice) {
-        console.warn('Must use physical device for push notifications');
+        console.warn("Must use physical device for push notifications");
         return;
       }
+  
+      // Ask permissions
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
-      if (existingStatus !== 'granted') {
+      if (existingStatus !== "granted") {
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
       }
-      if (finalStatus !== 'granted') {
-        console.warn('Push notification permission not granted!');
+      if (finalStatus !== "granted") {
+        console.warn("Push notification permission not granted!");
         return;
       }
-
-      // Create or reuse channel on Android for custom sound
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'default',
+  
+      // Android channel (ties to your bundled wav)
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "default",
           importance: Notifications.AndroidImportance.MAX,
-          sound: 'push_notif.wav',
+          sound: "push_notif.wav",
           vibrationPattern: [0, 250, 250, 250],
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         });
       }
-
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: Constants?.expoConfig?.extra?.eas?.projectId,
+  
+      // The critical bit: pass a stable projectId
+      const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync({
+        projectId: PROJECT_ID,
       });
-
-      const token = tokenData.data;
-      console.log('Expo push token:', token);
+      console.log("Expo push token:", expoPushToken);
+  
+      // You may get here before login; store and write once user exists
       if (auth.currentUser) {
-        const userDoc = doc(firestore, 'users', auth.currentUser.uid);
-        await setDoc(userDoc, { expoPushToken: token }, { merge: true });
+        await setDoc(
+          doc(firestore, "users", auth.currentUser.uid),
+          { expoPushToken },
+          { merge: true }
+        );
       }
+  
+      // Also update token when auth state changes
+      const unsub = auth.onAuthStateChanged(async (u) => {
+        if (u) {
+          await setDoc(doc(firestore, "users", u.uid), { expoPushToken }, { merge: true });
+        }
+      });
+      return () => unsub();
     })();
   }, []);
 
