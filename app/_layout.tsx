@@ -33,6 +33,7 @@ import InAppNotification from "../components/InAppNotification";
 import OfflineNotice from "../components/OfflineNotice";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 //import { initAds } from "@/services/ads";
 
@@ -238,7 +239,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return (/*
+  return (
+    /*
     <AnimatedSplashScreen>
       {demoAllowed === null ? (
         // While we don't know yet, render a blank screen behind the splash.
@@ -258,13 +260,31 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </ImageBackground>
       ) : (*/
         // Normal app
-        <InactivityHandler>
-          <AuthProvider>
-            <PresenceWrapper>
-              <MoneysProvider>
-                <ForegroundGate>
-                  {shouldWrapMusic ? (
-                    <MusicProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <InactivityHandler>
+            <AuthProvider>
+              <PresenceWrapper>
+                <MoneysProvider>
+                  <ForegroundGate>
+                    {shouldWrapMusic ? (
+                      <MusicProvider>
+                        <NotificationProvider>
+                          <FirstTimeProvider>
+                            <ProfileProvider>
+                              <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
+                                <View style={styles.container}>
+                                  <NotificationDisplay />
+                                  <OfflineNotice />
+                                  {!hideNavbar && <Navbar />}
+                                  <Stack screenOptions={{ headerShown: false }} />
+                                  <StatusBar hidden />
+                                </View>
+                              </NavbarContext.Provider>
+                            </ProfileProvider>
+                          </FirstTimeProvider>
+                        </NotificationProvider>
+                      </MusicProvider>
+                    ) : (
                       <NotificationProvider>
                         <FirstTimeProvider>
                           <ProfileProvider>
@@ -280,29 +300,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           </ProfileProvider>
                         </FirstTimeProvider>
                       </NotificationProvider>
-                    </MusicProvider>
-                  ) : (
-                    <NotificationProvider>
-                      <FirstTimeProvider>
-                        <ProfileProvider>
-                          <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-                            <View style={styles.container}>
-                              <NotificationDisplay />
-                              <OfflineNotice />
-                              {!hideNavbar && <Navbar />}
-                              <Stack screenOptions={{ headerShown: false }} />
-                              <StatusBar hidden />
-                            </View>
-                          </NavbarContext.Provider>
-                        </ProfileProvider>
-                      </FirstTimeProvider>
-                    </NotificationProvider>
-                  )}
-                </ForegroundGate>
-              </MoneysProvider>
-            </PresenceWrapper>
-          </AuthProvider>
-        </InactivityHandler>
+                    )}
+                  </ForegroundGate>
+                </MoneysProvider>
+              </PresenceWrapper>
+            </AuthProvider>
+          </InactivityHandler>
+        </GestureHandlerRootView>
       /*)}
     </AnimatedSplashScreen> */
   );

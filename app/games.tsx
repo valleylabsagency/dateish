@@ -13,8 +13,10 @@ import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
 import PopUp from "../components/PopUp";
-import { spendMoneys } from "../services/moneys";          // ⬅️ add
-import { MoneysContext } from "../contexts/MoneysContext";  // ⬅️ add
+import { spendMoneys } from "../services/moneys";          
+import { MoneysContext } from "../contexts/MoneysContext"; 
+import { useRouter } from "expo-router";
+
 
 const { width, height } = Dimensions.get("window");
 
@@ -22,6 +24,8 @@ export default function GamesScreen() {
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
   });
+
+  const router = useRouter();
 
   const [showPopupDarts, setShowPopupDarts] = useState(false);
   const [showPopupArcade, setShowPopupArcade] = useState(false);
@@ -40,8 +44,15 @@ export default function GamesScreen() {
       triggerSpend(2); // animate "-2" in the navbar
 
       // Close the right modal
-      if (which === "darts") setShowPopupDarts(false);
-      else setShowPopupArcade(false);
+      
+      if (which === "darts") {
+        setShowPopupDarts(false);
+        router.push("/darts");  
+      } else {
+        setShowPopupArcade(false);
+        // router.push("/arcade")      // (Arcade)
+      }
+      
     } catch (e: any) {
       // Friendly error for low balance
       if (e?.code === "functions/failed-precondition" || /Insufficient moneys/i.test(e?.message)) {

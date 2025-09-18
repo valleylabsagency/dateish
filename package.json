@@ -60,7 +60,8 @@
     "react-native-size-matters": "^0.4.2",
     "react-native-vision-camera": "^4.7.2",
     "react-native-web": "^0.20.0",
-    "expo-build-properties": "~0.14.8"
+    "expo-build-properties": "~0.14.8",
+    "expo-image": "~2.4.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
