@@ -67,27 +67,29 @@ function useDisableBackButton() {
 /**
  * Renders the splash video and calls onLoaded/onFinish events
  */
-function SplashVideo({ onLoaded, onFinish }: { onLoaded: () => void; onFinish: () => void; }) {
+
+function SplashVideo({
+    onLoaded,
+    onFinish,
+  }: {
+    onLoaded: () => void;
+    onFinish: () => void;
+  }) {
   const videoRef = useRef<any>(null);
-  const [lastStatus, setLastStatus] = useState<AVPlaybackStatus>({});
-  const { width } = useWindowDimensions();
-  const isTablet = width >= 768;
+  const [lastStatus, setLastStatus] = useState<AVPlaybackStatus | null>(null);
 
   return (
     <Video
       ref={videoRef}
-      source={
-        isTablet
-          ? require("../assets/images/splash-screen.mp4")
-          : require("../assets/images/splash-screen.mp4")
-      }
+      source={require("../assets/images/splash-screen.mp4")}
       style={StyleSheet.absoluteFill}
-      shouldPlay={!(lastStatus.isLoaded && lastStatus.didJustFinish)}
+      shouldPlay={!(lastStatus && "isLoaded" in lastStatus && lastStatus.isLoaded && "didJustFinish" in lastStatus && lastStatus.didJustFinish)}
       isLooping={false}
       resizeMode={ResizeMode.COVER}
       onPlaybackStatusUpdate={(status) => {
-        if (status.isLoaded) {
-          if (!lastStatus.isLoaded) {
+        if ("isLoaded" in status && status.isLoaded) {
+          // first time we see loaded -> trigger onLoaded
+          if (!(lastStatus && "isLoaded" in lastStatus && lastStatus.isLoaded)) {
             onLoaded();
           }
           if (status.didJustFinish) {
@@ -96,6 +98,12 @@ function SplashVideo({ onLoaded, onFinish }: { onLoaded: () => void; onFinish: (
         }
         setLastStatus(status);
       }}
+      onError={() => {
+        // If the asset can’t load, skip the splash
+        onFinish();
+      }}
+      // Optional: prevent transport controls from flashing
+      useNativeControls={false}
     />
   );
 }
@@ -103,7 +111,11 @@ function SplashVideo({ onLoaded, onFinish }: { onLoaded: () => void; onFinish: (
 /**
  * Wraps children with animated fade-out after splash video and app load
  */
-function AnimatedSplashScreen() {
+function AnimatedSplashScreen({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const animation = useMemo(() => new Animated.Value(1), []);
   const [isAppReady, setAppReady] = useState(false);
   const [isSplashVideoComplete, setVideoComplete] = useState(false);
@@ -117,25 +129,36 @@ function AnimatedSplashScreen() {
         useNativeDriver: true,
       }).start(() => setAnimationComplete(true));
     }
-  }, [isAppReady, isSplashVideoComplete]);
+  }, [isAppReady, isSplashVideoComplete, animation]);
 
   const onVideoLoaded = useCallback(async () => {
     try {
+      // Only hide native splash if you previously called preventAutoHideAsync
+      // It's safe to call hide even if prevent wasn't called, but wrap in try/catch
       await SplashScreen.hideAsync();
-      // load any resources if needed
-    } catch (e) {
-      console.warn(e);
-    } finally {
+    } catch {}
+    finally {
       setAppReady(true);
     }
   }, []);
 
-  const videoElement = useMemo(() => (
-    <SplashVideo
-      onLoaded={onVideoLoaded}
-      onFinish={() => setVideoComplete(true)}
-    />
-  ), [onVideoLoaded]);
+  // Safety: if the video never reports finish (bad asset, codec issue), move on after a timeout
+  useEffect(() => {
+    const failSafe = setTimeout(() => {
+      if (!isSplashVideoComplete) setVideoComplete(true);
+    }, 4000);
+    return () => clearTimeout(failSafe);
+  }, [isSplashVideoComplete]);
+
+  const videoElement = useMemo(
+    () => (
+      <SplashVideo
+        onLoaded={onVideoLoaded}
+        onFinish={() => setVideoComplete(true)}
+      />
+    ),
+    [onVideoLoaded]
+  );
 
   return (
     <View style={{ flex: 1 }}>
@@ -145,10 +168,7 @@ function AnimatedSplashScreen() {
           pointerEvents="box-only"
           onStartShouldSetResponder={() => true}
           onResponderTerminationRequest={() => false}
-          style={[
-            StyleSheet.absoluteFill,
-            { opacity: animation },
-          ]}
+          style={[StyleSheet.absoluteFill, { opacity: animation }]}
         >
           {videoElement}
         </Animated.View>
@@ -156,6 +176,7 @@ function AnimatedSplashScreen() {
     </View>
   );
 }
+
 
 export default function Layout() {
   const [showWcButton, setShowWcButton] = useState(false);
