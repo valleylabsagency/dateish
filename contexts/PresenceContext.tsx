@@ -8,7 +8,9 @@ interface PresenceWrapperProps {
   children: ReactNode;
 }
 
-export default function PresenceWrapper({ children }: PresenceWrapperProps) {
+type Props = React.PropsWithChildren<{}>;
+
+export default function PresenceWrapper({ children }: Props) {
   useEffect(() => {
     const db = getDatabase();
     // Listen for auth state changes to ensure a user is present

@@ -114,7 +114,7 @@ function SplashVideo({
 function AnimatedSplashScreen({
   children,
 }: {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   const animation = useMemo(() => new Animated.Value(1), []);
   const [isAppReady, setAppReady] = useState(false);
@@ -184,7 +184,14 @@ export default function Layout() {
   const { partner } = useLocalSearchParams<{ partner?: string }>();
   const [didForceRTL, setDidForceRTL] = useState(false);
   const [demoAllowed, setDemoAllowed] = useState<boolean | null>(null);
-  const { isPlaying, toggleMusic } = useContext(MusicContext);
+
+  const music = useContext(MusicContext); // may be undefined
+
+useEffect(() => {
+  if (demoAllowed === false && music?.isPlaying) {
+    music.toggleMusic();
+  }
+}, [demoAllowed, music]);
 
   useDisableBackButton();
 
@@ -208,10 +215,6 @@ export default function Layout() {
       Updates.reloadAsync();
     }
   }, [didForceRTL]);
-
-  useEffect(() => {
-    if (demoAllowed === false && isPlaying) toggleMusic();
-  }, [demoAllowed]);
 
   useEffect(() => {
     NavigationBar.setVisibilityAsync("hidden");
@@ -269,7 +272,6 @@ export default function Layout() {
             <PresenceWrapper>
               <MoneysProvider>
                 <ForegroundGate>
-                  {shouldWrapMusic ? (
                     <MusicProvider>
                       <NotificationProvider>
                         <FirstTimeProvider>
@@ -287,24 +289,6 @@ export default function Layout() {
                         </FirstTimeProvider>
                       </NotificationProvider>
                     </MusicProvider>
-                  ) : (
-                    <NotificationProvider>
-                      <FirstTimeProvider>
-                        <ProfileProvider>
-                          <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-                            <View style={styles.container}>
-                              <NotificationDisplay />
-                              <PushNavBridge />
-                              <OfflineNotice />
-                              {!hideNavbar && <Navbar />}
-                              <Stack screenOptions={{ headerShown: false }} />
-                              <StatusBar hidden />
-                            </View>
-                          </NavbarContext.Provider>
-                        </ProfileProvider>
-                      </FirstTimeProvider>
-                    </NotificationProvider>
-                  )}
                 </ForegroundGate>
               </MoneysProvider>
             </PresenceWrapper>

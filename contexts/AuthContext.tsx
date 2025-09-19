@@ -4,10 +4,11 @@ import { auth } from "../firebase";
 import type { User } from "firebase/auth";
 
 type AuthValue = { user: User | null; authReady: boolean };
+type Props = React.PropsWithChildren<{}>;
 
 const AuthContext = createContext<AuthValue>({ user: null, authReady: false });
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: Props) {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
 

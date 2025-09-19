@@ -5,8 +5,9 @@ import { auth } from "../firebase"; // your firebase config file
 
 // Duration in milliseconds (10 minutes)
 const INACTIVITY_DURATION = 10 * 60 * 1000;
+type Props = React.PropsWithChildren<{}>;
 
-const InactivityHandler = ({ children }) => {
+const InactivityHandler = ({ children }: Props) => {
   const timeoutRef = useRef(null);
 
   // Function to clear and restart the timer
