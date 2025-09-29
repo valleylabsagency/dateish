@@ -132,22 +132,22 @@ const nextEnabled =
 
   // --- Post-capture validator (ML Kit) ---
   async function validateFace(fileUri: string) {
-       try {
-         // Prefer the URI-based API with file://
-         const faces = await (FaceDetector as any).detectFromUri?.(fileUri);
-         // Fallback for older versions:
-         const result =
-           faces ??
-           (await (FaceDetector as any).detectFromFile?.(
-             fileUri.replace("file://", "")
-           )) ??
-           [];
-         return Array.isArray(result) && result.length > 0;
-       } catch (e) {
-         console.warn("Face detection failed:", e, { fileUri });
-         return false;
-       }
-     }
+    try {
+      if (Platform.OS === 'ios') {
+        // iOS: ML Kit expects file:// URI
+        const faces = await (FaceDetector as any).detectFromUri?.(fileUri);
+        return Array.isArray(faces) && faces.length > 0;
+      } else {
+        // Android: ML Kit expects a raw filesystem path (no scheme)
+        const rawPath = fileUri.replace(/^file:\/\//, '');
+        const faces = await (FaceDetector as any).detectFromFile?.(rawPath);
+        return Array.isArray(faces) && faces.length > 0;
+      }
+    } catch (e) {
+      console.warn('Face detection failed:', e, { fileUri });
+      return false;
+    }
+  }
   
 
   useEffect(() => {
@@ -286,17 +286,20 @@ useEffect(() => {
       const photo = await cameraRef.current.takePhoto({
         flash: "off",
         enableShutterSound: true,
-        // On iOS, ensure JPEG so ML Kit can decode it reliably
         ...(Platform.OS === "ios" ? { photoCodec: "jpeg" } : {}),
       });
   
-      const uri = photo.path.startsWith("file://")
-   ? photo.path
-   : `file://${photo.path}`;
-    const ok = await validateFace(uri);
-
-      if (ok) setPhotoUri(photo.path);
-      else setNoFaceVisible(true); // show Mr. Mingles popup
+      // Normalize to file://... for both platforms
+      const uri = photo.path.startsWith("file://") ? photo.path : `file://${photo.path}`;
+  
+      const ok = await validateFace(uri);
+  
+      if (ok) {
+        // IMPORTANT: Save the *same* uri you validated
+        setPhotoUri(uri);
+      } else {
+        setNoFaceVisible(true);
+      }
     } catch (e) {
       console.error(e);
       Alert.alert("Couldn’t capture", "Please try again.");
@@ -305,6 +308,7 @@ useEffect(() => {
       setCameraVisible(false);
     }
   };
+  
   
 
   // request location
