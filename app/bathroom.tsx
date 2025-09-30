@@ -130,47 +130,36 @@ const nextEnabled =
     return !isNaN(y) && y >= 1945;
   }
 
+// Always pass a proper URI with scheme (file://) to ML Kit on BOTH platforms
 async function validateFace(fileUri: string) {
-  try {
-    // Always pass a real file path to ML Kit:
-    //  - iOS is fine with file://
-    //  - Android wants a raw path (no scheme)
-    const pathForMLKit =
-      Platform.OS === 'android'
-        ? fileUri.replace(/^file:\/\//, '')
-        : fileUri;
+  const uri = fileUri.startsWith('file://') ? fileUri : `file://${fileUri}`;
 
+  try {
     const options: any = {
-      // keep it simple for detection-only (tune later if you want contours/landmarks)
-      performanceMode: 'fast',       // wrapper may map this internally
+      performanceMode: 'fast',
       classificationMode: 'none',
       contourMode: 'none',
-      minFaceSize: 0.05,             // detect smaller faces too
+      minFaceSize: 0.05,
       isTrackingEnabled: false,
     };
 
     const mod: any = FaceDetector as any;
-    let faces: any[] = [];
 
-    if (typeof mod.detectFromFile === 'function') {
-      faces = await mod.detectFromFile(pathForMLKit, options);
-    } else if (typeof mod.detectFromUri === 'function') {
-      // some versions expose this name
-      faces = await mod.detectFromUri(pathForMLKit, options);
-    } else if (typeof mod.detect === 'function') {
-      faces = await mod.detect(pathForMLKit, options);
-    } else {
-      console.warn('ML Kit face detector has no detect* function');
-      return false;
-    }
+    // Prefer detectFromFile; fall back to other method names some versions expose
+    const faces =
+      (typeof mod.detectFromFile === 'function' && await mod.detectFromFile(uri, options)) ||
+      (typeof mod.detectFromUri  === 'function' && await mod.detectFromUri(uri, options)) ||
+      (typeof mod.detect         === 'function' && await mod.detect(uri, options)) ||
+      [];
 
-    console.log('MLKit faces:', Array.isArray(faces) ? faces.length : faces);
+    console.log('MLKit faces count =', Array.isArray(faces) ? faces.length : faces);
     return Array.isArray(faces) && faces.length > 0;
   } catch (e) {
-    console.warn('Face detection failed:', e, { fileUri });
+    console.warn('Face detection failed:', e, { fileUri: uri });
     return false;
   }
 }
+
 
   
 
