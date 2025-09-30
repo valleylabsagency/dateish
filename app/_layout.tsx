@@ -265,7 +265,7 @@ useEffect(() => {
   }
 
   return (
-    <AnimatedSplashScreen>
+    
       <GestureHandlerRootView style={{ flex: 1 }}>
         <InactivityHandler>
           <AuthProvider>
@@ -295,7 +295,7 @@ useEffect(() => {
           </AuthProvider>
         </InactivityHandler>
       </GestureHandlerRootView>
-    </AnimatedSplashScreen>
+
   );
   
   

@@ -130,24 +130,48 @@ const nextEnabled =
     return !isNaN(y) && y >= 1945;
   }
 
-  // --- Post-capture validator (ML Kit) ---
-  async function validateFace(fileUri: string) {
-    try {
-      if (Platform.OS === 'ios') {
-        // iOS: ML Kit expects file:// URI
-        const faces = await (FaceDetector as any).detectFromUri?.(fileUri);
-        return Array.isArray(faces) && faces.length > 0;
-      } else {
-        // Android: ML Kit expects a raw filesystem path (no scheme)
-        const rawPath = fileUri.replace(/^file:\/\//, '');
-        const faces = await (FaceDetector as any).detectFromFile?.(rawPath);
-        return Array.isArray(faces) && faces.length > 0;
-      }
-    } catch (e) {
-      console.warn('Face detection failed:', e, { fileUri });
+async function validateFace(fileUri: string) {
+  try {
+    // Always pass a real file path to ML Kit:
+    //  - iOS is fine with file://
+    //  - Android wants a raw path (no scheme)
+    const pathForMLKit =
+      Platform.OS === 'android'
+        ? fileUri.replace(/^file:\/\//, '')
+        : fileUri;
+
+    const options: any = {
+      // keep it simple for detection-only (tune later if you want contours/landmarks)
+      performanceMode: 'fast',       // wrapper may map this internally
+      classificationMode: 'none',
+      contourMode: 'none',
+      minFaceSize: 0.05,             // detect smaller faces too
+      isTrackingEnabled: false,
+    };
+
+    const mod: any = FaceDetector as any;
+    let faces: any[] = [];
+
+    if (typeof mod.detectFromFile === 'function') {
+      faces = await mod.detectFromFile(pathForMLKit, options);
+    } else if (typeof mod.detectFromUri === 'function') {
+      // some versions expose this name
+      faces = await mod.detectFromUri(pathForMLKit, options);
+    } else if (typeof mod.detect === 'function') {
+      faces = await mod.detect(pathForMLKit, options);
+    } else {
+      console.warn('ML Kit face detector has no detect* function');
       return false;
     }
+
+    console.log('MLKit faces:', Array.isArray(faces) ? faces.length : faces);
+    return Array.isArray(faces) && faces.length > 0;
+  } catch (e) {
+    console.warn('Face detection failed:', e, { fileUri });
+    return false;
   }
+}
+
   
 
   useEffect(() => {
@@ -284,14 +308,15 @@ useEffect(() => {
     try {
       setValidating(true);
       const photo = await cameraRef.current.takePhoto({
-        flash: "off",
+        flash: 'off',
         enableShutterSound: true,
-        ...(Platform.OS === "ios" ? { photoCodec: "jpeg" } : {}),
+        ...(Platform.OS === 'ios' ? { photoCodec: 'jpeg' } : {}),
       });
+      
   
       // Normalize to file://... for both platforms
-      const uri = photo.path.startsWith("file://") ? photo.path : `file://${photo.path}`;
-  
+      const uri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
+
       const ok = await validateFace(uri);
   
       if (ok) {
