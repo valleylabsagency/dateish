@@ -29,7 +29,7 @@ import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 import { Video } from 'expo-av';
 import {
-  doc, setDoc, updateDoc, collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, arrayUnion
+  doc, setDoc, updateDoc, collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, arrayUnion, arrayRemove
 } from "firebase/firestore";
 import { ProfileContext } from "../contexts/ProfileContext";
 import { useIsFocused } from "@react-navigation/native";
@@ -43,7 +43,6 @@ import { ScaledSheet } from "react-native-size-matters";
 
 // NEW
 import * as MailComposer from "expo-mail-composer";
-import { arrayUnion, arrayRemove } from "firebase/firestore";
 
 
 
