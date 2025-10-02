@@ -4,13 +4,12 @@ module.exports = function (api) {
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-      // keep router first so it can transform routes
       'expo-router/babel',
-
-      // ...any other plugins you use...
-
-      // must be LAST:
-      'react-native-worklets/plugin',
+      // REMOVE: 'react-native-worklets/plugin',
+      ['react-native-reanimated/plugin', {
+        // optional: if you use VisionCamera frame processors & globals, add them here
+        // globals: ['__scanCodes'] 
+      }],
     ],
   };
 };

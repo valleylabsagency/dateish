@@ -370,15 +370,15 @@ async function handleRateNo() {
 
             {/* Hotspots – all normalized; tweak once and they’re stable everywhere */}
             <Pressable
-              style={[rect(0.57, 0.753, 0.16, 0.03), hotspotBase, debugOutline]} // drink
+              style={[rect(0.57, 0.753, 0.16, 0.03), hit("cyan")]} // drink
               onPress={() => setShowDrinkMenu(true)}
             />
             <Pressable
-              style={[rect(0.57, 0.813, 0.16, 0.03), hotspotBase, debugOutline]} // shop
+              style={[rect(0.57, 0.813, 0.16, 0.03), hit("red")]} // shop
               onPress={() => { setPopupFlag("shop"); setShowPopupShop(true); }}
             />
             <Pressable
-              style={[rect(0.54, 0.865, 0.18, 0.03), hotspotBase, debugOutline]} // rules
+              style={[rect(0.54, 0.865, 0.18, 0.03), hit("yellow")]} // rules
               onPress={() => { setPopupFlag("rules"); setShowPopupRules(true); }}
             />{/*
             <Pressable

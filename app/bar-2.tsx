@@ -29,7 +29,7 @@ import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 import { Video } from 'expo-av';
 import {
-  doc, setDoc, updateDoc, collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, arrayUnion, arrayRemove
+  doc, setDoc, updateDoc, collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, arrayUnion, arrayRemove, onSnapshot
 } from "firebase/firestore";
 import { ProfileContext } from "../contexts/ProfileContext";
 import { useIsFocused } from "@react-navigation/native";
@@ -43,6 +43,7 @@ import { ScaledSheet } from "react-native-size-matters";
 
 // NEW
 import * as MailComposer from "expo-mail-composer";
+import MMAnimated from "@/services/MMAnimated";
 
 
 
@@ -132,6 +133,7 @@ export default function Bar2Screen() {
   const [welcomeTyping, setWelcomeTyping] = useState(true);
   const [pointerTarget, setPointerTarget] = useState<'mingles'|'bathroom'|null>(null);
   const [minglesFrame, setMinglesFrame] = useState<{x:number,y:number,width:number,height:number} | null>(null);
+  const [bubbleVisible, setBubbleVisible] = useState(false);
 
   const isFocused = useIsFocused();
 
@@ -319,6 +321,7 @@ useEffect(() => {
 
   // Note: start button appears only when profile is complete
   const [started, setStarted] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
 
@@ -339,6 +342,34 @@ useEffect(() => {
 
   const [deletionFlag, setDeletionFlag] = useState<'you'|'them'|null>(null); // who deleted
   const [checkingDeletion, setCheckingDeletion] = useState(false);
+
+  const [introPlayed, setIntroPlayed] = useState<boolean>(false);
+
+//remove
+useEffect(() => {
+  if (!isFocused) return;
+  setStarted(false);
+  AsyncStorage.removeItem("bar2Started").catch(() => {});
+}, [isFocused]);
+
+useEffect(() => {
+  let alive = true;
+  (async () => {
+    try {
+      const v = await AsyncStorage.getItem("bar2IntroPlayed");
+      if (!alive) return;
+      const played = v === "true";
+      setIntroPlayed(played);
+      // If it's NOT the very first time, show bubble immediately (no entrance anim)
+      if (played) setBubbleVisible(true);
+      if (!played) await AsyncStorage.setItem("bar2IntroPlayed", "true");
+    } catch {}
+  })();
+  return () => { alive = false; };
+}, []);
+
+
+
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -914,29 +945,31 @@ function stripLinksAndWarn(txt: string, setFn: (s: string) => void) {
         {/* ─── START CHAT SCREEN (profile complete, not started) ───────── */}
         {profileComplete && !started && (
           <>
+          {bubbleVisible && (
             <View style={styles.bubbleContainer}>
-              <ImageBackground
-                source={require("../assets/images/speech-bubble.png")}
-                style={styles.bubble}
-                resizeMode="stretch"
-              />
-            </View>
+            <ImageBackground
+              source={require("../assets/images/speech-bubble.png")}
+              style={styles.bubble}
+              resizeMode="stretch"
+            />
+          </View>
+          )}
+            
+            <MMAnimated 
+            enterOnMount={true}
+              leaving={leaving}
+              onLeaveComplete={() => {
+                setLeaving(false);
+                setStarted(true)
+              }}
+             />
 
-            <View style={styles.minglesContainer}>
-              <View>
-                <Image
-                  source={require("../assets/images/mr-mingles.png")}
-                  style={styles.minglesImage}
-                  resizeMode="contain"
-                />
-              </View>
-              
-            </View>
+          
 
             <TouchableOpacity
               style={styles.startButton}
               onPress={async () => {
-                setStarted(true);
+                setLeaving(true);
                 try {
                   await AsyncStorage.setItem("bar2Started", "true");
                 } catch (e) {
@@ -1317,14 +1350,7 @@ function stripLinksAndWarn(txt: string, setFn: (s: string) => void) {
         <View style={creepStyles.mingInnerTriangle} />
       </View>
 
-      <Animated.Image
-        source={require("../assets/images/mr-mingles.png")}
-        style={[
-          creepStyles.mingMrMingles,
-          { transform: [{ translateX: creepRollAnim }] },
-        ]}
-        resizeMode="contain"
-      />
+      <MMAnimated />
     </View>
   </View>
 </Modal>
