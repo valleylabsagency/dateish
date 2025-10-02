@@ -1,4 +1,4 @@
-
+/*
 import mobileAds, {
     AdEventType,
     RewardedAdEventType,
@@ -93,4 +93,29 @@ import mobileAds, {
       }
     });
   }
-  
+  */
+ // services/ads.ts  (temporary no-ads stub for Expo Go)
+// Keep the same API surface you use elsewhere so you don't touch other files.
+
+export const ADS_ENABLED = false;
+
+type InterstitialResult = { shown: false; reason: 'ads-disabled' };
+type RewardResult = { rewarded: false; reason: 'ads-disabled' };
+
+export async function initAds(): Promise<void> {
+  // previously: await mobileAds().initialize()
+  // no-op
+}
+
+export async function showInterstitial(): Promise<InterstitialResult> {
+  // previously: create/show InterstitialAd
+  return { shown: false, reason: 'ads-disabled' };
+}
+
+export async function showRewarded(): Promise<RewardResult> {
+  // previously: create/show RewardedAd
+  return { rewarded: false, reason: 'ads-disabled' };
+}
+
+// If you had helpers like `requestTrackingPermission()` or consent utilities,
+// add lightweight no-ops here too so other files don't break.

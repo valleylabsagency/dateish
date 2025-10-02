@@ -232,7 +232,7 @@ export default function EntranceScreen() {
     try {
       if (enteredCode.trim() === sentCode) {
         // Approved → Entrance Animation
-        setShowAuth(false);
+        setShowAuth(false);  
         router.replace("/entranceAnimation");
       } else {
         Alert.alert(
@@ -433,7 +433,7 @@ export default function EntranceScreen() {
           setNotVipVisible(true);
           return;
         }
-        router.replace("/entranceAnimation");
+        router.replace("/bar-2");
       } catch (err: any) {
         const { title, message } = mapFirebaseAuthError(err);
         setAuthError(true);
@@ -481,7 +481,7 @@ export default function EntranceScreen() {
           setNotVipVisible(true);
           return;
         }
-        router.replace("/entranceAnimation");
+        router.replace("/bar-2"); //entrance anim
       } catch (err: any) {
         const { title, message } = mapFirebaseAuthError(err);
         setAuthError(true);
@@ -555,7 +555,7 @@ export default function EntranceScreen() {
     const user = auth.currentUser;
     if (isBarOpen) {
       if (user) {
-        router.replace("/entranceAnimation");
+        router.replace("/bar-2"); //entrance anim
       } else {
         setShowAuth(true);
       }
@@ -1036,7 +1036,7 @@ export default function EntranceScreen() {
               onPress={() => {
                 setShowVipCongrats(false);
                 setShowConfetti(false);
-                router.replace("/entranceAnimation");
+                router.replace("/bar-2");
               }}
             >
               <Text style={mmStyles.vipBtnText}>Enter</Text>

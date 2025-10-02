@@ -28,11 +28,17 @@ import { auth, firestore } from "../firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as StoreReview from "expo-store-review";
-import { Linking, Platform } from "react-native";
-import { showInterstitial } from "@/services/ads";
+import { Linking, Platform, useWindowDimensions, Pressable } from "react-native";
+//import { showInterstitial } from "@/services/ads";
 
 
+const BG_IMG = require("../assets/images/mm-back.png");
+const FRONT_IMG = require("../assets/images/mm-front.png");
+const MINGLES_IMG = require("../assets/images/mr-mingles.png");
 
+// Get the art’s intrinsic aspect ratio (so overlays line up exactly)
+const { width: BGW, height: BGH } = Image.resolveAssetSource(BG_IMG);
+const STAGE_AR = BGW / BGH; // aspect ratio of your scene artwork
 
 
 const { width, height } = Dimensions.get("window");
@@ -58,6 +64,52 @@ export default function MinglesScreen() {
   const [showPopupTips, setShowPopupTips] = useState(false);
   const [popupFlag, setPopupFlag] = useState<string | null>(null);
   const [vipLoading, setVipLoading] = useState(false);
+
+  // Turn on to SEE the touchable overlays (auto-on in dev if you want)
+const SHOW_HITBOXES = true; // or __DEV__
+const SHOW_HITBOX = false; // flip to true when debugging tap areas
+
+const hotspotBase = {
+  position: "absolute" as const,
+  zIndex: 10,
+  ...Platform.select({ android: { elevation: 10 } }),
+};
+
+const debugOutline = SHOW_HITBOX
+  ? { borderWidth: 1, borderColor: "rgba(0,255,255,0.6)", borderStyle: "dashed", backgroundColor: "transparent" }
+  : null;
+
+const hit = (color = "lime") =>
+  SHOW_HITBOXES
+    ? {
+        backgroundColor: "rgba(0,255,0,0.15)",
+        borderColor: color,
+        borderWidth: 1,
+        zIndex: 99,      // above front art
+        elevation: 99,   // Android
+      }
+    : null;
+
+
+  const { width: sw, height: sh } = useWindowDimensions();
+  // Fit the stage to the screen while preserving ART aspect (letterbox if needed)
+  const stageW = sw;
+  const stageH = stageW / STAGE_AR;
+  const fitsHeight = stageH <= sh;
+  const finalW = fitsHeight ? stageW : sh * STAGE_AR;
+  const finalH = fitsHeight ? stageH : sh;
+
+  // Helper to position things by normalized rects (0..1)
+  const rect = React.useCallback(
+    (x: number, y: number, w: number, h: number) => ({
+      position: "absolute" as const,
+      left: x * finalW,
+      top: y * finalH,
+      width: w * finalW,
+      height: h * finalH,
+    }),
+    [finalW, finalH]
+  );
 
 
   const router = useRouter();
@@ -131,7 +183,7 @@ async function handleRateNo() {
   await AsyncStorage.setItem("ratingPrompted", "1");
   setTimeout(async () => {
     setShowNoThanks(false);
-    await showInterstitial();
+   // await showInterstitial();
   }, 3000);
 }
 
@@ -212,204 +264,152 @@ async function handleRateNo() {
   return (
     <>
       <View style={styles.container}>
-        {/* 1) BACKGROUND */}
-        <ImageBackground
-          source={require("../assets/images/mm-back.png")}
-          style={styles.background}
-          imageStyle={styles.backgroundImage}
-        />
-
-        {/* 2) MR. MINGLES – clickable, cycles messages */}
-        <View style={styles.minglesContainer}>
-          <TouchableOpacity
-           onPress={cycle}
-           activeOpacity={0.8}
-           style={styles.minglesImageTouchable}
-          >
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "black", // letterbox bars if needed
+          }}
+        >
+          {/* ==== STAGE (locked to bg aspect) ==== */}
+          <View style={{ width: finalW, height: finalH }}>
+            {/* Back layer */}
             <Image
-              source={require("../assets/images/mr-mingles.png")}
-              style={styles.minglesImage}
-              resizeMode="contain"
+              source={BG_IMG}
+              style={{width: "100%", height: "100%"}}
+              // Stage already matches bg aspect; 'stretch' keeps pixel-perfect overlay alignment
+              resizeMode="stretch"
             />
-          </TouchableOpacity>
-         
-        </View>
 
-        {/* 3) BAR FRONT OVERLAY (no pointer events) */}
-        <View style={styles.frontContainer} pointerEvents="none">
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => {}}
-            style={{
-              width: "100%",
-              height: 700,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Image
-              source={require("../assets/images/mm-front.png")}
-              style={styles.frontImage}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-          
-        </View>
-
-        {/* 4) SPEECH BUBBLE */}
-        <View style={styles.bubbleContainer}>
-          <ImageBackground
-            source={require("../assets/images/speech-bubble.png")}
-            imageStyle={{ transform: [{ scaleX: -1 }] }}
-            style={styles.bubble}
-            resizeMode="stretch"
-          >
-            <TouchableOpacity onPress={back} style={styles.arrow}>
-              <MaterialIcons
-                name="chevron-left"
-                size={32}
-                color={"#fff"}
-              />
-            </TouchableOpacity>
-
-            <View style={styles.bubbleContent}>
-              <Text style={styles.bubbleText}>{messages[idx]}</Text>
-              {idx === 0 && (
-                <TouchableOpacity onPress={() => setShowDrinkMenu(true)} style={styles.tapButton}>
-                  <Text style={styles.tapText}>- TAP -</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <TouchableOpacity
+            {/* Mr. Mingles (click to cycle) */}
+            <Pressable
+              style={rect(0.58, 0.12, 0.35, 0.75)} // <— tweak once visually; works on all devices afterwards
               onPress={cycle}
-              style={styles.arrow}
+              android_ripple={{ color: "rgba(255,255,255,0.08)" }}
             >
-              <MaterialIcons
-                name="chevron-right"
-                size={32}
-                color={"#fff"}
-              />
-            </TouchableOpacity>
-          </ImageBackground>
-        </View>
-
-        {/* 5) DRINK MENU MODAL */}
-        <Modal visible={showDrinkMenu} transparent animationType="slide">
-          <View style={drinkModalStyles.modalOverlay}>
-            <View style={drinkModalStyles.modalContainer}>
-              <ImageBackground
-                source={require("../assets/images/drinks-menu.png")}
-                style={drinkModalStyles.menuBackground}
+              <Image
+                source={MINGLES_IMG}
+                style={{ width: 400, height: 400, position: "relative", right: 280, top: 80 }}
                 resizeMode="contain"
+              />
+            </Pressable>
+
+            {/* Speech bubble (placed by fraction, not pixels) */}
+            <View style={[rect(0.05, 0.02, 0.90, 0.18)]}>
+              <ImageBackground
+                source={require("../assets/images/speech-bubble.png")}
+                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10 }}
+                imageStyle={{ transform: [{ scaleX: -1 }] }}
+                resizeMode="stretch"
               >
-                <TouchableOpacity
-                  style={drinkModalStyles.closeHotspot}
-                  onPress={() => setShowDrinkMenu(false)}
-                />
-                {Object.entries(drinkMapping).map(([name]) => (
-                  <TouchableOpacity
-                    key={name}
-                    style={drinkModalStyles[name]}
-                    onPress={() => handleDrinkSelect(name)}
-                  >
-                    <Image
-                      source={require("../assets/images/price-label.png")}
-                      style={drinkModalStyles.labelImage}
-                      resizeMode="contain"
-                    />
-                  </TouchableOpacity>
-                ))}
-                {drinkLoading && (
-                  <View style={drinkModalStyles.loadingOverlay}>
-                    <LottieView
-                            source={withoutBg}
-                            autoPlay
-                            loop
-                            style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-                           />
-                  </View>
-                )}
+                <TouchableOpacity onPress={back} style={{ width: 40, alignItems: "center", justifyContent: "center" }}>
+                  <MaterialIcons name="chevron-left" size={32} color="#fff" />
+                </TouchableOpacity>
+
+                <View style={{ flex: 1, alignItems: "center" }}>
+                  <Text style={styles.bubbleText}>{messages[idx]}</Text>
+                  {idx === 0 && (
+                    <TouchableOpacity onPress={() => setShowDrinkMenu(true)} style={{ paddingHorizontal: 24, paddingVertical: 8, borderRadius: 8 }}>
+                      <Text style={styles.tapText}>- TAP -</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <TouchableOpacity onPress={cycle} style={{ width: 40, alignItems: "center", justifyContent: "center" }}>
+                  <MaterialIcons name="chevron-right" size={32} color="#fff" />
+                </TouchableOpacity>
               </ImageBackground>
             </View>
-          </View>
-        </Modal>
+            {/* ==== DRINK MENU MODAL ==== */}
+            <Modal visible={showDrinkMenu} transparent animationType="fade" onRequestClose={() => setShowDrinkMenu(false)}>
+              <View style={drinkModalStyles.modalOverlay}>
+                <View style={drinkModalStyles.modalContainer}>
+                  <ImageBackground
+                    source={require("../assets/images/drinks-menu.png")}
+                    style={drinkModalStyles.menuBackground}
+                    resizeMode="contain"
+                  >
+                    {/* close area in the top-right */}
+                    <TouchableOpacity
+                      style={drinkModalStyles.closeHotspot}
+                      onPress={() => setShowDrinkMenu(false)}
+                    />
 
-        {/* hotspots for drink/shop/rules/tips */}
-        <TouchableOpacity
-          style={styles.overlayTouchable}
-          onPress={() => setShowDrinkMenu(true)}
-          activeOpacity={0.6}
-        />
-        <TouchableOpacity
-          style={styles.overlayTouchableShop}
-          onPress={() => {
-            setPopupFlag("shop");
-            setShowPopupShop(true);
-          }}
-          activeOpacity={0.6}
-        />
-        <TouchableOpacity
-          style={styles.overlayTouchableRules}
-          onPress={() => {
-            setPopupFlag("rules");
-            setShowPopupRules(true);
-          }}
-          activeOpacity={0.6}
-        />
-        <TouchableOpacity
-          style={styles.overlayTouchableTips}
-          onPress={handleTipJar}          
-          activeOpacity={0.6}
-        />
-        <TouchableOpacity
-          style={styles.dontPressHotspot}
-          disabled={dontPressPressed}
-          onPress={async () => {
-            const ok = await showInterstitial();
-            setDontPressPressed(true);
-          }}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.dontPressText, dontPressPressed && styles.dontPressDisabled]}>
-            {dontPressPressed ? "Told you not to press…" : "Don’t Press Here"}
-          </Text>
-        </TouchableOpacity>
+                    {/* clickable price labels over each drink */}
+                    {Object.entries(drinkMapping).map(([name]) => (
+                      <TouchableOpacity
+                        key={name}
+                        style={drinkModalStyles[name]}   // wine/beer/… positions you already defined
+                        onPress={() => handleDrinkSelect(name)}
+                        activeOpacity={0.8}
+                      >
+                        <Image
+                          source={require("../assets/images/price-label.png")}
+                          style={drinkModalStyles.labelImage}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    ))}
 
-
-        {/* 6) USER DRINK ICON + SPEECH */}
-        {profile?.drink && (
-          <TouchableOpacity
-            style={[
-              styles.userDrinkIconContainer,
-              { top: isSmall ? height * 0.59 : height * 0.525 },
-            ]}
-            onPress={() => setShowDrinkSpeech(s => !s)}
-            activeOpacity={0.8}
-          >
-            {showDrinkSpeech && (
-              <View
-                style={[
-                  styles.drinkSpeechBubble,
-                  { bottom: drinkSize + 8 },
-                ]}
-              >
-                <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
+                    {drinkLoading && (
+                      <View style={drinkModalStyles.loadingOverlay}>
+                        <LottieView
+                          source={withoutBg}
+                          autoPlay
+                          loop
+                          style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+                        />
+                      </View>
+                    )}
+                  </ImageBackground>
+                </View>
               </View>
-            )}
-            <Image
-              source={drinkIcon}
-              style={{ width: drinkSize, height: drinkSize }}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        )}
+            </Modal>
 
-        {/* 7) BOTTOM NAV */}
+
+            {/* Hotspots – all normalized; tweak once and they’re stable everywhere */}
+            <Pressable
+              style={[rect(0.57, 0.753, 0.16, 0.03), hotspotBase, debugOutline]} // drink
+              onPress={() => setShowDrinkMenu(true)}
+            />
+            <Pressable
+              style={[rect(0.57, 0.813, 0.16, 0.03), hotspotBase, debugOutline]} // shop
+              onPress={() => { setPopupFlag("shop"); setShowPopupShop(true); }}
+            />
+            <Pressable
+              style={[rect(0.54, 0.865, 0.18, 0.03), hotspotBase, debugOutline]} // rules
+              onPress={() => { setPopupFlag("rules"); setShowPopupRules(true); }}
+            />{/*
+            <Pressable
+              style={rect(0.03, 0.58, 0.14, 0.18)} // tip jar
+              onPress={handleTipJar}
+            /> */}{/*
+            <Pressable
+              style={rect(0.38, 0.79, 0.28, 0.06)} // "Don’t Press Here"
+              onPress={async () => { if (!dontPressPressed) { setDontPressPressed(true); } }}
+            > 
+              <Text style={[styles.dontPressText, dontPressPressed && styles.dontPressDisabled]}>
+                {dontPressPressed ? "Told you not to press…" : "Don’t Press Here"}
+              </Text>
+            </Pressable>*/}
+
+            {/* Front layer (glass, bar, etc.) – perfectly aligned */}
+            <Image
+              source={FRONT_IMG}
+              style={styles.mmfront}
+              resizeMode="stretch"
+              pointerEvents="none"
+            />
+          </View>
+        </View>
+
+        {/* Bottom nav can remain full-width below */}
         <View style={styles.navbarContainer}>
           <BottomNavbar selectedTab="Mr. Mingles" />
         </View>
       </View>
+
 
       <PopUp
         visible={showPopupShop}
@@ -641,6 +641,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
+  mmfront: {
+    width: "100%",
+    height: 650,
+    position: "absolute",
+    bottom: 0
+  },
   bubble: {
     width: width * 0.9,
     height: BUBBLE_HEIGHT,
@@ -661,7 +667,7 @@ const styles = StyleSheet.create({
   },
   bubbleText: {
     fontFamily: FontNames.MontserratRegular,
-    fontSize: 20,
+    fontSize: 18,
     color: "#fff",
     textAlign: "center",
   },
@@ -683,7 +689,7 @@ const styles = StyleSheet.create({
     right: "27%",
     width: 70,
     height: 30,
-    zIndex: 550
+    zIndex: 550,
   },
   overlayTouchableShop: {
     position: "absolute",

@@ -41,6 +41,11 @@ import { MoneysContext } from "../contexts/MoneysContext";
 import PopUp from "../components/PopUp";
 import { ScaledSheet } from "react-native-size-matters";
 
+// NEW
+import * as MailComposer from "expo-mail-composer";
+import { arrayUnion, arrayRemove } from "firebase/firestore";
+
+
 
 
 const steamboat = require('../assets/videos/steamboatwillie.mp4');
@@ -147,7 +152,46 @@ export default function Bar2Screen() {
 
   const isLastWelcome = !profileComplete && welcomeIndex === LAST_WELCOME_INDEX;
 
+    // Privacy & Security
+  const [safetyOpen, setSafetyOpen] = useState(false);            // first popup: Block / Report
+  const [reportOpen, setReportOpen] = useState(false);            // second popup: reasons + notes
+  const [reportReason, setReportReason] = useState<string | null>(null);
+  const [reportNotes, setReportNotes] = useState("");
+  const [sendingReport, setSendingReport] = useState(false);
 
+  // Blocked list + settings
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
+  const [blockedOpen, setBlockedOpen] = useState(false);
+
+  // Link guard
+  const [noLinksVisible, setNoLinksVisible] = useState(false);
+
+
+
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const myRef = doc(firestore, "users", auth.currentUser.uid);
+    const unsub = onSnapshot(myRef, async snap => {
+      const data: any = snap.data() || {};
+      const ids: string[] = Array.isArray(data.blocked) ? data.blocked : [];
+      setBlockedIds(ids);
+  
+      // fetch the blocked user docs so we can render the “Losers I Blocked” list
+      const users: any[] = [];
+      for (const uid of ids) {
+        try {
+          const s = await getDoc(doc(firestore, "users", uid));
+          if (s.exists()) users.push({ id: s.id, ...(s.data() as any) });
+        } catch {}
+      }
+      setBlockedUsers(users);
+    });
+    return () => unsub();
+  }, []);
+  
 
 
   useEffect(() => {
@@ -402,7 +446,15 @@ useEffect(() => {
 
  const messagingBlocked = deletionFlag !== null;
 
-  const onlineProfiles = profiles.filter(p => onlineStatus[p.id]);
+
+  const myUid = auth.currentUser?.uid;
+  const filtered = profiles.filter(p => {
+    const theyBlockedMe = Array.isArray(p.blocked) && myUid ? p.blocked.includes(myUid) : false;
+    const iBlockedThem  = blockedIds.includes(p.id);
+    return onlineStatus[p.id] && !theyBlockedMe && !iBlockedThem;
+  });
+  const onlineProfiles = filtered;
+
 
   // Prepare drink data for selected profile
   const profileDrink = typeof selectedProfile?.drink === "string"
@@ -463,6 +515,168 @@ useEffect(() => {
     setModalVisible(false);
     setTimeout(() => setChitChatModalVisible(true), 50);
   };
+  
+  async function blockUser(uidToBlock: string) {
+    if (!auth.currentUser) return;
+  
+    Alert.alert(
+      "Block user?",
+      "They will be hidden and cannot contact you.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await updateDoc(doc(firestore, "users", auth.currentUser.uid), {
+                blocked: arrayUnion(uidToBlock),
+              });
+              setModalVisible(false);
+              setSafetyOpen(false);
+              Alert.alert("Done", "User is now blocked and hidden.");
+              // instantly hide on screen
+              setProfiles(prev => prev.filter(p => p.id !== uidToBlock));
+            } catch (e) {
+              console.error(e);
+              Alert.alert("Error", "Could not block user. Try again.");
+            }
+          }
+        }
+      ]
+    );
+  }
+
+  async function unblockUser(uidToUnblock: string) {
+    if (!auth.currentUser) return;
+    try {
+      await updateDoc(doc(firestore, "users", auth.currentUser.uid), {
+        blocked: arrayRemove(uidToUnblock),
+      });
+      setBlockedIds(b => b.filter(id => id !== uidToUnblock));
+      setBlockedUsers(u => u.filter(u2 => u2.id !== uidToUnblock));
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Could not unblock. Try again.");
+    }
+  }
+
+  const REPORT_REASONS = [
+    "Harassment or bullying",
+    "Hate speech or discrimination",
+    "Threats or violence",
+    "Sexual content or nudity",
+    "Scam or fraud",
+    "Spam",
+    "Impersonation",
+    "Underage account",
+    "Self-harm concerns",
+    "Illegal activity",
+    "Off-platform contact pressure",
+    "Other",
+  ];
+  
+  function buildReportEmailBody() {
+    const reporter = auth.currentUser;
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const when = new Date().toISOString();
+  
+    const target = selectedProfile || {};
+    const payload = {
+      reason: reportReason,
+      notes: reportNotes.trim(),
+      whenISO: when,
+      locale,
+      timeZone: tz,
+      reporter: {
+        uid: reporter?.uid || "",
+        email: reporter?.email || "",
+      },
+      reportedUser: {
+        uid: target.id || "",
+        name: target.name || "",
+        age: target.age || "",
+        location: target.location || "",
+      },
+    };
+  
+    return [
+      "Dateish Safety Report",
+      "",
+      `Reason: ${payload.reason}`,
+      `Notes: ${payload.notes || "(none)"}`,
+      "",
+      `Time: ${payload.whenISO} (${payload.timeZone}, ${payload.locale})`,
+      "",
+      "Reporter:",
+      `- uid: ${payload.reporter.uid}`,
+      `- email: ${payload.reporter.email}`,
+      "",
+      "Reported user:",
+      `- uid: ${payload.reportedUser.uid}`,
+      `- name: ${payload.reportedUser.name}`,
+      `- age: ${payload.reportedUser.age}`,
+      `- location: ${payload.reportedUser.location}`,
+    ].join("\n");
+  }
+  
+  async function sendReportEmail() {
+    try {
+      setSendingReport(true);
+      const subject = `Dateish report — ${reportReason || "No reason selected"}`;
+      const body = buildReportEmailBody();
+  
+      const can = await MailComposer.isAvailableAsync();
+      if (can) {
+        await MailComposer.composeAsync({
+          recipients: ["dateish.office@gmail.com"],
+          subject,
+          body,
+        });
+      } else {
+        const mailto = `mailto:dateish.office@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        Linking.openURL(mailto);
+      }
+  
+      setReportOpen(false);
+      setSafetyOpen(false);
+      setReportReason(null);
+      setReportNotes("");
+  
+      Alert.alert(
+        "Thank you for helping to make Dateish safer!",
+        "",
+        [
+          {
+            text: "Email us more details",
+            onPress: () =>
+              Linking.openURL(
+                `mailto:dateish.office@gmail.com?subject=${encodeURIComponent("Dateish report follow-up")}`
+              ),
+          },
+          { text: "Close" },
+        ]
+      );
+    } finally {
+      setSendingReport(false);
+    }
+  }
+
+  const linkRx = /(https?:\/\/|www\.)\S+/gi;
+
+function stripLinksAndWarn(txt: string, setFn: (s: string) => void) {
+  if (linkRx.test(txt)) {
+    const cleaned = txt.replace(linkRx, "").trim();
+    setFn(cleaned);
+    setNoLinksVisible(true);
+  } else {
+    setFn(txt);
+  }
+}
+
+  
+  
   
   
   const handleChatPress = async () => {
@@ -976,7 +1190,7 @@ useEffect(() => {
                         <TextInput
                           style={styles.replyInput}
                           value={replyText}
-                          onChangeText={setReplyText}
+                          onChangeText={(t) => stripLinksAndWarn(t, setReplyText)}
                           placeholder="Write your reply…"
                           placeholderTextColor="#7A4C6E"
                           multiline
@@ -1042,11 +1256,12 @@ useEffect(() => {
             <TextInput
               style={styles.replyInput}
               value={firstMessageText}
-              onChangeText={setFirstMessageText}
+              onChangeText={(t) => stripLinksAndWarn(t, setFirstMessageText)}
               placeholder="Type your first message…"
               placeholderTextColor="#AB83A1"
               multiline
             />
+
             <TouchableOpacity
               style={[styles.replyButton, sendingFirstMessage && { opacity: 0.5 }]}
               disabled={sendingFirstMessage || messagingBlocked}
@@ -1068,11 +1283,25 @@ useEffect(() => {
       </Modal>
       {/* “Don’t be a creep” popup */}
       <Modal
-  visible={creepVisible}
-  animationType="slide"
-  transparent
-  onRequestClose={() => setCreepVisible(false)}
->
+        visible={creepVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setCreepVisible(false)}
+      >
+      <Modal transparent visible={noLinksVisible} animationType="fade" onRequestClose={() => setNoLinksVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.ccContainer}>
+            <Text style={[styles.ccLabel, { marginBottom: 8 }]}>Mr. Mingles</Text>
+            <Text style={{ color: "#F5E1C4", textAlign: "center", fontSize: 18 }}>
+              No links allowed here, take it outside!
+            </Text>
+            <TouchableOpacity style={[styles.replyButton, { marginTop: 16 }]} onPress={() => setNoLinksVisible(false)}>
+              <Text style={styles.replyButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
   <View style={creepStyles.mingModalOverlay}>
     <View style={creepStyles.mingModalContainer}>
       <TouchableOpacity

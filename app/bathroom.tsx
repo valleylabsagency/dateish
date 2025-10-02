@@ -822,7 +822,7 @@ useEffect(() => {
           </View>
         </Modal>
 
-        <Modal visible={cameraVisible} animationType="slide" transparent={false}>
+       <Modal visible={cameraVisible} animationType="slide" transparent={false}>
           <View style={{ flex: 1, backgroundColor: "black" }}>
             {device ? (
               <Camera
@@ -838,7 +838,7 @@ useEffect(() => {
               </View>
             )}
 
-            {/* Overlay controls */}
+           
             <View style={{ position: "absolute", bottom: 30, left: 0, right: 0, alignItems: "center" }}>
               <Text style={{ color: "#fff", marginBottom: 8 }}>
                 Center your pretty face in the frame
@@ -867,7 +867,7 @@ useEffect(() => {
               </TouchableOpacity>
             </View>
           </View>
-        </Modal>
+        </Modal> 
 
         {/* No-face “Mr. Mingles” popup */}
         <Modal transparent visible={noFaceVisible} animationType="fade">
