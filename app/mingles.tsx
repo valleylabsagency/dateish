@@ -268,7 +268,7 @@ async function handleRateNo() {
           style={{
             flex: 1,
             alignItems: "center",
-            justifyContent: "center",
+            justifyContent: "flex-start",
             backgroundColor: "black", // letterbox bars if needed
           }}
         >

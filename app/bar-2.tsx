@@ -13,7 +13,8 @@ import {
   TextInput,
   Pressable,
   Alert,
-  Animated
+  Animated,
+  Easing
 } from "react-native";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
@@ -135,6 +136,11 @@ export default function Bar2Screen() {
   const [minglesFrame, setMinglesFrame] = useState<{x:number,y:number,width:number,height:number} | null>(null);
   const [bubbleVisible, setBubbleVisible] = useState(false);
 
+    // slide-in for the avatars row
+  const avatarsX = useRef(new Animated.Value(width)).current;   // start off-screen right
+  const avatarsOpacity = useRef(new Animated.Value(0)).current; // fade in
+
+
   const isFocused = useIsFocused();
 
   const pulse = useRef(new Animated.Value(0)).current;
@@ -170,6 +176,8 @@ export default function Bar2Screen() {
   const [noLinksVisible, setNoLinksVisible] = useState(false);
 
 
+
+  
 
 
   useEffect(() => {
@@ -474,6 +482,8 @@ useEffect(() => {
    return () => { alive = false; };
  }, [modalVisible, selectedProfile]);
 
+ 
+
  const messagingBlocked = deletionFlag !== null;
 
 
@@ -484,6 +494,46 @@ useEffect(() => {
     return onlineStatus[p.id] && !theyBlockedMe && !iBlockedThem;
   });
   const onlineProfiles = filtered;
+
+  // animate the avatars row once when it first appears
+const shouldAnimateAvatars = started && onlineProfiles.length > 0;
+const avatarsShownRef = useRef(false);
+
+useEffect(() => {
+  // If we shouldn't show them, keep row staged off-screen and
+  // reset the "already animated" flag so it re-animates next time.
+  if (!shouldAnimateAvatars) {
+    avatarsShownRef.current = false;
+    avatarsX.setValue(width);
+    avatarsOpacity.setValue(0);
+    return;
+  }
+
+  // If we've already animated this session, do nothing.
+  if (avatarsShownRef.current) return;
+
+  // First-time show → slide/fade in from the right.
+  avatarsX.setValue(width);
+  avatarsOpacity.setValue(0);
+
+  Animated.parallel([
+    Animated.timing(avatarsX, {
+      toValue: 0,
+      duration: 450,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }),
+    Animated.timing(avatarsOpacity, {
+      toValue: 1,
+      duration: 300,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }),
+  ]).start(() => {
+    avatarsShownRef.current = true;
+  });
+}, [shouldAnimateAvatars, width]);
+
 
 
   // Prepare drink data for selected profile
@@ -704,6 +754,8 @@ function stripLinksAndWarn(txt: string, setFn: (s: string) => void) {
     setFn(txt);
   }
 }
+
+
 
   
   
@@ -1027,7 +1079,12 @@ function stripLinksAndWarn(txt: string, setFn: (s: string) => void) {
               )}
             </Pressable>
 
-            <View style={styles.onlineRow}>
+            <Animated.View
+            style={[
+                  styles.onlineRow,
+                  { transform: [{ translateX: avatarsX }], opacity: avatarsOpacity },
+            ]}
+            >
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -1059,7 +1116,7 @@ function stripLinksAndWarn(txt: string, setFn: (s: string) => void) {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-            </View>
+            </Animated.View>
           </>
         )}
 
@@ -1543,7 +1600,7 @@ const styles = StyleSheet.create({
   },
   barFront: {
     width: "100%",
-    height: 830,
+    height: 850,
     zIndex: 2,
   },
 
