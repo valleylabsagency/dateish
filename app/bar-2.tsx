@@ -1,5 +1,6 @@
 // bar-2.tsx
 import React, { useState, useEffect, useRef, useContext } from "react";
+
 import {
   View,
   Text,
@@ -20,7 +21,7 @@ import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
 import { firestore, auth } from "../firebase";
-import { getDatabase, ref, onValue } from "firebase/database";
+import { getDatabase, ref as rtdbRef, onValue, update as rtdbUpdate, set as rtdbSet } from "firebase/database";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { scale } from "react-native-size-matters";
@@ -45,6 +46,8 @@ import { ScaledSheet } from "react-native-size-matters";
 // NEW
 import * as MailComposer from "expo-mail-composer";
 import MMAnimated from "@/services/MMAnimated";
+import { Linking } from "react-native";
+
 
 
 
@@ -200,6 +203,8 @@ export default function Bar2Screen() {
     });
     return () => unsub();
   }, []);
+
+  
   
 
 
@@ -353,12 +358,43 @@ useEffect(() => {
 
   const [introPlayed, setIntroPlayed] = useState<boolean>(false);
 
-//remove
+// presence: only be online when started && screen focused
 useEffect(() => {
-  if (!isFocused) return;
-  setStarted(false);
-  AsyncStorage.removeItem("bar2Started").catch(() => {});
-}, [isFocused]);
+  if (!auth.currentUser) return;
+  const db = getDatabase();
+  const statusRef = rtdbRef(db, `status/${auth.currentUser.uid}`);
+
+  let hb: any = null;
+
+  const goOnline = () => {
+    // set visible in bar and bump lastActive immediately
+    rtdbUpdate(statusRef, { online: true, bar: true, lastActive: Date.now() }).catch(() => {});
+    // heartbeat while visible in bar
+    hb = setInterval(() => {
+      rtdbUpdate(statusRef, { lastActive: Date.now() }).catch(() => {});
+    }, 30_000);
+  };
+
+  const goOffline = () => {
+    if (hb) { clearInterval(hb); hb = null; }
+    rtdbUpdate(statusRef, { online: false, bar: false, lastActive: Date.now() }).catch(() => {});
+  };
+
+  if (started && isFocused) {
+    goOnline();
+  } else {
+    goOffline();
+  }
+
+  return () => {
+    if (hb) { clearInterval(hb); hb = null; }
+    // If we’re leaving this screen, ensure we’re hidden
+    if (auth.currentUser) {
+      rtdbUpdate(statusRef, { online: false, bar: false, lastActive: Date.now() }).catch(() => {});
+    }
+  };
+}, [started, isFocused, auth.currentUser?.uid]);
+
 
 useEffect(() => {
   let alive = true;
@@ -426,16 +462,37 @@ useEffect(() => {
   // 2) subscribe to realtime online status
   useEffect(() => {
     const db = getDatabase();
-    const unsub: (() => void)[] = [];
-    profiles.forEach(p => {
-      const statusRef = ref(db, `status/${p.id}`);
-      const off = onValue(statusRef, snap =>
-        setOnlineStatus(prev => ({ ...prev, [p.id]: snap.val()?.online ?? false }))
-      );
+    const unsub: Array<() => void> = [];
+    const TEN_MIN = 10 * 60 * 1000;
+  
+    profiles.forEach((p) => {
+      if (!p?.id) return;
+  
+      const statusRef = rtdbRef(db, `status/${p.id}`);
+  
+      const off = onValue(statusRef, (snap) => {
+        const s = snap.val() || {};
+  
+        const fresh =
+          typeof s.lastActive === "number" &&
+          Date.now() - s.lastActive < TEN_MIN;
+  
+        // must be online, in the bar, and fresh
+        const isOnline = Boolean(s.online) && Boolean(s.bar) && fresh;
+  
+        setOnlineStatus((prev) => {
+          if (prev[p.id] === isOnline) return prev; // avoid churn
+          return { ...prev, [p.id]: isOnline };
+        });
+      });
+  
       unsub.push(off);
     });
-    return () => unsub.forEach(f => f());
+  
+    return () => unsub.forEach((u) => u());
   }, [profiles]);
+  
+  
 
  // When the profile modal opens, figure out if the chat was deleted by you/them
  useEffect(() => {
@@ -1023,10 +1080,11 @@ function stripLinksAndWarn(txt: string, setFn: (s: string) => void) {
               onPress={async () => {
                 setLeaving(true);
                 try {
-                  await AsyncStorage.setItem("bar2Started", "true");
-                } catch (e) {
-                  console.error("Save start-chat flag:", e);
-                }
+                  const db = getDatabase();
+                  const statusRef = rtdbRef(db, `status/${auth.currentUser!.uid}`);
+                  // Immediately mark online so others can see you right away
+                  rtdbUpdate(statusRef, { online: true, bar: true, lastActive: Date.now() }).catch(() => {});
+                } catch {}
               }}
             >
               <Text numberOfLines={1} style={styles.startButtonText}>Start Chatting</Text>

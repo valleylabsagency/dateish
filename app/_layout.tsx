@@ -11,7 +11,7 @@ import {
   Animated,
   useWindowDimensions,
 } from "react-native";
-import { Stack, usePathname, useLocalSearchParams, Slot } from "expo-router";
+import { usePathname, useLocalSearchParams, withLayoutContext } from "expo-router"
 import Navbar from "../components/Navbar";
 import { NavbarContext } from '../contexts/NavbarContext';
 import { MoneysProvider } from "../contexts/MoneysContext";
@@ -35,6 +35,12 @@ import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import PushNavBridge from './PushNavBridge';
+import * as SystemUI from 'expo-system-ui';
+
+import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
+
+const BaseStack = createStackNavigator();
+const Stack = withLayoutContext(BaseStack.Navigator);
 
 //import { initAds } from "@/services/ads";
 
@@ -130,6 +136,11 @@ function AnimatedSplashScreen({
       }).start(() => setAnimationComplete(true));
     }
   }, [isAppReady, isSplashVideoComplete, animation]);
+
+  useEffect(() => {
+    // Prevent white flashes between route transitions
+    SystemUI.setBackgroundColorAsync('#000');
+  }, []);
 
   const onVideoLoaded = useCallback(async () => {
     try {
@@ -252,7 +263,7 @@ useEffect(() => {
     return (
       <ImageBackground
         source={require("../assets/images/chat-background.png")}
-        style={styles.background}
+        style={[styles.background, { flex: 1 }]}
         resizeMode="cover"
       >
         <View style={styles.centered}>
@@ -266,7 +277,7 @@ useEffect(() => {
 
   return (
     
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000"}}>
         <InactivityHandler>
           <AuthProvider>
             <PresenceWrapper>
@@ -281,7 +292,28 @@ useEffect(() => {
                                 <NotificationDisplay />
                                 <OfflineNotice />
                                 {!hideNavbar && <Navbar />}
-                                <Stack screenOptions={{ headerShown: false }} />
+                                <Stack
+                                  detachInactiveScreens={false}            // keep previous screen mounted (no flashes)
+                                  screenOptions={{
+                                    headerShown: false,
+                                    // Both screens slide horizontally (iOS-like) on iOS & Android
+                                    cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+
+                                    // Slow it down (tweak to taste)
+                                    transitionSpec: {
+                                      open:  { animation: 'timing', config: { duration: 600 } },
+                                      close: { animation: 'timing', config: { duration: 600 } },
+                                    },
+
+                                    // Never show a white/black flash
+                                    cardStyle:    { backgroundColor: '#000' },
+                                    contentStyle: { backgroundColor: '#000' },
+
+                                    gestureEnabled: true,
+                                  }}
+                                />
+
+
                                 <StatusBar hidden />
                               </View>
                             </NavbarContext.Provider>
@@ -315,8 +347,8 @@ function NotificationDisplay() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  background: { flex: 1, justifyContent: "flex-start", alignItems: "center" },
+  container: { flex: 1, backgroundColor: '#000'},
+  background: { flex: 1, justifyContent: "flex-start", alignItems: "center", backgroundColor: "#000" },
   centered: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "black" },
   message: { fontSize: 32, textAlign: "center", padding: 20, color: "yellow" },
 });

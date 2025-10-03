@@ -1,55 +1,67 @@
-import React, { useEffect, ReactNode } from "react";
-import { AppState } from "react-native";
-import { getDatabase, ref, onDisconnect, onValue, set } from "firebase/database";
+// PresenceWrapper.tsx
+import React, { useEffect } from "react";
+import { AppState, AppStateStatus } from "react-native";
+import { getDatabase, ref, onDisconnect, set, update } from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
 import { auth } from "../firebase";
 
-interface PresenceWrapperProps {
-  children: ReactNode;
-}
-
 type Props = React.PropsWithChildren<{}>;
+
+const IDLE_LIMIT_MS  = 10 * 60 * 1000;   // 10 minutes
+const LAST_BG_KEY    = "presence:lastBackgroundAt";
 
 export default function PresenceWrapper({ children }: Props) {
   useEffect(() => {
     const db = getDatabase();
-    // Listen for auth state changes to ensure a user is present
+    let cleanupUser: (() => void) | null = null;
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (!user) return; // No user is logged in
-      
+      if (cleanupUser) { cleanupUser(); cleanupUser = null; }
+      if (!user) return;
+
       const userStatusRef = ref(db, `status/${user.uid}`);
-      const connectedRef = ref(db, ".info/connected");
 
-      // Listen for connection state changes
-      const unsubscribeConnected = onValue(connectedRef, (snap) => {
-        if (snap.val() === true) {
-          onDisconnect(userStatusRef).set({ online: false });
-          set(userStatusRef, { online: true });
-        }
-      });
+      // If the app/socket dies, force hidden
+      onDisconnect(userStatusRef)
+        .set({ online: false, bar: false, lastActive: Date.now() })
+        .catch(() => {});
 
-      // sets to offline if the user has app in the background.
-      //  Commented out so a user is offline only if they close the app entirely
-      
-      /*const handleAppStateChange = (nextAppState: string) => {
-        if (nextAppState === "active") {
-          set(userStatusRef, { online: true });
-          console.log(`User ${user.uid} active`);
+      // Default state while not in the bar: hidden
+      set(userStatusRef, { online: false, bar: false, lastActive: Date.now() }).catch(() => {});
+
+      const onAppStateChange = async (next: AppStateStatus) => {
+        if (next === "active") {
+          const lastBgStr = await AsyncStorage.getItem(LAST_BG_KEY);
+          const lastBg = lastBgStr ? parseInt(lastBgStr, 10) : 0;
+
+          if (lastBg && Date.now() - lastBg >= IDLE_LIMIT_MS) {
+            // Idle too long → send to entrance and keep hidden
+            update(userStatusRef, { online: false, bar: false, lastActive: Date.now() }).catch(() => {});
+            router.replace("/entrance");
+          } else {
+            // Foreground quickly → keep whatever 'online' was (don’t force true)
+            update(userStatusRef, { lastActive: Date.now() }).catch(() => {});
+          }
+          await AsyncStorage.removeItem(LAST_BG_KEY);
         } else {
-          set(userStatusRef, { online: false });
-          console.log(`User ${user.uid} inactive`);
+          // background/inactive — record the time; do not flip online=true
+          await AsyncStorage.setItem(LAST_BG_KEY, String(Date.now()));
         }
       };
 
-      const subscription = AppState.addEventListener("change", handleAppStateChange); */
+      const appSub = AppState.addEventListener("change", onAppStateChange);
 
-      // Cleanup the connected listener and AppState listener for this user
-      return () => {
-        unsubscribeConnected();
+      cleanupUser = () => {
+        appSub.remove();
       };
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      if (cleanupUser) cleanupUser();
+      unsubscribeAuth();
+    };
   }, []);
 
   return <>{children}</>;
