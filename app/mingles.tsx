@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
   },
   mmfront: {
     width: "100%",
-    height: 650,
+    height: "80%",
     position: "absolute",
     bottom: 0
   },
