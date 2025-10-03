@@ -103,7 +103,7 @@ export default function ProfileNavbar({ onBack, showBack = true }: ProfileNavbar
         )}
 
       <View style={profileNavbarStyles.navSpacer} />
-        {/*}
+        
       <TouchableOpacity 
         style={profileNavbarStyles.moneysBar}
         onPress={() => {
@@ -112,7 +112,7 @@ export default function ProfileNavbar({ onBack, showBack = true }: ProfileNavbar
         }}>
               <Text style={profileNavbarStyles.moneysAmount}>10</Text>
               <Image style={profileNavbarStyles.moneysImage} source={require("../assets/images/moneys.png")} />
-            </TouchableOpacity> */}
+            </TouchableOpacity> 
 
       {/* Speaker icon area */}
       {soundLoading ? (
