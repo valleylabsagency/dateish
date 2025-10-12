@@ -29,6 +29,7 @@ import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as StoreReview from "expo-store-review";
 import { Linking, Platform, useWindowDimensions, Pressable } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 //import { showInterstitial } from "@/services/ads";
 
 
@@ -65,14 +66,16 @@ export default function MinglesScreen() {
   const [popupFlag, setPopupFlag] = useState<string | null>(null);
   const [vipLoading, setVipLoading] = useState(false);
 
+  
+
   // Turn on to SEE the touchable overlays (auto-on in dev if you want)
 const SHOW_HITBOXES = true; // or __DEV__
 const SHOW_HITBOX = false; // flip to true when debugging tap areas
 
 const hotspotBase = {
   position: "absolute" as const,
-  zIndex: 10,
-  ...Platform.select({ android: { elevation: 10 } }),
+  zIndex: 9999,
+  ...Platform.select({ android: { elevation: 9999 } }),
 };
 
 const debugOutline = SHOW_HITBOX
@@ -89,28 +92,6 @@ const hit = (color = "lime") =>
         elevation: 99,   // Android
       }
     : null;
-
-
-  const { width: sw, height: sh } = useWindowDimensions();
-  // Fit the stage to the screen while preserving ART aspect (letterbox if needed)
-  const stageW = sw;
-  const stageH = stageW / STAGE_AR;
-  const fitsHeight = stageH <= sh;
-  const finalW = fitsHeight ? stageW : sh * STAGE_AR;
-  const finalH = fitsHeight ? stageH : sh;
-
-  // Helper to position things by normalized rects (0..1)
-  const rect = React.useCallback(
-    (x: number, y: number, w: number, h: number) => ({
-      position: "absolute" as const,
-      left: x * finalW,
-      top: y * finalH,
-      width: w * finalW,
-      height: h * finalH,
-    }),
-    [finalW, finalH]
-  );
-
 
   const router = useRouter();
   const params = useLocalSearchParams<{ open?: string }>();
@@ -261,6 +242,78 @@ async function handleRateNo() {
 
   if (!fontsLoaded) return null;
 
+ // state to hold the *exact* visible height
+const [stageH, setStageH] = React.useState<number | null>(null);
+
+// ====== Stage sizing (COVER, no side bars, no bottom gap) ======
+const { width: sw, height: sh } = useWindowDimensions();
+
+// Use measured stage height if we have it; otherwise fall back to full height minus our initial navbar guess
+const containerW = sw;
+const visibleH = stageH ?? (sh - 72); 
+
+
+
+// Compute cover scale in the *visible* area only
+const scale = Math.max(containerW / BGW, visibleH / BGH);
+const dispW = BGW * scale;
+const dispH = BGH * scale;
+
+const offsetX = (containerW - dispW) / 2;
+const offsetY = (visibleH - dispH) / 2;
+
+const FRONT_HEIGHT_FRAC = 0.64; // was 0.8 → shorter
+
+const FRONT = { x: 0, w: 1 };
+
+const frontLeft = offsetX + FRONT.x * dispW;
+const frontHeightPx = FRONT_HEIGHT_FRAC * dispH;
+const frontTop = Math.round(visibleH - frontHeightPx);
+
+// Generic rect helper in art space (uses visibleH offsets)
+const rect = React.useCallback(
+  (x: number, y: number, w: number, h: number) => ({
+    position: "absolute" as const,
+    left: offsetX + x * dispW,
+    top:  offsetY + y * dispH,
+    width:  w * dispW,
+    height: h * dispH,
+  }),
+  [offsetX, offsetY, dispW, dispH]
+);
+
+// Hotspots tied to FRONT box
+const rectInFront = (x: number, y: number, w: number, h: number) => ({
+  position: "absolute" as const,
+  left:  frontLeft + x * dispW,
+  top:   frontTop  + y * frontHeightPx,
+  width: w * dispW,
+  height: h * frontHeightPx,
+});
+
+const MINGLES = { x: 0.02, y: 0.23, w: 0.70, h: 0.50 };
+const minglesBox = rect(MINGLES.x, MINGLES.y, MINGLES.w, MINGLES.h);
+const HIT_INSET = { left: 0.3, right: 0.3, top: 0.25, bottom: 0.24 }; // 10–12% inset
+const minglesHit = rect(
+  MINGLES.x + MINGLES.w * HIT_INSET.left,
+  MINGLES.y + MINGLES.h * HIT_INSET.top,
+  MINGLES.w * (1 - HIT_INSET.left - HIT_INSET.right),
+  MINGLES.h * (1 - HIT_INSET.top - HIT_INSET.bottom)
+);
+
+const BUBBLE = { x: 0.05, y: 0.08, w: 0.90, h: 0.18 };
+const bubbleBox = rect(BUBBLE.x, BUBBLE.y, BUBBLE.w, BUBBLE.h);
+// move content up ~2% of stage height; tweak -0.015…-0.03 to taste
+const bubbleNudgeY = -0.02 * dispH;
+const arrowNudgeY  = -0.015 * dispH;   // moves arrows up to match
+
+// A little extra spacing for the TAP button (positive pushes it down)
+const tapExtraGap = 0.02 * dispH;
+
+
+
+
+
   return (
     <>
       <View style={styles.container}>
@@ -273,54 +326,107 @@ async function handleRateNo() {
           }}
         >
           {/* ==== STAGE (locked to bg aspect) ==== */}
-          <View style={{ width: finalW, height: finalH }}>
+          <View style={{ width: containerW, height: visibleH, overflow: "hidden" }}>
+
             {/* Back layer */}
             <Image
               source={BG_IMG}
-              style={{width: "100%", height: "100%"}}
-              // Stage already matches bg aspect; 'stretch' keeps pixel-perfect overlay alignment
+              style={{ position: "absolute", left: offsetX, top: offsetY, width: dispW, height: dispH }}
               resizeMode="stretch"
             />
 
+
             {/* Mr. Mingles (click to cycle) */}
-            <Pressable
-              style={rect(0.58, 0.12, 0.35, 0.75)} // <— tweak once visually; works on all devices afterwards
-              onPress={cycle}
-              android_ripple={{ color: "rgba(255,255,255,0.08)" }}
-            >
-              <Image
-                source={MINGLES_IMG}
-                style={{ width: 400, height: 400, position: "relative", right: 280, top: 80 }}
-                resizeMode="contain"
-              />
-            </Pressable>
+            
+            <Image
+              source={MINGLES_IMG}
+              style={[minglesBox]}
+              resizeMode="contain"
+              pointerEvents="none"
+            />
+           
+
 
             {/* Speech bubble (placed by fraction, not pixels) */}
-            <View style={[rect(0.05, 0.02, 0.90, 0.18)]}>
+            <View style={bubbleBox}>
               <ImageBackground
                 source={require("../assets/images/speech-bubble.png")}
-                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10 }}
+                style={{ flex: 1 }}
                 imageStyle={{ transform: [{ scaleX: -1 }] }}
                 resizeMode="stretch"
               >
-                <TouchableOpacity onPress={back} style={{ width: 40, alignItems: "center", justifyContent: "center" }}>
+                {/* LEFT ARROW */}
+                <TouchableOpacity
+                  onPress={back}
+                  style={{
+                    position: "absolute",
+                    left: 0, top: 0, bottom: 0, width: 40,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transform: [{ translateY: arrowNudgeY }],
+                    zIndex: 2,
+                    ...Platform.select({ android: { elevation: 2 } }),
+                  }}
+                >
                   <MaterialIcons name="chevron-left" size={32} color="#fff" />
                 </TouchableOpacity>
 
-                <View style={{ flex: 1, alignItems: "center" }}>
-                  <Text style={styles.bubbleText}>{messages[idx]}</Text>
+                {/* RIGHT ARROW */}
+                <TouchableOpacity
+                  onPress={cycle}
+                  style={{
+                    position: "absolute",
+                    right: 0, top: 0, bottom: 0, width: 40,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transform: [{ translateY: arrowNudgeY }],
+                    zIndex: 2,
+                    ...Platform.select({ android: { elevation: 2 } }),
+                  }}
+                >
+                  <MaterialIcons name="chevron-right" size={32} color="#fff" />
+                </TouchableOpacity>
+
+                {/* CENTER CONTENT (let touches pass through to siblings) */}
+                <View
+                  pointerEvents="box-none"
+                  style={{
+                    flex: 1,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    paddingLeft: 40,
+                    paddingRight: 40,
+                    transform: [{ translateY: bubbleNudgeY }],
+                    zIndex: 1,
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.bubbleText,
+                      { includeFontPadding: false, textAlignVertical: "center" },
+                    ]}
+                  >
+                    {messages[idx]}
+                  </Text>
+
                   {idx === 0 && (
-                    <TouchableOpacity onPress={() => setShowDrinkMenu(true)} style={{ paddingHorizontal: 24, paddingVertical: 8, borderRadius: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => setShowDrinkMenu(true)}
+                      style={{
+                        paddingHorizontal: 24,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        marginTop: tapExtraGap, // keeps it lower/clearer
+                      }}
+                    >
                       <Text style={styles.tapText}>- TAP -</Text>
                     </TouchableOpacity>
                   )}
                 </View>
-
-                <TouchableOpacity onPress={cycle} style={{ width: 40, alignItems: "center", justifyContent: "center" }}>
-                  <MaterialIcons name="chevron-right" size={32} color="#fff" />
-                </TouchableOpacity>
               </ImageBackground>
             </View>
+
+
             {/* ==== DRINK MENU MODAL ==== */}
             <Modal visible={showDrinkMenu} transparent animationType="fade" onRequestClose={() => setShowDrinkMenu(false)}>
               <View style={drinkModalStyles.modalOverlay}>
@@ -370,21 +476,28 @@ async function handleRateNo() {
 
             {/* Hotspots – all normalized; tweak once and they’re stable everywhere */}
             <Pressable
-              style={[rect(0.57, 0.753, 0.16, 0.03), hit("cyan")]} // drink
+              style={[hotspotBase, minglesHit]} // hit() only for debugging
+              onPress={cycle}
+              android_ripple={{ color: "rgba(255,255,255,0.08)" }}
+            />
+
+            <Pressable
+              style={[hotspotBase, rectInFront(0.57, 0.69, 0.16, 0.03)]}
               onPress={() => setShowDrinkMenu(true)}
             />
             <Pressable
-              style={[rect(0.57, 0.813, 0.16, 0.03), hit("red")]} // shop
+              style={[hotspotBase, rectInFront(0.57, 0.76, 0.13, 0.03)]}
               onPress={() => { setPopupFlag("shop"); setShowPopupShop(true); }}
             />
             <Pressable
-              style={[rect(0.54, 0.865, 0.18, 0.03), hit("yellow")]} // rules
+              style={[hotspotBase, rectInFront(0.54, 0.84, 0.16, 0.03)]}
               onPress={() => { setPopupFlag("rules"); setShowPopupRules(true); }}
-            />{/*
+            />
             <Pressable
-              style={rect(0.03, 0.58, 0.14, 0.18)} // tip jar
+              style={[hotspotBase, rectInFront(0.05, 0.3, 0.18, 0.19)]}
               onPress={handleTipJar}
-            /> */}{/*
+            />
+            {/*
             <Pressable
               style={rect(0.38, 0.79, 0.28, 0.06)} // "Don’t Press Here"
               onPress={async () => { if (!dontPressPressed) { setDontPressPressed(true); } }}
@@ -397,15 +510,27 @@ async function handleRateNo() {
             {/* Front layer (glass, bar, etc.) – perfectly aligned */}
             <Image
               source={FRONT_IMG}
-              style={styles.mmfront}
+              style={{
+                position: "absolute",
+                left: frontLeft,
+                top: frontTop,
+                width: FRONT.w * dispW,
+                height: frontHeightPx,
+              }}
               resizeMode="stretch"
               pointerEvents="none"
             />
+
+
           </View>
         </View>
 
         {/* Bottom nav can remain full-width below */}
-        <View style={styles.navbarContainer}>
+        <View
+          style={styles.navbarContainer}
+          onLayout={(e) => setStageH(e.nativeEvent.layout.y)}
+          pointerEvents="box-none"
+        >
           <BottomNavbar selectedTab="Mr. Mingles" />
         </View>
       </View>
@@ -628,10 +753,6 @@ const styles = StyleSheet.create({
     height: "80%",
     alignItems: "center",
     // pointerEvents none above
-  },
-  frontImage: {
-    width: "100%",
-    height: 700
   },
   bubbleContainer: {
     position: "absolute",

@@ -74,13 +74,7 @@ function useDisableBackButton() {
  * Renders the splash video and calls onLoaded/onFinish events
  */
 
-function SplashVideo({
-    onLoaded,
-    onFinish,
-  }: {
-    onLoaded: () => void;
-    onFinish: () => void;
-  }) {
+function SplashVideo({ onLoaded, onFinish }: { onLoaded: () => void; onFinish: () => void; }) {
   const videoRef = useRef<any>(null);
   const [lastStatus, setLastStatus] = useState<AVPlaybackStatus | null>(null);
 
@@ -94,71 +88,63 @@ function SplashVideo({
       resizeMode={ResizeMode.COVER}
       onPlaybackStatusUpdate={(status) => {
         if ("isLoaded" in status && status.isLoaded) {
-          // first time we see loaded -> trigger onLoaded
-          if (!(lastStatus && "isLoaded" in lastStatus && lastStatus.isLoaded)) {
-            onLoaded();
-          }
-          if (status.didJustFinish) {
-            onFinish();
-          }
+          if (!(lastStatus && "isLoaded" in lastStatus && lastStatus.isLoaded)) onLoaded();
+          if (status.didJustFinish) onFinish();
         }
         setLastStatus(status);
       }}
       onError={() => {
-        // If the asset can’t load, skip the splash
+        // ✅ If Android can't decode the file, complete the splash flow
         onFinish();
       }}
-      // Optional: prevent transport controls from flashing
       useNativeControls={false}
     />
   );
 }
 
+
 /**
  * Wraps children with animated fade-out after splash video and app load
  */
-function AnimatedSplashScreen({
-  children,
-}: {
-  children?: React.ReactNode;
-}) {
+function AnimatedSplashScreen({ children }: { children?: React.ReactNode }) {
   const animation = useMemo(() => new Animated.Value(1), []);
   const [isAppReady, setAppReady] = useState(false);
   const [isSplashVideoComplete, setVideoComplete] = useState(false);
   const [isSplashAnimationComplete, setAnimationComplete] = useState(false);
+  const [minDurationReached, setMinDurationReached] = useState(false);
+
+  // App ready independent of video
+  useEffect(() => {
+    let raf = requestAnimationFrame(() => setAppReady(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // ✅ Minimum visible time (e.g., 1200 ms) so it doesn’t insta-skip
+  useEffect(() => {
+    const t = setTimeout(() => setMinDurationReached(true), 1200);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
-    if (isAppReady && isSplashVideoComplete) {
+    if (isAppReady && isSplashVideoComplete && minDurationReached) {
       Animated.timing(animation, {
         toValue: 0,
-        duration: 200,
+        duration: 220,
         useNativeDriver: true,
       }).start(() => setAnimationComplete(true));
     }
-  }, [isAppReady, isSplashVideoComplete, animation]);
+  }, [isAppReady, isSplashVideoComplete, minDurationReached, animation]);
 
-  useEffect(() => {
-    // Prevent white flashes between route transitions
-    SystemUI.setBackgroundColorAsync('#000');
-  }, []);
+  useEffect(() => { SystemUI.setBackgroundColorAsync('#000'); }, []);
 
   const onVideoLoaded = useCallback(async () => {
-    try {
-      // Only hide native splash if you previously called preventAutoHideAsync
-      // It's safe to call hide even if prevent wasn't called, but wrap in try/catch
-      await SplashScreen.hideAsync();
-    } catch {}
-    finally {
-      setAppReady(true);
-    }
+    try { await SplashScreen.hideAsync(); } catch {}
   }, []);
 
-  // Safety: if the video never reports finish (bad asset, codec issue), move on after a timeout
+  // Safety: if the video never reports finish, complete after 4s
   useEffect(() => {
-    const failSafe = setTimeout(() => {
-      if (!isSplashVideoComplete) setVideoComplete(true);
-    }, 4000);
-    return () => clearTimeout(failSafe);
+    const t = setTimeout(() => { if (!isSplashVideoComplete) setVideoComplete(true); }, 4000);
+    return () => clearTimeout(t);
   }, [isSplashVideoComplete]);
 
   const videoElement = useMemo(
@@ -173,13 +159,11 @@ function AnimatedSplashScreen({
 
   return (
     <View style={{ flex: 1 }}>
-      {isAppReady && children}
+      {children}
       {!isSplashAnimationComplete && (
         <Animated.View
           pointerEvents="box-only"
-          onStartShouldSetResponder={() => true}
-          onResponderTerminationRequest={() => false}
-          style={[StyleSheet.absoluteFill, { opacity: animation }]}
+          style={[StyleSheet.absoluteFill, { opacity: animation, backgroundColor: '#000' }]}
         >
           {videoElement}
         </Animated.View>
@@ -187,6 +171,8 @@ function AnimatedSplashScreen({
     </View>
   );
 }
+
+
 
 
 export default function Layout() {
@@ -276,7 +262,7 @@ useEffect(() => {
   }
 
   return (
-    
+    <AnimatedSplashScreen>
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000"}}>
         <InactivityHandler>
           <AuthProvider>
@@ -327,7 +313,7 @@ useEffect(() => {
           </AuthProvider>
         </InactivityHandler>
       </GestureHandlerRootView>
-
+      </AnimatedSplashScreen>
   );
   
   
