@@ -69,6 +69,17 @@ const withoutBg = {
   ),
 }
 
+const BAR_FRONT_IMG = require("../assets/images/bar-front.png");
+
+// Controls for how the bar front sits on the background, as fractions of bg height
+const BAR_FRONT_HEIGHT_FRAC = 0.92;    // ~36% of the background's height
+const BAR_FRONT_BOTTOM_FRAC = -0.05;   // same -5% you had, but as a fractionc
+
+const MINGLES_LEFT_FRAC  = 0.23;  // was width * 0.08
+const MINGLES_TOP_FRAC   = 0.11;  // was "11%"
+const MINGLES_WIDTH_FRAC = 0.80;  // was width * 0.8
+const MINGLES_HEIGHT_FRAC = 0.75; // was height * 0.75
+
 // Mapping of drink types to icons
 const drinkMapping: Record<string, any> = {
   wine: require("../assets/images/icons/wine.png"),
@@ -959,8 +970,17 @@ function stripLinksAndWarn(txt: string, setFn: (s: string) => void) {
               </ImageBackground>
             </View>
 
+            {bgFrame && (
             <View
-              style={[styles.minglesContainer, { zIndex: 3 }]} // keep him below the bar-front (we’ll bump that to 10)
+              style={{
+                position: "absolute",
+                zIndex: 3,
+                // origin is already the top-left of the background container
+                left:  bgFrame.w * MINGLES_LEFT_FRAC,
+                top:   bgFrame.h * MINGLES_TOP_FRAC,
+                width: bgFrame.w * MINGLES_WIDTH_FRAC,
+                height:bgFrame.h * MINGLES_HEIGHT_FRAC,
+              }}
               pointerEvents="box-none"
               collapsable={false}
               onLayout={e => {
@@ -973,15 +993,18 @@ function stripLinksAndWarn(txt: string, setFn: (s: string) => void) {
                 hitSlop={20}
                 pointerEvents="box-only"
                 disabled={welcomeIndex === LAST_WELCOME_INDEX}
-                style={styles.minglesImage}            // <- pressable == exact image bounds
+                style={{ width: "100%", height: "100%" }}
               >
                 <Image
                   source={require("../assets/images/mr-mingles.png")}
-                  style={{ width: "100%", height: "100%" }}
+                  style={{ width: "100%", height: "100%", }}
                   resizeMode="contain"
                 />
               </Pressable>
             </View>
+          )}
+
+
 
 
             {/* Pointer → Mr. Mingles (after first line) */}
@@ -1179,14 +1202,30 @@ function stripLinksAndWarn(txt: string, setFn: (s: string) => void) {
         )}
 
         {/* ─── BACK BAR LAYERS ───────────────────────── */}
-        <View style={styles.barFrontContainer} pointerEvents="none">
-          <Image
-            style={styles.barFront}
-            source={require("../assets/images/bar-front.png")}
-            resizeMode="stretch"
+        {/* ─── BAR FRONT LAYER (percent-based, anchored to bgFrame) ───────── */}
+        {bgFrame && (
+          <View
             pointerEvents="none"
-          />
-        </View>
+            style={{
+              position: "absolute",
+              // Full width of the background:
+              left: bgFrame.x,
+              width: bgFrame.w,
+              // Height is a fraction of the bg height:
+              height: bgFrame.h * BAR_FRONT_HEIGHT_FRAC,
+              // Sit slightly “past” the bottom like your -5%:
+              bottom: bgFrame.h * BAR_FRONT_BOTTOM_FRAC,
+              zIndex: 10,
+            }}
+          >
+            <Image
+              source={BAR_FRONT_IMG}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="stretch"
+            />
+          </View>
+        )}
+
       </ImageBackground>
 
       {/* ─── PROFILE DETAIL MODAL ──────────────────── */}
@@ -1530,22 +1569,6 @@ const styles = StyleSheet.create({
     zIndex: 2, // below Mr. Mingles (zIndex 5) and Skip (zIndex 6), above background
   },
 
-  // ─── Mr. Mingles ──────────────────────────────
-  minglesContainer: {
-    position: "absolute",
-    top: "11%",
-    left: width * 0.08,
-    height: "100%",
-    width: "100%",
-    alignItems: "center",
-    zIndex: 1,
-  },
-  minglesImage: {
-    width: width * 0.8,
-    height: height * 0.75,
-    alignSelf: "center"
-  },
-
   // Skip (welcome)
   skipButton: {
     position: "absolute",
@@ -1638,7 +1661,7 @@ const styles = StyleSheet.create({
   // ─── ONLINE ROW ──────────────────────────────
   onlineRow: {
     position: "absolute",
-    top: "55%",
+    top: "58%",
     right: 0,
     width: "100%",
     zIndex: 25,
@@ -1646,20 +1669,6 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: "100%",
     height: "100%",
-  },
-
-  // ─── BAR FRONT ───────────────────────────────
-  barFrontContainer: {
-    position: "absolute",
-    bottom: "-5%",
-    width: "100%",
-    alignItems: "center",
-    zIndex: 10,
-  },
-  barFront: {
-    width: "100%",
-    height: 850,
-    zIndex: 2,
   },
 
   // ─── NAVBAR ──────────────────────────────────

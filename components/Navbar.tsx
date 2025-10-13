@@ -202,7 +202,6 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
      
 
       <View style={styles.navSpacer} />
- 
       <TouchableOpacity 
         style={styles.moneysBar}
         disabled={!!lockNonBathroom}
@@ -234,7 +233,6 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
           ))}
         
       </TouchableOpacity>
- 
 
       {/* Speaker icon area */}
       {soundLoading ? (

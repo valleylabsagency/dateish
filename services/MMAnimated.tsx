@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   mingles: {
     width: 400,
     height: 500,
-    marginBottom: 200,
+    marginBottom: "50%",
     marginLeft: 100
   },
   barFront: {
