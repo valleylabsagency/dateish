@@ -43,7 +43,9 @@ const withoutBg = {
   ),
 }
 
-
+const CLIPBOARD_IMG = require("../assets/images/clipboard.png");
+const { width: cbW, height: cbH } = Image.resolveAssetSource(CLIPBOARD_IMG);
+const CLIPBOARD_AR = cbW / cbH; // keeps art from stretching
 
 function mapFirebaseAuthError(err: any): { title: string; message: string; code?: string } {
   const code = err?.code || "";
@@ -659,244 +661,263 @@ export default function EntranceScreen() {
             onRequestClose={() => setPlayAnimation(true)}
       >
         <View style={authStyles.modalOverlay}>
-          <ImageBackground
-            source={require("../assets/images/clipboard.png")}
-            style={authStyles.clipboard}
-            resizeMode="contain"
-          >
-          <TouchableOpacity
-             style={authStyles.closeButton}
-             onPress={() => setShowAuth(false)}
-           >
-             <Image source={closeIcon} style={styles.closeIcon} />
-          </TouchableOpacity>
-          <View style={authStyles.sheet}>
-            {/* Title switches by step */}
-            <Text style={authStyles.title}>
-              {authStep === 1 && (newAccount ? "Create your account" : "Welcome back")}
-              {authStep === 2 && (authMethod === "email" ? "Your Email" : "Your Username")}
-              {authStep === 3 && (newAccount ? "Create a password" : "Enter your password")}
-              {authStep === 4 && "One last thing…"}
-            </Text>
+        <ImageBackground
+          source={CLIPBOARD_IMG}
+          style={authStyles.clipboard}
+          resizeMode="contain"
+        >
+            {/* White paper bounds */}
+            <View style={authStyles.paperBox}>
+              {/* Close (X) pinned to sheet corner */}
+              <TouchableOpacity
+                style={authStyles.closeButton}
+                onPress={() => setShowAuth(false)}
+                hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              >
+                <Image source={closeIcon} style={authStyles.closeIcon} />
+              </TouchableOpacity>
 
-            {/* STEP 1 — Choose path */}
-            {authStep === 1 && (
-              <>
-                <Text style={authStyles.subtitle}>Continue with socials</Text>
-                <View style={authStyles.socialRow}>
-                  <TouchableOpacity style={authStyles.socialBtn} onPress={() => chooseMethod("google")}>
-                    <AntDesign name="google" size={28} color="#DB4437" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={authStyles.socialBtn} onPress={() => chooseMethod("meta")}>
-                    <FontAwesome name="facebook-square" size={28} color="#1877F2" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={authStyles.socialBtn} onPress={() => chooseMethod("apple")}>
-                    <Ionicons name="logo-apple" size={30} color="#000" />
-                  </TouchableOpacity>
-                </View>
+              {/* Scrollable sheet content (never spills outside white area) */}
+              <Animated.ScrollView
+                contentContainerStyle={authStyles.sheetContent}
+                keyboardShouldPersistTaps="handled"
+                bounces={false}
+                showsVerticalScrollIndicator={false}
+              >
+                {/* ==== your existing content from <Text style={authStyles.title}> ... to the end of step 4 ==== */}
+                {/* Title switches by step */}
+                <Text 
+                  style={authStyles.title}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit        // shrink to fit the width
+                  minimumFontScale={0.85}     // don’t shrink smaller than 85%
+                  allowFontScaling={false}    // ignore OS text scaling
+                  maxFontSizeMultiplier={1}   // belt & suspenders
+                  ellipsizeMode="clip"
+                >
+                  {authStep === 1 && (newAccount ? "Create your account" : "Welcome back")}
+                  {authStep === 2 && (authMethod === "email" ? "Your Email" : "Your Username")}
+                  {authStep === 3 && (newAccount ? "Create a password" : "Enter your password")}
+                  {authStep === 4 && "One last thing…"}
+                </Text>
 
-                <Text style={authStyles.orText}>or</Text>
-
-                <View style={{ gap: 10, width: "100%", alignItems: "center" }}>
-                  <TouchableOpacity style={authStyles.primaryBtn} onPress={() => chooseMethod("email")}>
-                    <Text style={authStyles.primaryBtnText}>Use Email</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={authStyles.secondaryBtn} onPress={() => chooseMethod("username")}>
-                    <Text style={authStyles.secondaryBtnText}>Use Username</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={authStyles.modeRow}>
-                  <Text style={authStyles.modeText}>
-                    {newAccount ? "Already have an account?" : "New here?"}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => { setNewAccount(!newAccount); setFirstTime(!newAccount); }}
-                  >
-                    <Text style={authStyles.modeLink}>
-                      {newAccount ? "Sign in" : "Create account"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-
-            {/* STEP 2 — Identifier */}
-            {authStep === 2 && (
-              <>
-                {authMethod === "email" ? (
-                  <TextInput
-                    style={authStyles.input}
-                    placeholder="Email address"
-                    placeholderTextColor="#999"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    value={emailAddr}
-                    onChangeText={setEmailAddr}
-                    editable={!loadingAuth}
-                  />
-                ) : (
-                  <TextInput
-                    style={authStyles.input}
-                    placeholder="Username"
-                    placeholderTextColor="#999"
-                    autoCapitalize="none"
-                    value={userHandle}
-                    onChangeText={setUserHandle}
-                    editable={!loadingAuth}
-                  />
-                )}
-
-                {authError ? <Text style={authStyles.error}>{authErrorMsg}</Text> : null}
-
-                <View style={authStyles.navRow}>
-                  <TouchableOpacity onPress={() => setAuthStep(1)}>
-                    <Text style={authStyles.navLink}>Back</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[authStyles.primaryBtn, { opacity: IDENT ? 1 : 0.6 }]}
-                    disabled={!IDENT || loadingAuth}
-                    onPress={() => setAuthStep(3)}
-                  >
-                    <Text style={authStyles.primaryBtnText}>Continue</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-
-            {/* STEP 3 — Password (create or enter) */}
-            {authStep === 3 && (
-              <>
-                {/* Static identifier above password(s) */}
-                {!!IDENT && (
-                  <View style={authStyles.staticInput}>
-                    <Text style={authStyles.staticInputText}>{IDENT}</Text>
-                  </View>
-                )}
-
-                {newAccount ? (
+                {/* STEP 1 — Choose path */}
+                {authStep === 1 && (
                   <>
-                    <TextInput
-                      style={authStyles.input}
-                      placeholder="Create password"
-                      placeholderTextColor="#999"
-                      secureTextEntry
-                      value={pwd1}
-                      onChangeText={setPwd1}
-                      editable={!loadingAuth}
-                    />
-                    <TextInput
-                      style={authStyles.input}
-                      placeholder="Confirm password"
-                      placeholderTextColor="#999"
-                      secureTextEntry
-                      value={pwd2}
-                      onChangeText={setPwd2}
-                      editable={!loadingAuth}
-                    />
-                    {authError ? <Text style={authStyles.error}>{authErrorMsg}</Text> : null}
-                    <View style={authStyles.navRow}>
-                      <TouchableOpacity onPress={() => setAuthStep(2)}>
-                        <Text style={authStyles.navLink}>Back</Text>
+                    <Text style={authStyles.subtitle} maxFontSizeMultiplier={1.1}>Continue with socials</Text>
+                    <View style={authStyles.socialRow}>
+                      <TouchableOpacity style={authStyles.socialBtn} onPress={() => chooseMethod("google")}>
+                        <AntDesign name="google" size={28} color="#DB4437" />
                       </TouchableOpacity>
+                      <TouchableOpacity style={authStyles.socialBtn} onPress={() => chooseMethod("meta")}>
+                        <FontAwesome name="facebook-square" size={28} color="#1877F2" />
+                      </TouchableOpacity>
+                      <TouchableOpacity style={authStyles.socialBtn} onPress={() => chooseMethod("apple")}>
+                        <Ionicons name="logo-apple" size={30} color="#000" />
+                      </TouchableOpacity>
+                    </View>
+
+                    <Text style={authStyles.orText} maxFontSizeMultiplier={1.1}>or</Text>
+
+                    <View style={{ gap: 10, width: "100%", alignItems: "center" }}>
+                      <TouchableOpacity style={authStyles.primaryBtn} onPress={() => chooseMethod("email")}>
+                        <Text style={authStyles.primaryBtnText} maxFontSizeMultiplier={1.1}>Use Email</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={authStyles.secondaryBtn} onPress={() => chooseMethod("username")}>
+                        <Text style={authStyles.secondaryBtnText} maxFontSizeMultiplier={1.1}>Use Username</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={authStyles.modeRow}>
+                      <Text style={authStyles.modeText} maxFontSizeMultiplier={1.1}>
+                        {newAccount ? "Already have an account?" : "New here?"}
+                      </Text>
                       <TouchableOpacity
-                        style={[authStyles.primaryBtn, { opacity: pwd1 && pwd2 ? 1 : 0.6 }]}
-                        disabled={!pwd1 || !pwd2 || loadingAuth}
-                        onPress={() => setAuthStep(4)}
+                        onPress={() => { setNewAccount(!newAccount); setFirstTime(!newAccount); }}
                       >
-                        <Text style={authStyles.primaryBtnText}>Continue</Text>
+                        <Text style={authStyles.modeLink} maxFontSizeMultiplier={1.1}>
+                          {newAccount ? "Sign in" : "Create account"}
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </>
-                ) : (
+                )}
+
+                {/* STEP 2 — Identifier */}
+                {authStep === 2 && (
                   <>
-                    <TextInput
-                      style={authStyles.input}
-                      placeholder="Password"
-                      placeholderTextColor="#999"
-                      secureTextEntry
-                      value={pwd1}
-                      onChangeText={setPwd1}
-                      editable={!loadingAuth}
-                    />
-                    {authError ? <Text style={authStyles.error}>{authErrorMsg}</Text> : null}
+                    {authMethod === "email" ? (
+                      <TextInput
+                        style={authStyles.input}
+                        placeholder="Email address"
+                        placeholderTextColor="#999"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        value={emailAddr}
+                        onChangeText={setEmailAddr}
+                        editable={!loadingAuth}
+                      />
+                    ) : (
+                      <TextInput
+                        style={authStyles.input}
+                        placeholder="Username"
+                        placeholderTextColor="#999"
+                        autoCapitalize="none"
+                        value={userHandle}
+                        onChangeText={setUserHandle}
+                        editable={!loadingAuth}
+                      />
+                    )}
+
+                    {authError ? <Text style={authStyles.error} maxFontSizeMultiplier={1.1}>{authErrorMsg}</Text> : null}
+
                     <View style={authStyles.navRow}>
-                      <TouchableOpacity onPress={() => setAuthStep(2)}>
-                        <Text style={authStyles.navLink}>Back</Text>
+                      <TouchableOpacity onPress={() => setAuthStep(1)}>
+                        <Text style={authStyles.navLink} maxFontSizeMultiplier={1.1}>Back</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={[authStyles.primaryBtn, { opacity: pwd1 ? 1 : 0.6 }]}
-                        disabled={!pwd1 || loadingAuth}
-                        onPress={handleReturningGoIn}  // GO IN here for returning users
+                        style={[authStyles.primaryBtn, { opacity: IDENT ? 1 : 0.6 }]}
+                        disabled={!IDENT || loadingAuth}
+                        onPress={() => setAuthStep(3)}
+                      >
+                        <Text style={authStyles.primaryBtnText} maxFontSizeMultiplier={1.1}>Continue</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+
+                {/* STEP 3 — Password (create or enter) */}
+                {authStep === 3 && (
+                  <>
+                    {!!IDENT && (
+                      <View style={authStyles.staticInput}>
+                        <Text style={authStyles.staticInputText} maxFontSizeMultiplier={1.1}>{IDENT}</Text>
+                      </View>
+                    )}
+
+                    {newAccount ? (
+                      <>
+                        <TextInput
+                          style={authStyles.input}
+                          placeholder="Create password"
+                          placeholderTextColor="#999"
+                          secureTextEntry
+                          value={pwd1}
+                          onChangeText={setPwd1}
+                          editable={!loadingAuth}
+                        />
+                        <TextInput
+                          style={authStyles.input}
+                          placeholder="Confirm password"
+                          placeholderTextColor="#999"
+                          secureTextEntry
+                          value={pwd2}
+                          onChangeText={setPwd2}
+                          editable={!loadingAuth}
+                        />
+                        {authError ? <Text style={authStyles.error} maxFontSizeMultiplier={1.1}>{authErrorMsg}</Text> : null}
+                        <View style={authStyles.navRow}>
+                          <TouchableOpacity onPress={() => setAuthStep(2)}>
+                            <Text style={authStyles.navLink} maxFontSizeMultiplier={1.1}>Back</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[authStyles.primaryBtn, { opacity: pwd1 && pwd2 ? 1 : 0.6 }]}
+                            disabled={!pwd1 || !pwd2 || loadingAuth}
+                            onPress={() => setAuthStep(4)}
+                          >
+                            <Text style={authStyles.primaryBtnText} maxFontSizeMultiplier={1.1}>Continue</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <TextInput
+                          style={authStyles.input}
+                          placeholder="Password"
+                          placeholderTextColor="#999"
+                          secureTextEntry
+                          value={pwd1}
+                          onChangeText={setPwd1}
+                          editable={!loadingAuth}
+                        />
+                        {authError ? <Text style={authStyles.error} maxFontSizeMultiplier={1.1}>{authErrorMsg}</Text> : null}
+                        <View style={authStyles.navRow}>
+                          <TouchableOpacity onPress={() => setAuthStep(2)}>
+                            <Text style={authStyles.navLink} maxFontSizeMultiplier={1.1}>Back</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[authStyles.primaryBtn, { opacity: pwd1 ? 1 : 0.6 }]}
+                            disabled={!pwd1 || loadingAuth}
+                            onPress={handleReturningGoIn}
+                          >
+                            {loadingAuth ? (
+                              <LottieView source={withoutBg} autoPlay loop style={{ width: 80, height: 80, backgroundColor: "transparent" }} />
+                            ) : (
+                              <Text style={authStyles.primaryBtnText} maxFontSizeMultiplier={1.1}>GO IN!</Text>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {/* STEP 4 — Legal */}
+                {authStep === 4 && (
+                  <>
+                    <View style={authStyles.checkboxRow}>
+                      <TouchableOpacity
+                        style={[authStyles.checkbox, agreeLegal && authStyles.checkboxChecked]}
+                        onPress={() => setAgreeLegal(v => !v)}
+                      >
+                        {agreeLegal ? <Text style={authStyles.checkmark}>✓</Text> : null}
+                      </TouchableOpacity>
+                      <Text style={authStyles.legalText} maxFontSizeMultiplier={1.1}>
+                        I have read and agree to the{" "}
+                        <Text style={authStyles.link} onPress={() => Linking.openURL(termsUrl)}>Terms & Conditions</Text>
+                        {" "}and{" "}
+                        <Text style={authStyles.link} onPress={() => Linking.openURL(termsUrl)}>Privacy Policy</Text>.
+                      </Text>
+                    </View>
+
+                    <View style={authStyles.checkboxRow}>
+                      <TouchableOpacity
+                        style={[authStyles.checkbox, agree21 && authStyles.checkboxChecked]}
+                        onPress={() => setAgree21(v => !v)}
+                      >
+                        {agree21 ? <Text style={authStyles.checkmark}>✓</Text> : null}
+                      </TouchableOpacity>
+                      <Text style={authStyles.legalText} maxFontSizeMultiplier={1.1}>I confirm that I am at least 21 years old.</Text>
+                    </View>
+
+                    {legalError && (
+                      <Text style={authStyles.legalError} maxFontSizeMultiplier={1.1}>You have to agree to the legal stuff first.</Text>
+                    )}
+                    {authError ? <Text style={authStyles.error} maxFontSizeMultiplier={1.1}>{authErrorMsg}</Text> : null}
+
+                    <View style={authStyles.navRow}>
+                      <TouchableOpacity onPress={() => setAuthStep(3)}>
+                        <Text style={authStyles.navLink} maxFontSizeMultiplier={1.1}>Back</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={authStyles.primaryBtn}
+                        onPress={handleNewGoIn}
+                        disabled={loadingAuth}
                       >
                         {loadingAuth ? (
                           <LottieView source={withoutBg} autoPlay loop style={{ width: 80, height: 80, backgroundColor: "transparent" }} />
                         ) : (
-                          <Text style={authStyles.primaryBtnText}>GO IN!</Text>
+                          <Text style={authStyles.primaryBtnText} maxFontSizeMultiplier={1.1}>GO IN!</Text>
                         )}
                       </TouchableOpacity>
                     </View>
                   </>
                 )}
-              </>
-            )}
-
-            {/* STEP 4 — Legal gates (new users only) */}
-            {authStep === 4 && (
-              <>
-                <View style={authStyles.checkboxRow}>
-                  <TouchableOpacity
-                    style={[authStyles.checkbox, agreeLegal && authStyles.checkboxChecked]}
-                    onPress={() => setAgreeLegal(v => !v)}
-                  >
-                    {agreeLegal ? <Text style={authStyles.checkmark}>✓</Text> : null}
-                  </TouchableOpacity>
-                  <Text style={authStyles.legalText}>
-                    I have read and agree to the{" "}
-                    <Text style={authStyles.link} onPress={() => Linking.openURL(termsUrl)}>Terms & Conditions</Text>
-                    {" "}and{" "}
-                    <Text style={authStyles.link} onPress={() => Linking.openURL(termsUrl)}>Privacy Policy</Text>.
-                  </Text>
-                </View>
-
-                <View style={authStyles.checkboxRow}>
-                  <TouchableOpacity
-                    style={[authStyles.checkbox, agree21 && authStyles.checkboxChecked]}
-                    onPress={() => setAgree21(v => !v)}
-                  >
-                    {agree21 ? <Text style={authStyles.checkmark}>✓</Text> : null}
-                  </TouchableOpacity>
-                  <Text style={authStyles.legalText}>I confirm that I am at least 21 years old.</Text>
-                </View>
-
-                {legalError && (
-                  <Text style={authStyles.legalError}>You have to agree to the legal stuff first.</Text>
-                )}
-                {authError ? <Text style={authStyles.error}>{authErrorMsg}</Text> : null}
-
-                <View style={authStyles.navRow}>
-                  <TouchableOpacity onPress={() => setAuthStep(3)}>
-                    <Text style={authStyles.navLink}>Back</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={authStyles.primaryBtn}
-                    onPress={handleNewGoIn}    // GO IN here for new users
-                    disabled={loadingAuth}
-                  >
-                    {loadingAuth ? (
-                      <LottieView source={withoutBg} autoPlay loop style={{ width: 80, height: 80, backgroundColor: "transparent" }} />
-                    ) : (
-                      <Text style={authStyles.primaryBtnText}>GO IN!</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </View>
-
-          
-            
+                {/* ==== end content ==== */}
+              </Animated.ScrollView>
+            </View>
           </ImageBackground>
+
         </View>
       </Modal>
   {/* — Bar Rules popup when closed — */}
@@ -1186,12 +1207,62 @@ const styles = StyleSheet.create({
   },
 });
 
+const CLOSE_ICON_PX = Math.max(18, Math.min(30, Math.round(width * 0.05)));
 const authStyles = StyleSheet.create({
+  
   modalOverlay:   { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.2)", justifyContent: "center", alignItems: "center", height },
-  clipboard:      { width: width * 0.9, height: height * 0.75, justifyContent: "center", alignItems: "center" },
-  sheet:          { width: 320, padding: 20, alignItems: "center" },
-  title:          { fontSize: 27, fontFamily: FontNames.MontserratBold, marginBottom: 10 },
-  input:          { width: width * 0.6, borderBottomWidth: 1, borderColor: "#000", marginVertical: 8, fontSize: 18, padding: 5, color: "#000" },
+  // dynamic size for the X icon
+
+
+  clipboard: {
+    width: Math.min(width * 0.9, 420),
+    aspectRatio: CLIPBOARD_AR,   // <-- gives it a proper height
+    // height: undefined,        // (implicit with aspectRatio)
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  
+paperBox: {
+  position: "absolute",
+  left: "12%",
+  right: "12%",
+  top: "18%",
+  bottom: "2%",
+  borderRadius: 10,
+  overflow: "hidden",
+},
+  sheet: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  sheetContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexGrow: 1,              // <-- key: fills available height then scrolls if needed
+    alignItems: "center",
+  },
+  
+  
+  title: {
+    fontFamily: FontNames.MontserratBold,
+    fontSize: 25,          // starting size (will shrink if needed)
+    lineHeight: 30,        // keep steady vertical rhythm
+    includeFontPadding: false, // Android consistency
+    textAlign: "center",
+    alignSelf: "stretch",
+    marginTop: "5%"
+  },
+  input: {
+    width: "100%",
+    borderBottomWidth: 1,
+    borderColor: "#000",
+    marginVertical: 8,
+    fontSize: 18,
+    padding: 5,
+    color: "#000",
+  },
   button:         { width: 200, height: 60, backgroundColor: "#610e14", borderWidth: 5, borderColor: "#4a0a0f", borderRadius: 30, alignItems: "center", justifyContent: "center", marginTop: 10 },
   buttonText:     { fontSize: 32, color: "#fff", fontFamily: FontNames.MontserratRegular },
   bottomRow:      { flexDirection: "row", alignItems: "center", marginTop: 15 },
@@ -1201,15 +1272,15 @@ const authStyles = StyleSheet.create({
   loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
   closeButton: {
     position: "absolute",
-    top: "25%",
-    right: "12%",
+    top: -5,
+    right: -3,
     zIndex: 10,
+    padding: 6, // increases touch target
   },
-  
-  closeButtonText: {
-    fontSize: 32,
-    color: "#000",
-    fontFamily: FontNames.MontserratBold,
+  closeIcon: {
+    width: CLOSE_ICON_PX,
+    height: CLOSE_ICON_PX,
+    tintColor: "black",
   },
   legalWrap: { width: "100%", marginTop: 4, marginBottom: 6 },
   legalRow: { flexDirection: "row", alignItems: "center" },
@@ -1237,7 +1308,7 @@ const authStyles = StyleSheet.create({
   socialRow:      { flexDirection: "row", gap: 12, marginBottom: 8 },
   socialBtn:      { width: 54, height: 54, borderRadius: 27, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#000" },
   orText:         { marginVertical: 8, color: "#444", fontFamily: FontNames.MontserratRegular },
-  primaryBtn:     { minWidth: 200, height: 48, backgroundColor: "#610e14", borderWidth: 4, borderColor: "#4a0a0f", borderRadius: 24, alignItems: "center", justifyContent: "center" },
+  primaryBtn:     { minWidth: width * 0.4, height: 48, backgroundColor: "#610e14", borderWidth: 4, borderColor: "#4a0a0f", borderRadius: 24, alignItems: "center", justifyContent: "center" },
   primaryBtnText: { color: "#fff", fontSize: 16, fontFamily: FontNames.MontserratBold },
   secondaryBtn:   { minWidth: 200, height: 48, borderWidth: 2, borderColor: "#000", borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.85)" },
   secondaryBtnText:{ color: "#000", fontSize: 16, fontFamily: FontNames.MontserratRegular },
