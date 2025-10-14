@@ -301,7 +301,7 @@ const minglesHit = rect(
   MINGLES.h * (1 - HIT_INSET.top - HIT_INSET.bottom)
 );
 
-const BUBBLE = { x: 0.05, y: 0.09, w: 0.90, h: 0.18 };
+const BUBBLE = { x: 0.05, y: 0.1, w: 0.90, h: 0.18 };
 const bubbleBox = rect(BUBBLE.x, BUBBLE.y, BUBBLE.w, BUBBLE.h);
 // move content up ~2% of stage height; tweak -0.015…-0.03 to taste
 const bubbleNudgeY = -0.02 * dispH;
@@ -520,6 +520,54 @@ const tapExtraGap = 0.02 * dispH;
               resizeMode="stretch"
               pointerEvents="none"
             />
+            {/* --- User's drink, positioned relative to the FRONT image --- */}
+            {drinkIcon && (
+              <View
+                // pick a spot on the bar: tweak these fractions to move it
+                style={[
+                  rectInFront(0.53, 0.33, 0.13, 0.22), // x, y, w, h as fractions of FRONT
+                  { zIndex: 20, alignItems: "center", justifyContent: "center",
+                    ...Platform.select({ android: { elevation: 20 } }),
+                  },
+                ]}
+                pointerEvents="box-none"
+              >
+                <TouchableOpacity
+                  onPress={() => setShowDrinkSpeech((v) => !v)}
+                  activeOpacity={0.9}
+                  style={StyleSheet.absoluteFill}
+                >
+                  <Image
+                    source={drinkIcon}
+                    // fill the front-relative box; use contain so art keeps aspect
+                    style={{ width: "100%", height: "100%" }}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+
+                {showDrinkSpeech && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      bottom: "105%",             // bubble sits just above the drink
+                      left: "50%",
+                      transform: [{ translateX: -70 }],
+                      backgroundColor: "rgba(0,0,0,0.8)",
+                      paddingHorizontal: 8,
+                      paddingVertical: 6,
+                      borderRadius: 10,
+                      width: 140,
+                    }}
+                    pointerEvents="none"
+                  >
+                    <Text style={{ color: "#fff", textAlign: "center", fontFamily: FontNames.MontserratRegular }}>
+                      {drinkText}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
 
 
           </View>

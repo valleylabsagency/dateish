@@ -145,7 +145,7 @@ const frontHeight = FRONT_HEIGHT_FRAC * dispH;
 // ✅ Key change: align to the stage bottom (visibleH), not BG bottom (offsetY + dispH)
 const frontTop    = Math.round(visibleH - frontHeight);
 
-const START_BUTTON_EXTRA_RAISE = 28; // tweak to taste
+const START_BUTTON_EXTRA_RAISE = 25; // tweak to taste
 
 
 
@@ -608,7 +608,7 @@ const START_BUTTON_EXTRA_RAISE = 28; // tweak to taste
   const drinkText = drinkTextMapping[profileDrink] || drinkTextMapping["water"];
 
   const navHeightGuess = sh - (stageH ?? (sh - 72));
-  const buttonBottomGap = navHeightGuess + 20; // ~20px above navbar
+  const buttonBottomGap = navHeightGuess + 120; // ~20px above navbar
 
   if (!fontsLoaded || loading) {
     return (
@@ -1080,7 +1080,7 @@ const START_BUTTON_EXTRA_RAISE = 28; // tweak to taste
         <>
           {/* Blank bubble above the stage (same position as onboarding bubble) */}
           {bubbleVisible && (
-            <View style={[rect(0.05, 0.14, 0.90, BUBBLE_HEIGHT / dispH, { zIndex: 30 })]}>
+            <View style={[rect(0.05, 0.15, 0.90, BUBBLE_HEIGHT / dispH, { zIndex: 30 })]}>
               <ImageBackground
                 source={require("../assets/images/speech-bubble.png")}
                 style={{ flex: 1 }}
