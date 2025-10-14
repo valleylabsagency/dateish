@@ -13,7 +13,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  Linking
+  Linking,
+  Dimensions
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -29,8 +30,10 @@ import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 import closeIcon from '../assets/images/x.png'
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
-import { Camera, useCameraDevice } from "react-native-vision-camera";
+//import { Camera, useCameraDevice } from "react-native-vision-camera";
 import FaceDetector from "@react-native-ml-kit/face-detection";
+
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 
 // resolve the asset to get its intrinsic size
@@ -44,6 +47,20 @@ const withoutBg = {
     layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
   ),
 }
+
+// ===== Stage sizing helpers (fit whole image on screen) =====
+const { width: sw, height: sh } = Dimensions.get("window");
+
+// Fit image fully *inside* the screen (no cropping)
+const scaleFit = Math.min(sw / imgW, sh / imgH);
+const dispW = imgW * scaleFit;
+const dispH = imgH * scaleFit;
+const offsetX = (sw - dispW) / 2;
+const offsetY = (sh - dispH) / 2;
+
+// Place children by normalized art coords (0..1)
+
+
 
 export default function BathroomScreen() {
   const router = useRouter();
@@ -65,7 +82,7 @@ export default function BathroomScreen() {
 
   const [cameraVisible, setCameraVisible] = useState(false);
   const cameraRef = useRef<Camera>(null);
-  const device = useCameraDevice("front");
+  //const device = useCameraDevice("front");
   const [noFaceVisible, setNoFaceVisible] = useState(false);
   const [validating, setValidating] = useState(false);
 
@@ -96,6 +113,43 @@ export default function BathroomScreen() {
   const ddRef = useRef<TextInput>(null);
   const mmRef = useRef<TextInput>(null);
   const yyyyRef = useRef<TextInput>(null);
+
+
+  const insets = useSafeAreaInsets();
+
+
+  const { width: sw, height: sh } = Dimensions.get("window");
+
+  const TOP_PADDING = insets.top + 12;     // tweak as needed
+  const BOTTOM_PADDING = 0;    // if you have a bottom bar, keep it
+  const availH = sh - TOP_PADDING - BOTTOM_PADDING;
+
+  // COVER scale (fills width/height; may crop bottom)
+  const scaleCover = Math.max(sw / imgW, availH / imgH);
+  const dispW = imgW * scaleCover;
+  const dispH = imgH * scaleCover;
+
+  // horizontally centered, **top anchored**
+  const imgLeft  = (sw - dispW) / 2;
+  const imgTop   = 0;            // <- top anchored (no vertical centering)
+
+  // If you need to position children in “art space”:
+  const rect = (x: number, y: number, w: number, h: number) => ({
+    position: "absolute" as const,
+    left: imgLeft + x * dispW,
+    top:  imgTop  + y * dispH,   // top-anchored crop means y=0 is always the visible top of the art
+    width:  w * dispW,
+    height: h * dispH,
+  });
+
+
+
+  
+
+  // how much to bias vertical placement: 0 = top, .5 = center, 1 = bottom
+  const Y_ANCHOR = 0;                          // <- pin toward the top
+
+
 
   const isMounted = useRef(true);
     useEffect(() => {
@@ -282,7 +336,7 @@ useEffect(() => {
 
 
   // take photo
-  
+  /*
   const handleTakePhoto = async () => {
     const status = await Camera.requestCameraPermission();
     if (status !== "granted") {
@@ -290,7 +344,7 @@ useEffect(() => {
       return;
     }
     setCameraVisible(true);
-  };
+  }; */
 
   const captureAndValidate = async () => {
     if (!cameraRef.current) return;
@@ -695,247 +749,247 @@ useEffect(() => {
   if (!fontsLoaded) return null;
 
   return (
-    <>
-      <ImageBackground
-        source={bathroomImg}
-        style={styles.background}
-        resizeMode="stretch"
-        imageStyle={{ marginTop: moderateScale(50) }}
-      >
-        <ProfileNavbar
-          onBack={() => router.replace("/bar-2")}
-          showBack={hasSavedInSession}       
-        />
-        <View style={styles.formContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Name"
-            placeholderTextColor="#999"
-            value={name}
-            editable={false}           
-            onChangeText={setName}
+    <View style={{ flex: 1, backgroundColor: "black" }}>
+        <ImageBackground
+          source={bathroomImg}
+          style={{ position: "absolute", left: imgLeft, top: imgTop, width: dispW, height: dispH }}
+          resizeMode="cover"
+          imageStyle={{top: "7%"}}
+        >
+          <ProfileNavbar
+            onBack={() => router.replace("/bar-2")}
+            showBack={hasSavedInSession}       
           />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Age"
-            placeholderTextColor="#999"
-            value={age}
-            editable={false}           
-            onChangeText={setAge}
-            keyboardType="numeric"
-          />
-
-          <View style={styles.locationContainer}>
-              <View style={styles.locationInputWrap}>
-                <TextInput
-                  style={[styles.input, locationLoading && styles.inputLoadingText]}
-                  placeholder="Location"
-                  placeholderTextColor="#999"
-                  value={location}
-                  onChangeText={setLocation}    
-                  editable={false}
-                />
-                {locationLoading && (
-                  <LottieView
-                    source={withoutBg}
-                    autoPlay
-                    loop
-                    style={styles.locationInlineLoader}
-                  />
-                )}
-              </View>
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={handleRequestLocation}
-                disabled={locationLoading}
-              >
-                <Text style={styles.editButtonText}>
-                  {locationLoading ? "Getting…" : "Get Location"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-          <View style={styles.photoContainer}>
-            {photoUri ? (
-              <Image source={{ uri: photoUri }} style={styles.photo} />
-            ) : (
-              <MaterialIcons name="person" size={scale(125)} color="grey" />
-            )}
-            <TouchableOpacity
-              style={[styles.editButton, styles.editButtonPhoto]}
-              onPress={handleTakePhoto}
-            >
-              <Text style={styles.editButtonText}>Take a pic</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.aboutContainer}>
-            <TouchableOpacity onPress={() => setEditingAbout(true)}>
-              <Text style={styles.aboutText}>
-                {about || "Write something about yourself..."}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.editButton, styles.bottomEdit]}
-              onPress={() => setEditingAbout(true)}
-            >
-              <Text style={styles.editButtonText}>EDIT</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Existing Incomplete Profile Warning Modal */}
-        <Modal transparent visible={modalVisible} animationType="slide">
-          <View style={modalStyles.modalOverlay}>
-            <TouchableOpacity
-              style={modalStyles.closeButton}
-              onPress={() => setModalVisible(false)}
-            >
-              <Image source={closeIcon} style={styles.closeIcon} />
-            </TouchableOpacity>
-            <View style={modalStyles.modalContainer}>
-              <Text style={modalStyles.modalText}>{modalTypedText}</Text>
-              <View style={modalStyles.triangleContainer}>
-                <View style={modalStyles.outerTriangle} />
-                <View style={modalStyles.innerTriangle} />
-              </View>
-              <Animated.Image
-                source={require("../assets/images/mr-mingles.png")}
-                style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
-                resizeMode="contain"
-              />
-            </View>
-          </View>
-        </Modal>
-
-        {/* NEW: Onboarding Modal (uses same visual motif) */}
-        <Modal transparent visible={onboardingVisible} animationType="fade">
-          <View style={modalStyles.modalOverlay}>
-            <TouchableOpacity
-              style={modalStyles.closeButton}
-              onPress={() => setOnboardingVisible(false)}
-            >
-              <Image source={closeIcon} style={styles.closeIcon} />
-            </TouchableOpacity>
-            {renderOnboardingContent()}
-          </View>
-        </Modal>
-
-       <Modal visible={cameraVisible} animationType="slide" transparent={false}>
-          <View style={{ flex: 1, backgroundColor: "black" }}>
-            {device ? (
-              <Camera
-                ref={cameraRef}
-                style={{ flex: 1 }}
-                device={device}
-                isActive={cameraVisible}
-                photo={true}
-              />
-            ) : (
-              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                <Text style={{ color: "#fff" }}>Loading camera…</Text>
-              </View>
-            )}
-
-           
-            <View style={{ position: "absolute", bottom: 30, left: 0, right: 0, alignItems: "center" }}>
-              <Text style={{ color: "#fff", marginBottom: 8 }}>
-                Center your pretty face in the frame
-              </Text>
-              <TouchableOpacity
-                onPress={captureAndValidate}
-                style={{
-                  backgroundColor: "#6e1944",
-                  borderWidth: 4,
-                  borderColor: "#460b2a",
-                  paddingVertical: 10,
-                  paddingHorizontal: 24,
-                  borderRadius: 28,
-                }}
-              >
-                <Text style={{ color: "#ffe3d0", fontWeight: "700" }}>
-                  {validating ? "Checking…" : "Capture"}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setCameraVisible(false)}
-                style={{ marginTop: 10, padding: 8 }}
-              >
-                <Text style={{ color: "#ddd" }}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal> 
-
-        {/* No-face “Mr. Mingles” popup */}
-        <Modal transparent visible={noFaceVisible} animationType="fade">
-          <View style={modalStyles.modalOverlay}>
-            <TouchableOpacity
-              style={modalStyles.closeButton}
-              onPress={() => setNoFaceVisible(false)}
-            >
-              <Image source={closeIcon} style={styles.closeIcon} />
-            </TouchableOpacity>
-            <View style={modalStyles.modalContainer}>
-              <Text style={modalStyles.modalText}>
-                You need to take a picture that includes your pretty face.
-              </Text>
-              <View style={modalStyles.triangleContainer}>
-                <View style={modalStyles.outerTriangle} />
-                <View style={modalStyles.innerTriangle} />
-              </View>
-              <Animated.Image
-                source={require("../assets/images/mr-mingles.png")}
-                style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
-                resizeMode="contain"
-              />
-            </View>
-          </View>
-        </Modal>
-
-
-        {hasSavedInSession && (
-          <TouchableOpacity
-            style={styles.hitbox}
-            onPress={() => router.push('/settings')}
-          />
-        )}
-        <TouchableOpacity
-          style={styles.hitboxChats}
-          onPress={() => setShowChitChats(true)}
-        />
-
-        <ChitChats
-          visible={showChitChats}
-          onClose={() => setShowChitChats(false)}
-          existingChats={chats}
-          onSave={handleSave}
-          onDelete={handleDelete}
-          required={mustAnswer}
-          onRequiredChange={toggleRequired}
-        />
-
-        {renderAboutEditor()}
-
-        {isSaving && (
-          <View style={styles.loadingOverlay}>
-            <LottieView
-              source={withoutBg}
-              autoPlay
-              loop
-              style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+          <View style={styles.formContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Name"
+              placeholderTextColor="#999"
+              value={name}
+              editable={false}           
+              onChangeText={setName}
             />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Age"
+              placeholderTextColor="#999"
+              value={age}
+              editable={false}           
+              onChangeText={setAge}
+              keyboardType="numeric"
+            />
+
+            <View style={styles.locationContainer}>
+                <View style={styles.locationInputWrap}>
+                  <TextInput
+                    style={[styles.input, locationLoading && styles.inputLoadingText]}
+                    placeholder="Location"
+                    placeholderTextColor="#999"
+                    value={location}
+                    onChangeText={setLocation}    
+                    editable={false}
+                  />
+                  {locationLoading && (
+                    <LottieView
+                      source={withoutBg}
+                      autoPlay
+                      loop
+                      style={styles.locationInlineLoader}
+                    />
+                  )}
+                </View>
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={handleRequestLocation}
+                  disabled={locationLoading}
+                >
+                  <Text style={styles.editButtonText}>
+                    {locationLoading ? "Getting…" : "Get Location"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+            <View style={styles.photoContainer}>
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={styles.photo} />
+              ) : (
+                <MaterialIcons name="person" size={scale(125)} color="grey" />
+              )} 
+              <TouchableOpacity
+                style={[styles.editButton, styles.editButtonPhoto]}
+                //onPress={handleTakePhoto}
+              >
+                <Text style={styles.editButtonText}>Take a pic</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.aboutContainer}>
+              <TouchableOpacity onPress={() => setEditingAbout(true)}>
+                <Text style={styles.aboutText}>
+                  {about || "Write something about yourself..."}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.editButton, styles.bottomEdit]}
+                onPress={() => setEditingAbout(true)}
+              >
+                <Text style={styles.editButtonText}>EDIT</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        )}
-        {!hasSavedInSession && (
-          <TouchableOpacity style={styles.saveBtn} onPress={() => handleSubmit()}>
-            <Text style={styles.saveBtnText}>Save Profile</Text>
-          </TouchableOpacity>
-        )}
-      </ImageBackground>
-    </>
+
+          {/* Existing Incomplete Profile Warning Modal */}
+          <Modal transparent visible={modalVisible} animationType="slide">
+            <View style={modalStyles.modalOverlay}>
+              <TouchableOpacity
+                style={modalStyles.closeButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Image source={closeIcon} style={styles.closeIcon} />
+              </TouchableOpacity>
+              <View style={modalStyles.modalContainer}>
+                <Text style={modalStyles.modalText}>{modalTypedText}</Text>
+                <View style={modalStyles.triangleContainer}>
+                  <View style={modalStyles.outerTriangle} />
+                  <View style={modalStyles.innerTriangle} />
+                </View>
+                <Animated.Image
+                  source={require("../assets/images/mr-mingles.png")}
+                  style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
+          </Modal>
+
+          {/* NEW: Onboarding Modal (uses same visual motif) */}
+          <Modal transparent visible={onboardingVisible} animationType="fade">
+            <View style={modalStyles.modalOverlay}>
+              <TouchableOpacity
+                style={modalStyles.closeButton}
+                onPress={() => setOnboardingVisible(false)}
+              >
+                <Image source={closeIcon} style={styles.closeIcon} />
+              </TouchableOpacity>
+              {renderOnboardingContent()}
+            </View>
+          </Modal>
+  {/*
+        <Modal visible={cameraVisible} animationType="slide" transparent={false}>
+            <View style={{ flex: 1, backgroundColor: "black" }}>
+              {device ? (
+                <Camera
+                  ref={cameraRef}
+                  style={{ flex: 1 }}
+                  device={device}
+                  isActive={cameraVisible}
+                  photo={true}
+                />
+              ) : (
+                <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ color: "#fff" }}>Loading camera…</Text>
+                </View>
+              )}
+
+            
+              <View style={{ position: "absolute", bottom: 30, left: 0, right: 0, alignItems: "center" }}>
+                <Text style={{ color: "#fff", marginBottom: 8 }}>
+                  Center your pretty face in the frame
+                </Text>
+                <TouchableOpacity
+                  onPress={captureAndValidate}
+                  style={{
+                    backgroundColor: "#6e1944",
+                    borderWidth: 4,
+                    borderColor: "#460b2a",
+                    paddingVertical: 10,
+                    paddingHorizontal: 24,
+                    borderRadius: 28,
+                  }}
+                >
+                  <Text style={{ color: "#ffe3d0", fontWeight: "700" }}>
+                    {validating ? "Checking…" : "Capture"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setCameraVisible(false)}
+                  style={{ marginTop: 10, padding: 8 }}
+                >
+                  <Text style={{ color: "#ddd" }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal> */}
+
+          {/* No-face “Mr. Mingles” popup */}
+          <Modal transparent visible={noFaceVisible} animationType="fade">
+            <View style={modalStyles.modalOverlay}>
+              <TouchableOpacity
+                style={modalStyles.closeButton}
+                onPress={() => setNoFaceVisible(false)}
+              >
+                <Image source={closeIcon} style={styles.closeIcon} />
+              </TouchableOpacity>
+              <View style={modalStyles.modalContainer}>
+                <Text style={modalStyles.modalText}>
+                  You need to take a picture that includes your pretty face.
+                </Text>
+                <View style={modalStyles.triangleContainer}>
+                  <View style={modalStyles.outerTriangle} />
+                  <View style={modalStyles.innerTriangle} />
+                </View>
+                <Animated.Image
+                  source={require("../assets/images/mr-mingles.png")}
+                  style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
+          </Modal>
+
+
+          {hasSavedInSession && (
+            <TouchableOpacity
+              style={styles.hitbox}
+              onPress={() => router.push('/settings')}
+            />
+          )}
+          <TouchableOpacity
+            style={styles.hitboxChats}
+            onPress={() => setShowChitChats(true)}
+          />
+
+          <ChitChats
+            visible={showChitChats}
+            onClose={() => setShowChitChats(false)}
+            existingChats={chats}
+            onSave={handleSave}
+            onDelete={handleDelete}
+            required={mustAnswer}
+            onRequiredChange={toggleRequired}
+          />
+
+          {renderAboutEditor()}
+
+          {isSaving && (
+            <View style={styles.loadingOverlay}>
+              <LottieView
+                source={withoutBg}
+                autoPlay
+                loop
+                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+              />
+            </View>
+          )}
+          {!hasSavedInSession && (
+            <TouchableOpacity style={styles.saveBtn} onPress={() => handleSubmit()}>
+              <Text style={styles.saveBtnText}>Save Profile</Text>
+            </TouchableOpacity>
+          )}
+        </ImageBackground>
+      </View>
   );
 }
 
@@ -947,7 +1001,7 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     position: "absolute",
-    top: verticalScale(175),
+    top: verticalScale(180),
     alignSelf: "center",
     width: "90%",
   },
@@ -967,7 +1021,7 @@ const styles = StyleSheet.create({
   },
   locationContainer: {
     alignItems: "center",
-    paddingBottom: verticalScale(4)
+    paddingBottom: verticalScale(3)
   },
   locationInputWrap: {
     width: "100%",
@@ -1002,8 +1056,8 @@ const styles = StyleSheet.create({
     marginVertical: verticalScale(2),
   },
   photo: {
-    width: scale(140),
-    height: scale(140),
+    width: scale(130),
+    height: scale(130),
     borderRadius: scale(100),
   },
   editButtonPhoto: {
@@ -1031,7 +1085,7 @@ const styles = StyleSheet.create({
   },
   hitboxChats: {
     position: 'absolute',
-    top: "70%",
+    top: "78%",
     right: "10%",
     width: 120,
     height: 80,

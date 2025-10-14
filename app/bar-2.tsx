@@ -145,7 +145,7 @@ const frontHeight = FRONT_HEIGHT_FRAC * dispH;
 // ✅ Key change: align to the stage bottom (visibleH), not BG bottom (offsetY + dispH)
 const frontTop    = Math.round(visibleH - frontHeight);
 
-const START_BUTTON_EXTRA_RAISE = 25; // tweak to taste
+const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
 
 
 
@@ -158,6 +158,21 @@ const START_BUTTON_EXTRA_RAISE = 25; // tweak to taste
 
   const AVATAR_SIZE_PX = Math.round(frontHeight * AVATAR_SIZE_PCT_OF_FRONT);
   const AVATAR_GAP_PX  = dispW * AVATAR_GAP_FRAC_OF_WIDTH;
+
+  // ---- Start button geometry (relative to FRONT image) ----
+  const BTN_W_FRAC = 0.90;           // 90% of visible art width
+  const BTN_H_FRAC = 0.085;          // ~8.5% of visible art height
+  const BTN_GAP_FRAC = -0.555;        // gap between button and the FRONT image
+
+  const btnW = Math.round(dispW * BTN_W_FRAC);
+  const btnH = Math.round(Math.max(56, Math.min(76, dispH * BTN_H_FRAC))); // clamp for tiny/huge screens
+  const btnLeft = Math.round(offsetX + (dispW - btnW) / 2);
+  // place it just ABOVE the FRONT image (uses its *top* edge)
+  const btnTop = Math.max(
+    8,
+    Math.round(frontTop - btnH - dispH * BTN_GAP_FRAC)
+  );
+
 
 
 
@@ -608,7 +623,7 @@ const START_BUTTON_EXTRA_RAISE = 25; // tweak to taste
   const drinkText = drinkTextMapping[profileDrink] || drinkTextMapping["water"];
 
   const navHeightGuess = sh - (stageH ?? (sh - 72));
-  const buttonBottomGap = navHeightGuess + 120; // ~20px above navbar
+  const buttonBottomGap = navHeightGuess + 90; // ~20px above navbar
 
   if (!fontsLoaded || loading) {
     return (
@@ -1090,15 +1105,21 @@ const START_BUTTON_EXTRA_RAISE = 25; // tweak to taste
           )}
           {/* Start Chatting button pinned ~20px above navbar */}
           <TouchableOpacity
-            style={[styles.startButton, { bottom: buttonBottomGap + START_BUTTON_EXTRA_RAISE }]}
+            style={[
+              styles.startButton,
+              {
+                position: "absolute",
+                left: btnLeft,
+                top: btnTop,
+                width: btnW,
+                height: btnH,
+                zIndex: 40,
+              },
+            ]}
             onPress={async () => {
-              setBubbleVisible(false);   // <- hide bubble immediately
-              setLeaving(true);          // <- kicks off MMAnimated slide-out
-
-              // ✅ safety net: if the reanimated callback doesn’t fire,
-              // forcibly flip started after ~1s so UI always advances.
+              setBubbleVisible(false);
+              setLeaving(true);
               setTimeout(() => setStarted((s) => s || true), 1100);
-
               try {
                 const db = getDatabase();
                 const statusRef = rtdbRef(db, `status/${auth.currentUser!.uid}`);
@@ -1107,7 +1128,15 @@ const START_BUTTON_EXTRA_RAISE = 25; // tweak to taste
               } catch {}
             }}
           >
-            <Text numberOfLines={1} style={styles.startButtonText}>Start Chatting</Text>
+            <Text
+              style={styles.startButtonText}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}   // shrink instead of truncating
+              ellipsizeMode="clip"     // just in case, don’t show "…"
+            >
+              Start Chatting
+            </Text>
           </TouchableOpacity>
 
         </>
@@ -1459,28 +1488,25 @@ const styles = StyleSheet.create({
 
   // ─── START CHAT button (profile complete, not started) ─────────────
   startButton: {
-    position: "absolute",
-    alignSelf: "center",
     backgroundColor: "#6e1944",
     borderWidth: 4,
     borderColor: "#460b2a",
-    width: "90%",
-    height: 65,
     borderRadius: 20,
-    zIndex: 40,
-    paddingTop: 8,
+    paddingHorizontal: 12,
+    justifyContent: "center",
+    alignItems: "center",
   },
-
+  
   startButtonText: {
-    fontSize: 36,
+    fontSize: 36,                 // starting size; will auto-shrink if needed
     lineHeight: 38,
     fontFamily: FontNames.MontSerratSemiBold,
     textTransform: "uppercase",
     color: "#ffe3d0",
-    zIndex: 41,
     textAlign: "center",
+    includeFontPadding: false,
   },
-
+  
   // ─── NAVBAR ──────────────────────────────────
   bottomNavbarContainer: {
     position: "absolute",

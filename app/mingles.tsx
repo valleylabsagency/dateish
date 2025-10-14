@@ -697,7 +697,7 @@ const tapExtraGap = 0.02 * dispH;
           title="Bar Rules"
           onClose={() => setShowPopupRules(false)}
         >
-        <View style={styles.rulesContainer}>
+        <ScrollView style={shopStyles.vipScroll}>
           <View style={styles.hoursContainer}>
             <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
             <Text style={styles.hours}>17:00–05:00</Text>
@@ -720,7 +720,7 @@ const tapExtraGap = 0.02 * dispH;
           <Text style={styles.ruleText}>No Nude Pics</Text>
           <Text style={[styles.hoursText, {marginBottom: 20}]}>No Links Allowed</Text>
           <Text style={styles.ruleText}>Age 21 and Up</Text>
-        </View>
+        </ScrollView>
       </PopUp>
 
       <PopUp
