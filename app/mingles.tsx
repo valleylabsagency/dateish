@@ -291,7 +291,7 @@ const rectInFront = (x: number, y: number, w: number, h: number) => ({
   height: h * frontHeightPx,
 });
 
-const MINGLES = { x: 0.02, y: 0.23, w: 0.70, h: 0.50 };
+const MINGLES = { x: 0.02, y: 0.06, w: 0.8, h: 0.8 };
 const minglesBox = rect(MINGLES.x, MINGLES.y, MINGLES.w, MINGLES.h);
 const HIT_INSET = { left: 0.3, right: 0.3, top: 0.25, bottom: 0.24 }; // 10–12% inset
 const minglesHit = rect(
@@ -301,7 +301,7 @@ const minglesHit = rect(
   MINGLES.h * (1 - HIT_INSET.top - HIT_INSET.bottom)
 );
 
-const BUBBLE = { x: 0.05, y: 0.08, w: 0.90, h: 0.18 };
+const BUBBLE = { x: 0.05, y: 0.09, w: 0.90, h: 0.18 };
 const bubbleBox = rect(BUBBLE.x, BUBBLE.y, BUBBLE.w, BUBBLE.h);
 // move content up ~2% of stage height; tweak -0.015…-0.03 to taste
 const bubbleNudgeY = -0.02 * dispH;

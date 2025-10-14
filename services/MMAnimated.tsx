@@ -158,13 +158,7 @@ const MMAnimated: React.FC<MMAnimatedProps> = ({
         />
       )}
 
-      {showControls && (
-        <View style={styles.controls}>
-          <Button title="Come in" onPress={slideInMM} />
-          <View style={{ height: 10 }} />
-          <Button title="Leave" onPress={slideOutMM} />
-        </View>
-      )}
+      
     </View>
   );
 
@@ -203,14 +197,14 @@ const styles = StyleSheet.create({
     width: 400,
     height: 500,
     marginBottom: "50%",
-    marginLeft: 100
+    marginLeft: 100,
+    zIndex: 8
   },
   barFront: {
     position: "absolute",
     bottom: "-5%",
     width: "100%",
     height: 830,
-    zIndex: 2,
   },
   controls: {
     position: "absolute",
