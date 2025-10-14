@@ -30,7 +30,7 @@ import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 import closeIcon from '../assets/images/x.png'
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
-//import { Camera, useCameraDevice } from "react-native-vision-camera";
+import { Camera, useCameraDevice } from "react-native-vision-camera";
 import FaceDetector from "@react-native-ml-kit/face-detection";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -82,7 +82,7 @@ export default function BathroomScreen() {
 
   const [cameraVisible, setCameraVisible] = useState(false);
   const cameraRef = useRef<Camera>(null);
-  //const device = useCameraDevice("front");
+  const device = useCameraDevice("front");
   const [noFaceVisible, setNoFaceVisible] = useState(false);
   const [validating, setValidating] = useState(false);
 
@@ -172,7 +172,7 @@ const nextEnabled =
 
 
   // show animation only on first and last step
-  const showAnimatedMM = onboardingVisible && (onboardingStep === 0 || onboardingStep === 3);
+  const showAnimatedMM = onboardingVisible && (onboardingStep === 0 || onboardingStep === 1 || onboardingStep === 2 || onboardingStep === 3);
 
   // Firestore user ref for chit-chats
   const userDocRef = auth.currentUser
@@ -336,7 +336,7 @@ useEffect(() => {
 
 
   // take photo
-  /*
+  
   const handleTakePhoto = async () => {
     const status = await Camera.requestCameraPermission();
     if (status !== "granted") {
@@ -344,7 +344,7 @@ useEffect(() => {
       return;
     }
     setCameraVisible(true);
-  }; */
+  }; 
 
   const captureAndValidate = async () => {
     if (!cameraRef.current) return;
@@ -875,7 +875,7 @@ useEffect(() => {
               {renderOnboardingContent()}
             </View>
           </Modal>
-  {/*
+  
         <Modal visible={cameraVisible} animationType="slide" transparent={false}>
             <View style={{ flex: 1, backgroundColor: "black" }}>
               {device ? (
@@ -921,7 +921,7 @@ useEffect(() => {
                 </TouchableOpacity>
               </View>
             </View>
-          </Modal> */}
+          </Modal> 
 
           {/* No-face “Mr. Mingles” popup */}
           <Modal transparent visible={noFaceVisible} animationType="fade">
@@ -1107,7 +1107,7 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     position: "absolute",
-    bottom: verticalScale(60),
+    bottom: verticalScale(30),
     alignSelf: "center",
     backgroundColor: "#6e1944",
     borderWidth: 4,
@@ -1203,7 +1203,7 @@ const modalStyles = StyleSheet.create({
   },
   modalContainer: {
     width: "90%",
-    height: verticalScale(400),
+    height: verticalScale(300),
     backgroundColor: "#020621",
     borderWidth: 4,
     borderColor: "#fff",
@@ -1212,6 +1212,7 @@ const modalStyles = StyleSheet.create({
     alignItems: "center",
     position: "relative",
     overflow: "visible",      // <- allow MM to hang out of the box
+    marginBottom: "55%"
   },
   modalText: {
     color: "#eceded",
@@ -1257,7 +1258,7 @@ const modalStyles = StyleSheet.create({
     width: scale(380),        
     height: scale(460),
     position: "absolute",
-    bottom: -verticalScale(260),
+    bottom: -verticalScale(310),
     right: -scale(120),
     zIndex: 100,
     pointerEvents: "none",

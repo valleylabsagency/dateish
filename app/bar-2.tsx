@@ -162,7 +162,7 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
   // ---- Start button geometry (relative to FRONT image) ----
   const BTN_W_FRAC = 0.90;           // 90% of visible art width
   const BTN_H_FRAC = 0.085;          // ~8.5% of visible art height
-  const BTN_GAP_FRAC = -0.555;        // gap between button and the FRONT image
+  const BTN_GAP_FRAC = -0.60;        // gap between button and the FRONT image
 
   const btnW = Math.round(dispW * BTN_W_FRAC);
   const btnH = Math.round(Math.max(56, Math.min(76, dispH * BTN_H_FRAC))); // clamp for tiny/huge screens
@@ -1038,6 +1038,7 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
                     overflow: "hidden",
                     borderWidth: 2,
                     borderColor: "white",
+                    marginRight: "8%"
                   }}
                   onPress={() => {
                     setSelectedProfile(p);
@@ -1095,7 +1096,7 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
         <>
           {/* Blank bubble above the stage (same position as onboarding bubble) */}
           {bubbleVisible && (
-            <View style={[rect(0.05, 0.15, 0.90, BUBBLE_HEIGHT / dispH, { zIndex: 30 })]}>
+            <View style={[rect(0.05, 0.18, 0.90, BUBBLE_HEIGHT / dispH, { zIndex: 30 })]}>
               <ImageBackground
                 source={require("../assets/images/speech-bubble.png")}
                 style={{ flex: 1 }}
