@@ -41,12 +41,15 @@ import { spendMoneys, getMessageCost } from '../services/moneys';
 import { MoneysContext } from "../contexts/MoneysContext";
 import PopUp from "../components/PopUp";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+// top of file
+import * as NavigationBar from "expo-navigation-bar";
+
 
 
 // NEW
 import * as MailComposer from "expo-mail-composer";
 import MMAnimated from "@/services/MMAnimated";
-import { Linking, useWindowDimensions } from "react-native";
+import { Linking, useWindowDimensions, Platform } from "react-native";
 
 const BG_IMG = require("../assets/images/bar-back.png");
 const FRONT_IMG = require("../assets/images/bar-front.png");
@@ -123,11 +126,19 @@ export default function Bar2Screen() {
 
   // --- stage (art space) geometry
   const { width: sw, height: sh } = useWindowDimensions();
-  const [stageH, setStageH] = useState<number | null>(null); // exact visible height above navbar
+  //const [stageH, setStageH] = useState<number | null>(null); // exact visible height above navbar
   const containerW = sw;
-  const visibleH   = stageH ?? (sh - 72); // fallback until we measure navbar
-
+  //const visibleH   = stageH ?? (sh - 72); // fallback until we measure navbar
+  const [navHeight, setNavHeight] = useState(0);
   const insets = useSafeAreaInsets();
+// Safe, device-correct visible area above the navbar (or full height if no navbar)
+const [topNavH, setTopNavH] = useState(0);
+const [stageH, setStageH] = useState<number | null>(null);
+const hasBottomBar = !!profileComplete;
+const baseVisibleH = Math.max(0, sh - topNavH - (hasBottomBar ? navHeight : 0));
+const visibleH = hasBottomBar ? baseVisibleH : baseVisibleH + insets.bottom;
+
+  
 
   // COVER the available area with bg art
   const scaleArt = Math.max(containerW / BGW, visibleH / BGH);
@@ -140,14 +151,13 @@ export default function Bar2Screen() {
 
  // FRONT placement
 const FRONT_HEIGHT_FRAC = 0.64;     // keep whatever you like here
-const FRONT_BOTTOM_LIFT_FRAC = 0;   // can be 0; not used in the new formula below
 
 const frontLeft   = offsetX;
 const frontWidth  = dispW;
 const frontHeight = FRONT_HEIGHT_FRAC * dispH;
 
 // ✅ Key change: align to the stage bottom (visibleH), not BG bottom (offsetY + dispH)
-const frontTop    = Math.round(visibleH - frontHeight);
+const frontTop = visibleH - frontHeight;
 
 const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
 
@@ -177,6 +187,11 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
     Math.round(frontTop - btnH - dispH * BTN_GAP_FRAC)
   );
 
+  const MINGLES_IMG = require("../assets/images/mr-mingles.png");
+  const { width: MINGLES_W, height: MINGLES_H } = Image.resolveAssetSource(MINGLES_IMG);
+  const MINGLES_AR = MINGLES_W / MINGLES_H;
+
+
 
 
 
@@ -202,6 +217,8 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
   const [welcomeTyping, setWelcomeTyping] = useState(true);
   const [pointerTarget, setPointerTarget] = useState<'mingles'|'bathroom'|null>(null);
   const [minglesFrame, setMinglesFrame] = useState<{x:number,y:number,width:number,height:number} | null>(null);
+  const [minglesBox, setMinglesBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
+
 
   // pre-start bubble (blank) visibility
   const [bubbleVisible, setBubbleVisible] = useState(false);
@@ -379,6 +396,8 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
   const [loading, setLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
+
+
 
   // start state
   const [started, setStarted] = useState(false);
@@ -626,8 +645,8 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
   const drinkHeight = isWater ? scale(75) : scale(70);
   const drinkText = drinkTextMapping[profileDrink] || drinkTextMapping["water"];
 
-  const navHeightGuess = sh - (stageH ?? (sh - 72));
-  const buttonBottomGap = navHeightGuess + 90; // ~20px above navbar
+  //const navHeightGuess = sh - (stageH ?? (sh - 72));
+  //const buttonBottomGap = navHeightGuess + 90; // ~20px above navbar
 
   if (!fontsLoaded || loading) {
     return (
@@ -926,19 +945,38 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
     }
   };
 
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+  
+    // Let content extend under the nav and match its color to the scene
+    NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => {});
+    NavigationBar.setBackgroundColorAsync("#592540").catch(() => {});
+    NavigationBar.setButtonStyleAsync("light").catch(() => {});
+  }, [profileComplete]);
+  
+
   // ─────────────────────────── RENDER ───────────────────────────
   return (
-    <>
+    <View style={{flex: 1, backgroundColor: "#592540"}}>
+      <View onLayout={(e) => setTopNavH(e.nativeEvent.layout.height)} collapsable={false}>
       <Navbar
         bathroomRoute={!profileComplete ? "/bathroom?onboard=true" : "/bathroom"}
         lockNonBathroom={isLastWelcome}
       />
+    </View>
 
       {/* ==== STAGE (locks all layers to the same art space) ==== */}
-      <View style={{ width: containerW, height: visibleH, overflow: "hidden" }}>
+      <View style={{
+        width: containerW,
+        height: visibleH,
+        overflow: "hidden",
+        backgroundColor: "#592540",                 // backfill just in case
+        marginBottom: hasBottomBar ? 0 : -insets.bottom, // extend behind nav on welcome
+      }}>
         {/* Back layer (cover) */}
         <Image
           source={BG_IMG}
+          
           style={{ position: "absolute", left: offsetX, top: offsetY, width: dispW, height: dispH }}
           resizeMode="stretch"
         />
@@ -949,28 +987,32 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
             <View
               style={rect(0.23, 0.11, 0.80, 0.75, { zIndex: 9 })}
               pointerEvents="box-none"
+              collapsable={false}
               onLayout={e => {
-                const { x, y, width, height } = e.nativeEvent.layout;
-                setMinglesFrame({ x, y, width, height });
+                const { width: cw, height: ch } = e.nativeEvent.layout;
+
+                // contain math
+                let w = cw;
+                let h = w / MINGLES_AR;
+                if (h > ch) { h = ch; w = h * MINGLES_AR; }
+                const left = (cw - w) / 2;
+                const top  = (ch - h) / 2;
+
+                setMinglesBox({ left, top, width: w, height: h });
               }}
             >
-              <Pressable
-                onPress={onMinglesPress}
-                hitSlop={20}
-                disabled={welcomeIndex === LAST_WELCOME_INDEX}
-                style={{ width: "100%", height: "100%" }}
-              >
-                <Image
-                  source={require("../assets/images/mr-mingles.png")}
-                  style={{ width: "100%", height: "100%" }}
-                  resizeMode="contain"
-                />
-              </Pressable>
+              <Image
+                source={MINGLES_IMG}
+                style={{ position: "absolute", left: minglesBox.left, top: minglesBox.top, width: minglesBox.width, height: minglesBox.height }}
+                resizeMode="contain"
+                pointerEvents="none"
+              />
             </View>
 
+
             {/* Speech bubble (typed) */}
-            <View style={rect(0.05, 0.05, 0.90, BUBBLE_HEIGHT / dispH, { zIndex: 20 })}>
-              <ImageBackground source={require("../assets/images/speech-bubble.png")} style={{ flex: 1 }} resizeMode="stretch">
+            <View pointerEvents="none" style={rect(0.05, 0.05, 0.90, BUBBLE_HEIGHT / dispH, { zIndex: 20 })}>
+              <ImageBackground pointerEvents="none" source={require("../assets/images/speech-bubble.png")} style={{ flex: 1 }} resizeMode="stretch">
                 <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
                   <Text style={styles.bubbleText}>{welcomeDisplayed}</Text>
                 </View>
@@ -1089,10 +1131,40 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
         {/* Front layer (glass/bar) — fully visible on all devices */}
         <Image
           source={FRONT_IMG}
-          style={{ position: "absolute", left: frontLeft, top: frontTop, width: frontWidth, height: frontHeight, zIndex: 10 }}
+          style={{
+            position: "absolute",
+            left: frontLeft,
+            bottom: 0,               // ⬅️ anchor to bottom instead of using top
+            width: frontWidth,
+            height: frontHeight,
+            zIndex: 10,
+          }}
           resizeMode="stretch"
           pointerEvents="none"
         />
+        {!profileComplete && minglesBox.width > 0 && (
+        <Pressable
+          onPress={() => {
+            if (welcomeTyping) {
+              setWelcomeDisplayed(WELCOME_MESSAGES[welcomeIndex]);
+              setWelcomeTyping(false);
+              return;
+            }
+            setPointerTarget(null);
+            handleWelcomeAdvance();
+          }}
+          style={{
+            position: "absolute",
+            left:  offsetX + 0.23 * dispW + minglesBox.left,
+            top:   offsetY + 0.2 * dispH + minglesBox.top,
+            width: minglesBox.width,
+            height: minglesBox.height - 190,
+            zIndex: 999,         // draw order
+            elevation: 999,      // 👈 Android hit-test order
+            backgroundColor: 'transparent',
+          }}
+        />
+      )}
       </View>
 
       {/* ===== PRE-START OVERLAY (profile complete, not started) ===== */}
@@ -1473,15 +1545,20 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
         </View>
       )}
 
-      {profileComplete && (
-        <View
-          style={styles.bottomNavbarContainer}
-          onLayout={(e) => setStageH(e.nativeEvent.layout.y)}  // measure visible stage height
-        >
-          <BottomNavbar selectedTab="bar-2" />
-        </View>
-      )}
-    </>
+{profileComplete && (
+  <View
+    style={styles.bottomNavbarContainer}
+    onLayout={(e) => {
+      const h = e.nativeEvent.layout.height;
+      if (h !== navHeight) setNavHeight(h);
+    }}
+    collapsable={false} // <- ensures onLayout on Android physical devices
+  >
+    <BottomNavbar selectedTab="bar-2" />
+  </View>
+)}
+
+    </View>
   );
 }
 

@@ -651,7 +651,8 @@ const tapExtraGap = 0.02 * dispH;
         <ScrollView
           style={shopStyles.vipScroll}
           contentContainerStyle={shopStyles.vipScrollContent}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator
+          persistentScrollbar   
         >
           <View style={shopStyles.vipContainer}>
             <Text style={shopStyles.vipLine}>$5 a month</Text>
