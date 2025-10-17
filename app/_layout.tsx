@@ -3,6 +3,7 @@ import React, { useState, createContext, useEffect, useContext, useCallback, use
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   TouchableWithoutFeedback,
   ImageBackground,
@@ -172,6 +173,26 @@ function AnimatedSplashScreen({ children }: { children?: React.ReactNode }) {
   );
 }
 
+ // Stop RTL mirroring globally
+try {
+  I18nManager.allowRTL(false);
+  I18nManager.forceRTL(false);
+  I18nManager.swapLeftAndRightInRTL(false); 
+} catch {}
+
+// Freeze system font scaling globally (TS-safe casts)
+const TextAny = Text as any;
+const TextInputAny = TextInput as any;
+
+TextAny.defaultProps = TextAny.defaultProps || {};
+TextInputAny.defaultProps = TextInputAny.defaultProps || {};
+
+TextAny.defaultProps.allowFontScaling = false;
+TextAny.defaultProps.maxFontSizeMultiplier = 1;
+
+TextInputAny.defaultProps.allowFontScaling = false;
+TextInputAny.defaultProps.maxFontSizeMultiplier = 1;
+
 
 
 
@@ -203,15 +224,6 @@ useEffect(() => {
     );
     return () => unsub();
   }, []);
-
-  useEffect(() => {
-    if (I18nManager.isRTL && !didForceRTL) {
-      I18nManager.allowRTL(false);
-      I18nManager.forceRTL(false);
-      setDidForceRTL(true);
-      Updates.reloadAsync();
-    }
-  }, [didForceRTL]);
 
   useEffect(() => {
     NavigationBar.setVisibilityAsync("hidden");
