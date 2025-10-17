@@ -40,6 +40,8 @@ import Navbar from "@/components/Navbar";
 import { spendMoneys, getMessageCost } from '../services/moneys';
 import { MoneysContext } from "../contexts/MoneysContext";
 import PopUp from "../components/PopUp";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 
 // NEW
 import * as MailComposer from "expo-mail-composer";
@@ -124,6 +126,8 @@ export default function Bar2Screen() {
   const [stageH, setStageH] = useState<number | null>(null); // exact visible height above navbar
   const containerW = sw;
   const visibleH   = stageH ?? (sh - 72); // fallback until we measure navbar
+
+  const insets = useSafeAreaInsets();
 
   // COVER the available area with bg art
   const scaleArt = Math.max(containerW / BGW, visibleH / BGH);
@@ -1334,42 +1338,90 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
 
       <Modal visible={firstMessageModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.ccContainer}>
+          <View
+            style={[
+              styles.modalContent,
+              { maxHeight: Math.round(sh * 0.78), paddingBottom: 20 + insets.bottom }
+            ]}
+          >
             {deletionFlag && (
-              <View style={[styles.deletionBanner, { alignSelf: "flex-start" }]}>
+              <View style={styles.deletionBanner}>
                 <Text style={styles.deletionBannerText}>
                   {deletionFlag === 'you' ? 'You deleted this chat' : 'They deleted this chat'}
                 </Text>
               </View>
             )}
-            <Text style={styles.ccLabel}>Send a Message</Text>
-            <TextInput
-              style={styles.replyInput}
-              value={firstMessageText}
-              onChangeText={(t) => stripLinksAndWarn(t, setFirstMessageText)}
-              placeholder="Type your first message…"
-              placeholderTextColor="#AB83A1"
-              multiline
-            />
 
-            <TouchableOpacity
-              style={[styles.replyButton, sendingFirstMessage && { opacity: 0.5 }]}
-              disabled={sendingFirstMessage || messagingBlocked}
-              onPress={sendFirstMessage}
-            >
-              <Text style={styles.replyButtonText}>
-                {sendingFirstMessage ? "Sending…" : "Send"}
-              </Text>
+            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeButton}>
+              <Image style={{ width: 20, height: 20 }} source={require("../assets/images/x.png")} />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.ccCloseButton}
-              onPress={() => setFirstMessageModalVisible(false)}
-            >
-              <Image source={closeIcon} style={styles.closeIcon} />
-            </TouchableOpacity>
+            {selectedProfile && (
+              <>
+                {/* BODY SCROLLS IF NEEDED */}
+                <ScrollView
+                  contentContainerStyle={[styles.modalBody, { paddingBottom: 28 + insets.bottom }]}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {/* Photo wrapper so drink icon can anchor to its bottom-right reliably */}
+                  <View style={styles.photoWrap}>
+                    <Image source={{ uri: selectedProfile.photoUri }} style={styles.modalImage} />
+
+                    <TouchableOpacity
+                      style={[styles.drinkIcon, { right: "33%", bottom: "12%" }]} // ⬅️ key change
+                      onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}
+                    >
+                      <Image source={drinkIcon} style={{ width: "100%", height: "100%" }} />
+                      {showDrinkSpeech && (
+                        <View style={styles.drinkSpeechBubble}>
+                          <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.modalText}>
+                    <Text style={styles.modalName}>
+                      {selectedProfile.name}, {selectedProfile.age}
+                    </Text>
+                    <Text style={styles.modalLocation}>{selectedProfile.location}</Text>
+                    <Text style={styles.modalDescription}>{selectedProfile.about}</Text>
+                  </View>
+                </ScrollView>
+
+                {/* FOOTER PINNED TO BOTTOM OF CARD */}
+                <View
+                  style={[
+                    styles.modalFooter,
+                    (showChatButton !== showChitChatButton)
+                      ? { justifyContent: "center" }
+                      : { justifyContent: "space-around" },
+                  ]}                
+                >
+                  {showChatButton && (
+                    <TouchableOpacity
+                      style={styles.modalChatButton}
+                      onPress={handleChatPress}
+                      disabled={messagingBlocked}
+                    >
+                      <Text style={styles.modalChatButtonText}>Chat</Text>
+                    </TouchableOpacity>
+                  )}
+                  {showChitChatButton && (
+                    <TouchableOpacity
+                      style={styles.modalChatButton}
+                      onPress={openChitChatModal}
+                      disabled={messagingBlocked}
+                    >
+                      <Text style={styles.modalChatButtonText}>Chit Chat</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </>
+            )}
           </View>
         </View>
+
       </Modal>
 
       {/* “Don’t be a creep” popup */}
@@ -1520,14 +1572,12 @@ const styles = StyleSheet.create({
   // ─── PROFILE MODAL ───────────────────────────
   modalOverlay: {
     flex: 1,
-    marginBottom: 220,
     backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
   },
   modalContent: {
     width: "85%",
-    height: height * 0.65,
     borderWidth: 8,
     borderColor: "#460b2a",
     backgroundColor: "#592540",
@@ -1536,6 +1586,24 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: "center",
   },
+  modalBody: {
+    alignItems: "center",
+    paddingBottom: 12,
+  },
+  photoWrap: {
+    width: "100%",
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 8,
+    position: "relative",      // ⬅️ anchor for absolute drink icon
+  },
+  modalImage: {
+    width: "58%",
+    maxWidth: 180,
+    aspectRatio: 1,
+    borderRadius: 999,
+  },
+
   closeButton: {
     position: "absolute",
     top: 12,
@@ -1546,16 +1614,30 @@ const styles = StyleSheet.create({
     height: 18,
     tintColor: '#F5E1C4',
   },
-  modalImage: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    marginBottom: 16,
-    alignSelf: "center",
+  drinkIcon: {
+    position: "absolute",
+    left: "75%",
+    top: "30%",
+    width: 50,
+    height: 70,
   },
+
+  // text area
   modalText: {
-    marginTop: 16,
-    alignSelf: "flex-start",
+    marginTop: 25,
+    alignSelf: "stretch",
+    marginBottom: 30
+  },
+
+  // footer pinned at bottom of card
+  modalFooter: {
+    alignSelf: "stretch",
+    marginTop: 18,                 // ⬅️ extra gap above the buttons
+    paddingTop: 14,
+    borderTopWidth: 2,
+    borderTopColor: "rgba(70,11,42,0.35)",
+    flexDirection: "row",
+    alignItems: "center",
   },
   modalName: {
     color: "#ffe3d0",
@@ -1581,34 +1663,29 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-evenly",
     alignItems: "center",
-    marginTop: "25%"
   },
   modalChatButton: {
     backgroundColor: "#6e1944",
-    borderTopWidth: 5,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderBottomWidth: 15,
+    borderWidth: 3,
     borderColor: "#460b2a",
     paddingVertical: 5,
     paddingHorizontal: 10,
     marginHorizontal: 10,
     borderRadius: 25,
     alignSelf: "center",
-    shadowColor: "#460b2a",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 3,
+    shadowColor: "black",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.8,
+    shadowRadius: 9,
     elevation: 5,
+    boxShadow: "5px 9px 0px rgba(0,0,0,.3)",
   },
   modalChatButtonText: {
-    color: "#ffe3d0",
-    textTransform: "uppercase",
-    fontSize: 27,
-    lineHeight: 35,
-    textAlignVertical: "center",
+    color: "#F5E1C4",
+    fontSize: 28,
     fontFamily: FontNames.MontserratRegular,
     fontWeight: "600",
+    textAlignVertical: "center",
   },
 
   overlay: {
@@ -1715,11 +1792,6 @@ const styles = StyleSheet.create({
   },
 
   // ─── DRINK ICON + SPEECH BUBBLE ─────────────
-  drinkIcon: {
-    position: "absolute",
-    top: 160,
-    right: "15%"
-  },
   drinkSpeechBubble: {
     position: "absolute",
     bottom: "110%",
