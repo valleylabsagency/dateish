@@ -128,6 +128,7 @@ export default function Bar2Screen() {
   const { width: sw, height: sh } = useWindowDimensions();
   //const [stageH, setStageH] = useState<number | null>(null); // exact visible height above navbar
   const containerW = sw;
+  
   //const visibleH   = stageH ?? (sh - 72); // fallback until we measure navbar
   const [navHeight, setNavHeight] = useState(0);
   const insets = useSafeAreaInsets();
@@ -135,29 +136,35 @@ export default function Bar2Screen() {
 const [topNavH, setTopNavH] = useState(0);
 const [stageH, setStageH] = useState<number | null>(null);
 const hasBottomBar = !!profileComplete;
-const baseVisibleH = Math.max(0, sh - topNavH - (hasBottomBar ? navHeight : 0));
-const visibleH = hasBottomBar ? baseVisibleH : baseVisibleH + insets.bottom;
+const baseStageH = Math.max(0, sh - topNavH);
+const visibleH = baseStageH + (hasBottomBar ? 0 : insets.bottom);
+
+const effectiveH = stageH ?? Math.max(0, sh - topNavH - (profileComplete ? navHeight : 0));
+
+
 
   
 
   // COVER the available area with bg art
-  const scaleArt = Math.max(containerW / BGW, visibleH / BGH);
+  const scaleArt = Math.max(containerW / BGW, effectiveH / BGH);
   const dispW = BGW * scaleArt;
   const dispH = BGH * scaleArt;
 
   const offsetX = (containerW - dispW) / 2;
-  const offsetY = (visibleH - dispH) / 2;
+  const offsetY = (effectiveH - dispH) / 2;
+  
 
 
  // FRONT placement
-const FRONT_HEIGHT_FRAC = 0.64;     // keep whatever you like here
-
+ const FRONT_HEIGHT_FRAC = 0.64;
+ // Front placement
+const frontHeight = 0.64 * dispH;
 const frontLeft   = offsetX;
 const frontWidth  = dispW;
-const frontHeight = FRONT_HEIGHT_FRAC * dispH;
+const frontBottom = 0; // when welcome (!profileComplete) there is no bottom bar to clear
+const frontTop    = effectiveH - frontHeight - frontBottom;
 
-// ✅ Key change: align to the stage bottom (visibleH), not BG bottom (offsetY + dispH)
-const frontTop = visibleH - frontHeight;
+
 
 const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
 
@@ -647,6 +654,15 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
 
   //const navHeightGuess = sh - (stageH ?? (sh - 72));
   //const buttonBottomGap = navHeightGuess + 90; // ~20px above navbar
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+  
+    // Let content extend under the nav and match its color to the scene
+    NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => {});
+    NavigationBar.setBackgroundColorAsync("#592540").catch(() => {});
+    NavigationBar.setButtonStyleAsync("light").catch(() => {});
+  }, [profileComplete]);
+  
 
   if (!fontsLoaded || loading) {
     return (
@@ -945,19 +961,16 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
     }
   };
 
-  useEffect(() => {
-    if (Platform.OS !== "android") return;
-  
-    // Let content extend under the nav and match its color to the scene
-    NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => {});
-    NavigationBar.setBackgroundColorAsync("#592540").catch(() => {});
-    NavigationBar.setButtonStyleAsync("light").catch(() => {});
-  }, [profileComplete]);
   
 
   // ─────────────────────────── RENDER ───────────────────────────
   return (
-    <View style={{flex: 1, backgroundColor: "#592540"}}>
+    <View style={{
+      flex: 1,
+      backgroundColor: "#592540",
+      // cancel parent SafeArea bottom padding when there’s no BottomNavbar
+      marginBottom: hasBottomBar ? 0 : -insets.bottom,
+    }}>
       <View onLayout={(e) => setTopNavH(e.nativeEvent.layout.height)} collapsable={false}>
       <Navbar
         bathroomRoute={!profileComplete ? "/bathroom?onboard=true" : "/bathroom"}
@@ -966,13 +979,18 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
     </View>
 
       {/* ==== STAGE (locks all layers to the same art space) ==== */}
-      <View style={{
-        width: containerW,
-        height: visibleH,
-        overflow: "hidden",
-        backgroundColor: "#592540",                 // backfill just in case
-        marginBottom: hasBottomBar ? 0 : -insets.bottom, // extend behind nav on welcome
-      }}>
+      <View 
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: topNavH,                         // sits right under Navbar
+          bottom: profileComplete ? navHeight : 0, // when no bottom bar, go to screen bottom
+          backgroundColor: "#592540",
+          overflow: "hidden",
+        }}
+        onLayout={(e) => setStageH(e.nativeEvent.layout.height)}
+      >
         {/* Back layer (cover) */}
         <Image
           source={BG_IMG}
@@ -985,7 +1003,7 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
         {!profileComplete && (
           <>
             <View
-              style={rect(0.23, 0.11, 0.80, 0.75, { zIndex: 9 })}
+              style={rect(0.23, 0.14, 0.80, 0.75, { zIndex: 9 })}
               pointerEvents="box-none"
               collapsable={false}
               onLayout={e => {
@@ -1134,7 +1152,7 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
           style={{
             position: "absolute",
             left: frontLeft,
-            bottom: 0,               // ⬅️ anchor to bottom instead of using top
+            bottom: frontBottom,   // 👈 instead of bottom: 0
             width: frontWidth,
             height: frontHeight,
             zIndex: 10,
@@ -1547,12 +1565,12 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
 
 {profileComplete && (
   <View
-    style={styles.bottomNavbarContainer}
+    style={[styles.bottomNavbarContainer, { paddingBottom: insets.bottom }]} // 👈 include inset in height
     onLayout={(e) => {
       const h = e.nativeEvent.layout.height;
       if (h !== navHeight) setNavHeight(h);
     }}
-    collapsable={false} // <- ensures onLayout on Android physical devices
+    collapsable={false}
   >
     <BottomNavbar selectedTab="bar-2" />
   </View>

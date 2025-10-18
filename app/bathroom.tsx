@@ -30,7 +30,7 @@ import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 import closeIcon from '../assets/images/x.png'
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
-//import { Camera, useCameraDevice } from "react-native-vision-camera";
+import { Camera, useCameraDevice } from "react-native-vision-camera";
 import FaceDetector from "@react-native-ml-kit/face-detection";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -75,7 +75,7 @@ export default function BathroomScreen() {
 
   const [cameraVisible, setCameraVisible] = useState(false);
   const cameraRef = useRef<Camera>(null);
-  //const device = useCameraDevice("front");
+  const device = useCameraDevice("front");
   const [noFaceVisible, setNoFaceVisible] = useState(false);
   const [validating, setValidating] = useState(false);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
@@ -841,7 +841,7 @@ useEffect(() => {
                 )} 
                 <TouchableOpacity
                   style={[styles.editButton, styles.editButtonPhoto]}
-                  //onPress={handleTakePhoto}
+                  onPress={handleTakePhoto}
                 >
                   <Text style={styles.editButtonText}>Take a pic</Text>
                 </TouchableOpacity>
@@ -897,7 +897,7 @@ useEffect(() => {
                 {renderOnboardingContent()}
               </View>
             </Modal>
-    {/*
+    
           <Modal visible={cameraVisible} animationType="slide" transparent={false}>
               <View style={{ flex: 1, backgroundColor: "black" }}>
                 {device ? (
@@ -943,7 +943,7 @@ useEffect(() => {
                   </TouchableOpacity>
                 </View>
               </View>
-            </Modal> */}
+            </Modal> 
 
             {/* No-face “Mr. Mingles” popup */}
             <Modal transparent visible={noFaceVisible} animationType="fade">
@@ -1282,7 +1282,7 @@ const modalStyles = StyleSheet.create({
     width: scale(380),        
     height: scale(460),
     position: "absolute",
-    bottom: -verticalScale(310),
+    bottom: -verticalScale(350),
     right: -scale(120),
     zIndex: 100,
     pointerEvents: "none",
