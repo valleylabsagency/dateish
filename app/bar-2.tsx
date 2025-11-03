@@ -251,6 +251,8 @@ const STOOLS_ROW_Y_FRAC = 0.45;
     ...(extra || {}),
   });
 
+  
+
   // --- “TV” box (fractions from your original code)
   const TV = {
     x: 0.525, y: 0.163, w: 0.28, h: 0.11
@@ -298,6 +300,30 @@ const STOOLS_ROW_Y_FRAC = 0.45;
 
 // choose a safe bubble height
 const bubbleH = Math.min(Math.round(dispH * 0.18), 140); // max ~140px
+
+// Build rects *inside* the FRONT image (x,y,w,h are 0..1 in FRONT coords)
+const rectInFront = (
+  x: number, y: number, w: number, h: number, extra?: any
+) => ({
+  position: "absolute" as const,
+  left:  frontLeft + x * frontWidth,
+  top:   frontTop  + y * frontHeight,
+  width: w * frontWidth,
+  height:h * frontHeight,
+  ...(extra || {}),
+});
+
+// FRONT-anchored placement for Mr. Mingles
+// Slightly lower on *very* small devices so he doesn't clip
+const minglesFrontY =
+  shortSide < 380 ? 0.06 :   // very small
+  shortSide < 400 ? -0.00 :   // compact
+                     -0.02;   // normal/tall
+
+// Width/height as a fraction of FRONT; tweak to taste
+const MINGLES_F = { x: 0.18, y: minglesFrontY, w: 0.68, h: 0.95 };
+
+
 
 
   // toast for “message sent”
@@ -1122,29 +1148,26 @@ const bubbleH = Math.min(Math.round(dispH * 0.18), 140); // max ~140px
         {/* (WELCOME) Mr. Mingles image (static) + typed bubble only during onboarding */}
         {!profileComplete && (
           <>
+            {/* Mr. Mingles (FRONT-anchored) */}
             <View
-            pointerEvents="none"
-            style={rect(
-              MINGLES_PRE.x,
-              MINGLES_PRE.y + 0.05,
-              MINGLES_PRE.w,
-              MINGLES_PRE.h,
-              { zIndex: 9 }
-            )}
-          >
-            <MMAnimated
-              showBackground={false}
-              showBarFront={false}
-              showControls={false}
-              enterOnMount
-              leaving={leaving}
-              onLeaveComplete={() => {
-                setLeaving(false);
-                setStarted(true);
-              }}
-              style={StyleSheet.absoluteFill} // fill the rect above
-            />
-          </View>
+              pointerEvents="none"
+              style={rectInFront(MINGLES_F.x, MINGLES_F.y, MINGLES_F.w, MINGLES_F.h, { zIndex: 9 })}
+              onLayout={e => setMinglesBox(e.nativeEvent.layout)}  // ← capture absolute rect for pointers/hitboxes
+            >
+              <MMAnimated
+                showBackground={false}
+                showBarFront={false}
+                showControls={false}
+                enterOnMount
+                leaving={leaving}
+                onLeaveComplete={() => {
+                  setLeaving(false);
+                  setStarted(true);
+                }}
+                style={StyleSheet.absoluteFill}
+              />
+            </View>
+
 
 
             {/* Speech bubble (typed) */}
@@ -1180,12 +1203,8 @@ const bubbleH = Math.min(Math.round(dispH * 0.18), 140); // max ~140px
             pointerEvents="none"
             style={{
               position: 'absolute',
-              // Aim near Mingles’ face/hand; tweak multipliers to taste
-              left:
-                offsetX - .2 * dispW + minglesBox.left + minglesBox.width * 0.80 - 28,
-              top:
-                offsetY + 0.30 * dispH + minglesBox.top + minglesBox.height * 0.10 - 28
-                + pointerNudgeY,
+              left: minglesBox.left + minglesBox.width * 0.78 - 28,  // near face/hand
+              top:  minglesBox.top  + minglesBox.height * 0.14 - 28 + pointerNudgeY,
               zIndex: 999,
               transform: [{ scale: pointerScale }, { rotate: '85deg' }],
             }}
@@ -1285,29 +1304,26 @@ const bubbleH = Math.min(Math.round(dispH * 0.18), 140); // max ~140px
         )}
 
         {profileComplete && !started && (
-          <View
-            pointerEvents="none"
-            style={rect(
-              MINGLES_PRE.x,
-              MINGLES_PRE.y - 0.02,
-              MINGLES_PRE.w,
-              MINGLES_PRE.h,
-              { zIndex: 9 }
-            )}
-          >
-            <MMAnimated
-              showBackground={false}
-              showBarFront={false}
-              showControls={false}
-              enterOnMount
-              leaving={leaving}
-              onLeaveComplete={() => {
-                setLeaving(false);
-                setStarted(true);
-              }}
-              style={StyleSheet.absoluteFill} // fill the rect above
-            />
-          </View>
+
+<View
+  pointerEvents="none"
+  style={rectInFront(MINGLES_F.x, MINGLES_F.y, MINGLES_F.w, MINGLES_F.h, { zIndex: 9 })}
+  onLayout={e => setMinglesBox(e.nativeEvent.layout)}  // ← capture absolute rect for pointers/hitboxes
+>
+  <MMAnimated
+    showBackground={false}
+    showBarFront={false}
+    showControls={false}
+    enterOnMount
+    leaving={leaving}
+    onLeaveComplete={() => {
+      setLeaving(false);
+      setStarted(true);
+    }}
+    style={StyleSheet.absoluteFill}
+  />
+</View>
+
         )}
 
 
@@ -1328,28 +1344,28 @@ const bubbleH = Math.min(Math.round(dispH * 0.18), 140); // max ~140px
           pointerEvents="none"
         />
         {!profileComplete && minglesBox.width > 0 && (
-        <Pressable
-          onPress={() => {
-            if (welcomeTyping) {
-              setWelcomeDisplayed(WELCOME_MESSAGES[welcomeIndex]);
-              setWelcomeTyping(false);
-              return;
-            }
-            setPointerTarget(null);
-            handleWelcomeAdvance();
-          }}
-          style={{
-            position: "absolute",
-            left:  offsetX + 0.23 * dispW + minglesBox.left,
-            top:   offsetY + 0.2 * dispH + minglesBox.top,
-            width: minglesBox.width,
-            height: minglesBox.height - 190,
-            zIndex: 999,         // draw order
-            elevation: 999,      // 👈 Android hit-test order
-            backgroundColor: 'transparent',
-          }}
-        />
-      )}
+          <Pressable
+            onPress={() => {
+              if (welcomeTyping) {
+                setWelcomeDisplayed(WELCOME_MESSAGES[welcomeIndex]);
+                setWelcomeTyping(false);
+                return;
+              }
+              setPointerTarget(null);
+              handleWelcomeAdvance();
+            }}
+            style={{
+              position: "absolute",
+              left: minglesBox.left + minglesBox.width * 0.02,
+              top:  minglesBox.top  + minglesBox.height * 0.08,
+              width:  minglesBox.width * 0.96,
+              height: minglesBox.height * 0.72,    // reliable hitbox, scales with asset
+              zIndex: 999,
+              backgroundColor: "transparent",
+            }}
+          />
+        )}
+
       </View>
 
      
