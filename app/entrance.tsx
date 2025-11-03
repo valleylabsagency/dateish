@@ -33,6 +33,7 @@ import { AntDesign } from "@expo/vector-icons";     // Google
 import { FontAwesome } from "@expo/vector-icons";   // Meta (Facebook)
 import { Ionicons } from "@expo/vector-icons";   
 
+
 const { width, height } = Dimensions.get("window");
 const MESSAGE = "Happy Hour daily! ";
 

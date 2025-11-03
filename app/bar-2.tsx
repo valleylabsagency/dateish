@@ -46,6 +46,7 @@ import * as NavigationBar from "expo-navigation-bar";
 
 
 
+
 // NEW
 import * as MailComposer from "expo-mail-composer";
 import MMAnimated from "@/services/MMAnimated";
@@ -71,6 +72,8 @@ const withoutBg = {
     layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
   ),
 };
+
+
 
 // Mapping of drink types to icons
 const drinkMapping: Record<string, any> = {
@@ -111,7 +114,6 @@ const WELCOME_MESSAGES = [
   "Alright, enough chit chat! Go to the bathroom and make yourself a profile."
 ];
 
-const POINTER_ASSET: any = null; // require('../assets/images/hand-tap.png');
 const LAST_WELCOME_INDEX = WELCOME_MESSAGES.length - 1;
 
 export default function Bar2Screen() {
@@ -126,6 +128,14 @@ export default function Bar2Screen() {
 
   // --- stage (art space) geometry
   const { width: sw, height: sh } = useWindowDimensions();
+  const shortSide = Math.min(sw, sh);
+
+// Small screens: reduce front height fraction
+const FRONT_HEIGHT_FRAC =
+  shortSide < 360 ? 0.54 :   // very small (your 4.65")
+  shortSide < 400 ? 0.58 :   // small/compact
+  0.64;                      // normal/tall
+
   //const [stageH, setStageH] = useState<number | null>(null); // exact visible height above navbar
   const containerW = sw;
   
@@ -146,23 +156,13 @@ const effectiveH = stageH ?? Math.max(0, sh - topNavH - (profileComplete ? navHe
   
 
   // COVER the available area with bg art
-  const scaleArt = Math.max(containerW / BGW, effectiveH / BGH);
-  const dispW = BGW * scaleArt;
+  const scaleArt = containerW / BGW;
+  const dispW = containerW;
   const dispH = BGH * scaleArt;
-
-  const offsetX = (containerW - dispW) / 2;
-  const offsetY = (effectiveH - dispH) / 2;
   
+  const offsetX = 0;    // no side gaps
+  const offsetY = 0; 
 
-
- // FRONT placement
- const FRONT_HEIGHT_FRAC = 0.64;
- // Front placement
-const frontHeight = 0.64 * dispH;
-const frontLeft   = offsetX;
-const frontWidth  = dispW;
-const frontBottom = 0; // when welcome (!profileComplete) there is no bottom bar to clear
-const frontTop    = effectiveH - frontHeight - frontBottom;
 
 
 
@@ -171,37 +171,75 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
 
 
 // --- Avatars row placement (relative to FRONT image) ---
-  const STOOLS_ROW_Y_FRAC = 0.45; 
-  const STOOLS_ROW_NUDGE_PX = 0;   
-
-  const AVATAR_SIZE_PCT_OF_FRONT = 0.18;   
-  const AVATAR_GAP_FRAC_OF_WIDTH = 0.12;   
-
-  const AVATAR_SIZE_PX = Math.round(frontHeight * AVATAR_SIZE_PCT_OF_FRONT);
-  const AVATAR_GAP_PX  = dispW * AVATAR_GAP_FRAC_OF_WIDTH;
+  
 
   // ---- Start button geometry (relative to FRONT image) ----
   const BTN_W_FRAC = 0.90;           // 90% of visible art width
   const BTN_H_FRAC = 0.085;          // ~8.5% of visible art height
-  const BTN_GAP_FRAC = -0.60;        // gap between button and the FRONT image
+  const desiredBottomGap = (hasBottomBar ? insets.bottom + 16 : 24);
 
   const btnW = Math.round(dispW * BTN_W_FRAC);
   const btnH = Math.round(Math.max(56, Math.min(76, dispH * BTN_H_FRAC))); // clamp for tiny/huge screens
   const btnLeft = Math.round(offsetX + (dispW - btnW) / 2);
   // place it just ABOVE the FRONT image (uses its *top* edge)
+  const BTN_GAP_PX = 20; // ~20px above the front
   const btnTop = Math.max(
     8,
-    Math.round(frontTop - btnH - dispH * BTN_GAP_FRAC)
+    Math.round((stageH ?? effectiveH) - btnH - desiredBottomGap)
   );
 
   const MINGLES_IMG = require("../assets/images/mr-mingles.png");
   const { width: MINGLES_W, height: MINGLES_H } = Image.resolveAssetSource(MINGLES_IMG);
   const MINGLES_AR = MINGLES_W / MINGLES_H;
 
+// Get FRONT aspect ratio
+const { width: FRONT_W, height: FRONT_H } = Image.resolveAssetSource(FRONT_IMG);
+const FRONT_AR = FRONT_W / FRONT_H;
 
+// Use the actual stage height once measured; fall back to computed visible area
+const stageAvailH = (stageH ?? effectiveH);
 
+// Allow the bar to be bigger (so it feels “taller”) on mainstream tall phones
+const MAX_FRONT_FRAC =
+  shortSide < 380 ? 0.56 :   // tiniest phones: still visible but not huge
+  shortSide < 400 ? 0.62 :   // compact phones
+                      0.70;  // normal/tall phones → taller bar
 
+// Also enforce a floor so it's never “invisible” on very small screens
+const MIN_FRONT_FRAC =
+  shortSide < 360 ? 0.32 :   // tiny phones: guarantee presence
+  shortSide < 400 ? 0.30 :
+                      0.28;
 
+// First try: make it full-width so it touches left/right edges
+const baseFrontWidth  = dispW;
+const baseFrontHeight = baseFrontWidth / FRONT_AR;
+
+// Clamp height between min and max fractions of the stage (not the bg art)
+const frontMaxH = stageAvailH * MAX_FRONT_FRAC;
+const frontMinH = stageAvailH * MIN_FRONT_FRAC;
+const clampedHeight = Math.max(frontMinH, Math.min(baseFrontHeight, frontMaxH));
+
+// If clamped down, width must preserve aspect
+const frontWidth  = dispW;              // edge-to-edge
+const frontHeight = dispW / FRONT_AR;   // preserve aspect
+
+// If we didn’t clamp, width==dispW and we hit both edges.
+// If we did clamp (on tiny phones), width < dispW; center it.
+const frontLeft = offsetX
+
+// Anchor to the **bottom of the stage**, not the bottom of the bg art,
+// so it never “floats” off-screen on short devices.
+const frontTop = (stageAvailH - frontHeight);
+
+const STOOLS_ROW_Y_FRAC = 0.45; 
+  const STOOLS_ROW_NUDGE_PX = 16;   
+
+  const AVATAR_SIZE_PCT_OF_FRONT = 0.18;   
+  const AVATAR_GAP_FRAC_OF_WIDTH = 0.12;   
+
+  const AVATAR_SIZE_PX = Math.round(frontHeight * AVATAR_SIZE_PCT_OF_FRONT);
+  const AVATAR_GAP_PX  = dispW * AVATAR_GAP_FRAC_OF_WIDTH;
 
   // helpers in art space
   const rect = (x: number, y: number, w: number, h: number, extra?: any) => ({
@@ -237,6 +275,30 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
   const isFocused = useIsFocused();
   const pulse = useRef(new Animated.Value(0)).current;
   const { triggerSpend } = useContext(MoneysContext);
+
+  const aspect = sh / sw;
+  const M_W = shortSide < 380 ? 0.50 : shortSide < 400 ? 0.50 : 0.52;
+  const M_H = shortSide < 380 ? 0.50 : shortSide < 400 ? 0.63 : 0.66;
+  
+  
+  // lower him a bit everywhere
+  const minglesY =
+    shortSide < 380 ? 0.12 : shortSide < 400 ? 0.2 :
+    aspect > 2.05 ?   0.225 :
+                      0.215;
+  
+  const MINGLES_PRE = { x: 0.23, y: minglesY, w: M_W, h: M_H };
+
+  const pointerNudgeY = (() => {
+    // Move pointer UP a bit on smaller device
+    if (shortSide < 380) return -104;              // very small
+    if (shortSide < 400) return -14;              // small/compact
+    return 0;                                     // normal/tall → no change
+  })();
+
+// choose a safe bubble height
+const bubbleH = Math.min(Math.round(dispH * 0.18), 140); // max ~140px
+
 
   // toast for “message sent”
   const [sentToast, setSentToast] = useState(false);
@@ -998,45 +1060,150 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
           style={{ position: "absolute", left: offsetX, top: offsetY, width: dispW, height: dispH }}
           resizeMode="stretch"
         />
+        {profileComplete && !started && (
+        <>
+          {/* Blank bubble above the stage (same position as onboarding bubble) */}
+          {bubbleVisible && (
+            <View  style={{
+              position: "absolute",
+              left: offsetX + dispW * 0.05,
+              top: 2,                 // 2px under stage top (= under Navbar)
+              width: dispW * 0.90,
+              height: bubbleH,        // ✅ capped height
+              zIndex: 30,
+            }}>
+              <ImageBackground
+                source={require("../assets/images/speech-bubble.png")}
+                style={{ flex: 1 }}
+                resizeMode="stretch"
+              />
+            </View>
+          )}
+          {/* Start Chatting button pinned ~20px above navbar */}
+          <TouchableOpacity
+            style={[
+              styles.startButton,
+              {
+                position: "absolute",
+                left: btnLeft,
+                top: btnTop,
+                width: btnW,
+                height: btnH,
+                zIndex: 40,
+              },
+            ]}
+            onPress={async () => {
+              setBubbleVisible(false);
+              setLeaving(true);
+              setTimeout(() => setStarted((s) => s || true), 1100);
+              try {
+                const db = getDatabase();
+                const statusRef = rtdbRef(db, `status/${auth.currentUser!.uid}`);
+                rtdbUpdate(statusRef, { online: true, bar: true, lastActive: Date.now() }).catch(() => {});
+                await AsyncStorage.setItem("bar2Started", "true");
+              } catch {}
+            }}
+          >
+            <Text
+              style={styles.startButtonText}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}   // shrink instead of truncating
+              ellipsizeMode="clip"     // just in case, don’t show "…"
+            >
+              Start Chatting
+            </Text>
+          </TouchableOpacity>
+
+        </>
+      )}
+
 
         {/* (WELCOME) Mr. Mingles image (static) + typed bubble only during onboarding */}
         {!profileComplete && (
           <>
             <View
-              style={rect(0.23, 0.14, 0.80, 0.75, { zIndex: 9 })}
-              pointerEvents="box-none"
-              collapsable={false}
-              onLayout={e => {
-                const { width: cw, height: ch } = e.nativeEvent.layout;
-
-                // contain math
-                let w = cw;
-                let h = w / MINGLES_AR;
-                if (h > ch) { h = ch; w = h * MINGLES_AR; }
-                const left = (cw - w) / 2;
-                const top  = (ch - h) / 2;
-
-                setMinglesBox({ left, top, width: w, height: h });
+            pointerEvents="none"
+            style={rect(
+              MINGLES_PRE.x,
+              MINGLES_PRE.y + 0.05,
+              MINGLES_PRE.w,
+              MINGLES_PRE.h,
+              { zIndex: 9 }
+            )}
+          >
+            <MMAnimated
+              showBackground={false}
+              showBarFront={false}
+              showControls={false}
+              enterOnMount
+              leaving={leaving}
+              onLeaveComplete={() => {
+                setLeaving(false);
+                setStarted(true);
               }}
-            >
-              <Image
-                source={MINGLES_IMG}
-                style={{ position: "absolute", left: minglesBox.left, top: minglesBox.top, width: minglesBox.width, height: minglesBox.height }}
-                resizeMode="contain"
-                pointerEvents="none"
-              />
-            </View>
+              style={StyleSheet.absoluteFill} // fill the rect above
+            />
+          </View>
 
 
             {/* Speech bubble (typed) */}
-            <View pointerEvents="none" style={rect(0.05, 0.05, 0.90, BUBBLE_HEIGHT / dispH, { zIndex: 20 })}>
-              <ImageBackground pointerEvents="none" source={require("../assets/images/speech-bubble.png")} style={{ flex: 1 }} resizeMode="stretch">
-                <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
-                  <Text style={styles.bubbleText}>{welcomeDisplayed}</Text>
-                </View>
-              </ImageBackground>
-            </View>
+            <View
+  pointerEvents="none"
+  style={{
+    position: "absolute",
+    left: offsetX + dispW * 0.05,        // keep same side margins relative to art width
+    top: 2,                               // 👈 2px under the stage top (stage already sits under Navbar)
+    width: dispW * 0.90,
+    height: BUBBLE_HEIGHT,
+    zIndex: 30,
+  }}
+>
+  <ImageBackground
+    source={require("../assets/images/speech-bubble.png")}
+    style={{ flex: 1 }}
+    resizeMode="stretch"
+  >
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
+      <Text style={styles.bubbleText}>{welcomeDisplayed}</Text>
+    </View>
+  </ImageBackground>
+</View>
+
+            <TouchableOpacity style={styles.skipButton} onPress={skipWelcome}>
+              <Text style={styles.skipText}>Skip</Text>
+            </TouchableOpacity>
           </>
+        )}
+        {!profileComplete && pointerTarget === 'mingles' && minglesBox.width > 0 && (
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              // Aim near Mingles’ face/hand; tweak multipliers to taste
+              left:
+                offsetX - .2 * dispW + minglesBox.left + minglesBox.width * 0.80 - 28,
+              top:
+                offsetY + 0.30 * dispH + minglesBox.top + minglesBox.height * 0.10 - 28
+                + pointerNudgeY,
+              zIndex: 999,
+              transform: [{ scale: pointerScale }, { rotate: '85deg' }],
+            }}
+          >
+            <MaterialIcons name="pan-tool-alt" size={56} color="#ffe3d0" />
+          </Animated.View>
+        )}
+        {!profileComplete && pointerTarget === 'bathroom' && (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.pointerBase,
+              styles.pointerBathroom,
+              { transform: [{ scale: pointerScale }, { rotate: '10deg' }], zIndex: 999 },
+            ]}
+          >
+            <MaterialIcons name="pan-tool-alt" size={56} color="#ffe3d0" />
+          </Animated.View>
         )}
 
         {/* TV */}
@@ -1071,7 +1238,7 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
             style={[
               {
                 position: "absolute",
-                left: offsetX,
+                left: offsetX - 8.2,
                 width: dispW,
                 // Y is: top of FRONT + fraction of FRONT height, plus tiny pixel nudge
                 top: frontTop + frontHeight * STOOLS_ROW_Y_FRAC + STOOLS_ROW_NUDGE_PX,
@@ -1120,14 +1287,13 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
         {profileComplete && !started && (
           <View
             pointerEvents="none"
-            style={{
-              position: "absolute",
-              left: offsetX,
-              top: "1%",
-              width: dispW,
-              height: dispH,
-              zIndex: 9, // < front image (10)
-            }}
+            style={rect(
+              MINGLES_PRE.x,
+              MINGLES_PRE.y - 0.02,
+              MINGLES_PRE.w,
+              MINGLES_PRE.h,
+              { zIndex: 9 }
+            )}
           >
             <MMAnimated
               showBackground={false}
@@ -1137,12 +1303,13 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
               leaving={leaving}
               onLeaveComplete={() => {
                 setLeaving(false);
-                setStarted(true); // <-- important
+                setStarted(true);
               }}
-              style={{ width: "100%", height: "100%" }}
+              style={StyleSheet.absoluteFill} // fill the rect above
             />
           </View>
         )}
+
 
 
 
@@ -1151,13 +1318,13 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
           source={FRONT_IMG}
           style={{
             position: "absolute",
-            left: frontLeft,
-            bottom: frontBottom,   // 👈 instead of bottom: 0
+            left:  frontLeft,
+            top:   frontTop,
             width: frontWidth,
-            height: frontHeight,
+            height: frontHeight + 50,
             zIndex: 10,
           }}
-          resizeMode="stretch"
+          resizeMode="contain"   // show the whole asset without distortion
           pointerEvents="none"
         />
         {!profileComplete && minglesBox.width > 0 && (
@@ -1185,57 +1352,8 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
       )}
       </View>
 
-      {/* ===== PRE-START OVERLAY (profile complete, not started) ===== */}
-      {profileComplete && !started && (
-        <>
-          {/* Blank bubble above the stage (same position as onboarding bubble) */}
-          {bubbleVisible && (
-            <View style={[rect(0.05, 0.18, 0.90, BUBBLE_HEIGHT / dispH, { zIndex: 30 })]}>
-              <ImageBackground
-                source={require("../assets/images/speech-bubble.png")}
-                style={{ flex: 1 }}
-                resizeMode="stretch"
-              />
-            </View>
-          )}
-          {/* Start Chatting button pinned ~20px above navbar */}
-          <TouchableOpacity
-            style={[
-              styles.startButton,
-              {
-                position: "absolute",
-                left: btnLeft,
-                top: btnTop,
-                width: btnW,
-                height: btnH,
-                zIndex: 40,
-              },
-            ]}
-            onPress={async () => {
-              setBubbleVisible(false);
-              setLeaving(true);
-              setTimeout(() => setStarted((s) => s || true), 1100);
-              try {
-                const db = getDatabase();
-                const statusRef = rtdbRef(db, `status/${auth.currentUser!.uid}`);
-                rtdbUpdate(statusRef, { online: true, bar: true, lastActive: Date.now() }).catch(() => {});
-                await AsyncStorage.setItem("bar2Started", "true");
-              } catch {}
-            }}
-          >
-            <Text
-              style={styles.startButtonText}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.6}   // shrink instead of truncating
-              ellipsizeMode="clip"     // just in case, don’t show "…"
-            >
-              Start Chatting
-            </Text>
-          </TouchableOpacity>
-
-        </>
-      )}
+     
+      
 
       {/* ─── PROFILE DETAIL MODAL ──────────────────── */}
       <Modal
@@ -1581,6 +1699,12 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
 }
 
 const styles = StyleSheet.create({
+  centerInStage: {
+    position: "absolute",
+    left: 0, right: 0, top: 0, bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   background: {
     width: width,
     aspectRatio: 1125 / 2436
@@ -1605,7 +1729,7 @@ const styles = StyleSheet.create({
   // Skip (welcome)
   skipButton: {
     position: "absolute",
-    top: "18%",
+    top: "22%",
     right: "40%",
     backgroundColor: "#6e1944",
     borderWidth: 4,
@@ -1613,7 +1737,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
-    zIndex: 5,
+    zIndex: 500,
     width: 70
   },
   skipText: {

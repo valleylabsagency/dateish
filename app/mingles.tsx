@@ -52,6 +52,9 @@ const withoutBg = {
   ),
 }
 
+// Pick a lower Y on smaller phones so the drink sits farther down on the bar
+
+
 
 export default function MinglesScreen() {
   const [fontsLoaded] = useFonts({
@@ -301,15 +304,27 @@ const minglesHit = rect(
   MINGLES.h * (1 - HIT_INSET.top - HIT_INSET.bottom)
 );
 
-const BUBBLE = { x: 0.05, y: 0.1, w: 0.90, h: 0.18 };
-const bubbleBox = rect(BUBBLE.x, BUBBLE.y, BUBBLE.w, BUBBLE.h);
-// move content up ~2% of stage height; tweak -0.015…-0.03 to taste
-const bubbleNudgeY = -0.02 * dispH;
-const arrowNudgeY  = -0.015 * dispH;   // moves arrows up to match
+
+// Keep the bubble height consistent with bar-2
+const bubbleH = Math.min(Math.round(dispH * 0.18), 140);
+
 
 // A little extra spacing for the TAP button (positive pushes it down)
 const tapExtraGap = 0.02 * dispH;
 
+const shortSide = Math.min(sw, sh);
+
+// Default position (good for normal/tall phones)
+let drinkY = 0.33;
+
+// Nudge downward on compact devices
+if (shortSide < 400) drinkY = 0.30;   // small
+if (shortSide < 380) drinkY = 0.29;   // very small
+if (shortSide < 360) drinkY = 0.28;   // tiniest
+// You can tweak the numbers to taste, higher = lower placement
+
+// One place to control drink box geometry
+const DRINK_BOX = rectInFront(0.53, drinkY, 0.13, 0.22);
 
 
 
@@ -346,85 +361,83 @@ const tapExtraGap = 0.02 * dispH;
             />
            
 
+{/* Speech bubble — same placement as bar-2 */}
+<View
+  style={{
+    position: "absolute",
+    left:  offsetX + dispW * 0.05,
+    top:   2,                  // 2px under the stage top
+    width: dispW * 0.90,
+    height: bubbleH,           // capped height like bar-2
+    zIndex: 30,
+    ...Platform.select({ android: { elevation: 30 } }),
+  }}
+>
+  <ImageBackground
+    source={require("../assets/images/speech-bubble.png")}
+    style={{ flex: 1 }}
+    resizeMode="stretch"
+  >
+    {/* LEFT ARROW */}
+    <TouchableOpacity
+      onPress={back}
+      style={{
+        position: "absolute",
+        left: 0, top: 0, bottom: 0, width: 40,
+        alignItems: "center", justifyContent: "center",
+        zIndex: 2, ...Platform.select({ android: { elevation: 2 } }),
+      }}
+    >
+      <MaterialIcons name="chevron-left" size={32} color="#fff" />
+    </TouchableOpacity>
 
-            {/* Speech bubble (placed by fraction, not pixels) */}
-            <View style={bubbleBox}>
-              <ImageBackground
-                source={require("../assets/images/speech-bubble.png")}
-                style={{ flex: 1 }}
-                imageStyle={{ transform: [{ scaleX: -1 }] }}
-                resizeMode="stretch"
-              >
-                {/* LEFT ARROW */}
-                <TouchableOpacity
-                  onPress={back}
-                  style={{
-                    position: "absolute",
-                    left: 0, top: 0, bottom: 0, width: 40,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transform: [{ translateY: arrowNudgeY }],
-                    zIndex: 2,
-                    ...Platform.select({ android: { elevation: 2 } }),
-                  }}
-                >
-                  <MaterialIcons name="chevron-left" size={32} color="#fff" />
-                </TouchableOpacity>
+    {/* RIGHT ARROW */}
+    <TouchableOpacity
+      onPress={cycle}
+      style={{
+        position: "absolute",
+        right: 0, top: 0, bottom: 0, width: 40,
+        alignItems: "center", justifyContent: "center",
+        zIndex: 2, ...Platform.select({ android: { elevation: 2 } }),
+      }}
+    >
+      <MaterialIcons name="chevron-right" size={32} color="#fff" />
+    </TouchableOpacity>
 
-                {/* RIGHT ARROW */}
-                <TouchableOpacity
-                  onPress={cycle}
-                  style={{
-                    position: "absolute",
-                    right: 0, top: 0, bottom: 0, width: 40,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transform: [{ translateY: arrowNudgeY }],
-                    zIndex: 2,
-                    ...Platform.select({ android: { elevation: 2 } }),
-                  }}
-                >
-                  <MaterialIcons name="chevron-right" size={32} color="#fff" />
-                </TouchableOpacity>
+    {/* CENTER CONTENT */}
+    <View
+      pointerEvents="box-none"
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        position: "relative",
+        bottom: 10,
+        alignItems: "center",
+        paddingLeft: 40,
+        paddingRight: 40,
+      }}
+    >
+      <Text
+        style={[
+          styles.bubbleText,
+          { includeFontPadding: false },
+        ]}
+      >
+        {messages[idx]}
+      </Text>
 
-                {/* CENTER CONTENT (let touches pass through to siblings) */}
-                <View
-                  pointerEvents="box-none"
-                  style={{
-                    flex: 1,
-                    justifyContent: "center",
-                    alignItems: "center",
-                    paddingLeft: 40,
-                    paddingRight: 40,
-                    transform: [{ translateY: bubbleNudgeY }],
-                    zIndex: 1,
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.bubbleText,
-                      { includeFontPadding: false, textAlignVertical: "center" },
-                    ]}
-                  >
-                    {messages[idx]}
-                  </Text>
+      {idx === 0 && (
+        <TouchableOpacity
+          onPress={() => setShowDrinkMenu(true)}
+          style={{ paddingHorizontal: 24, paddingVertical: 8, borderRadius: 8, marginTop: 8 }}
+        >
+          <Text style={styles.tapText}>- TAP -</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  </ImageBackground>
+</View>
 
-                  {idx === 0 && (
-                    <TouchableOpacity
-                      onPress={() => setShowDrinkMenu(true)}
-                      style={{
-                        paddingHorizontal: 24,
-                        paddingVertical: 8,
-                        borderRadius: 8,
-                        marginTop: tapExtraGap, // keeps it lower/clearer
-                      }}
-                    >
-                      <Text style={styles.tapText}>- TAP -</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </ImageBackground>
-            </View>
 
 
             {/* ==== DRINK MENU MODAL ==== */}
@@ -525,7 +538,7 @@ const tapExtraGap = 0.02 * dispH;
               <View
                 // pick a spot on the bar: tweak these fractions to move it
                 style={[
-                  rectInFront(0.53, 0.33, 0.13, 0.22), // x, y, w, h as fractions of FRONT
+                  DRINK_BOX,
                   { zIndex: 20, alignItems: "center", justifyContent: "center",
                     ...Platform.select({ android: { elevation: 20 } }),
                   },

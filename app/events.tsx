@@ -12,6 +12,7 @@ import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
 
+
 // require the background once at module scope
 const bgImage = require("../assets/images/events-full.png");
 // get its intrinsic dimensions and compute aspect ratio

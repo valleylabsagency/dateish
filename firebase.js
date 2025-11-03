@@ -1,9 +1,20 @@
+// firebase.js
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeAuth, getReactNativePersistence, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import {
+  getAuth,
+  initializeAuth,
+  signInAnonymously,
+  onAuthStateChanged,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getDatabase } from "firebase/database";
-import { getFunctions, httpsCallable, httpsCallableFromURL } from "firebase/functions"; // ⬅️ add this
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  getFunctions,
+  httpsCallable,
+  httpsCallableFromURL,
+} from "firebase/functions";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBLSTw5hKlnlZ1oiEsXVMuDkcBYfZiL0zw",
@@ -12,21 +23,44 @@ const firebaseConfig = {
   storageBucket: "dateish-4edf2.firebasestorage.app",
   messagingSenderId: "482953150124",
   appId: "1:482953150124:web:f2273baa7f4e923e1c2909",
-  measurementId: "G-WVJK03806D"
+  measurementId: "G-WVJK03806D",
 };
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
+// ---- Auth (web-safe, native gets persistence if available) ----
+function createAuth(appInstance) {
+  if (Platform.OS === "web") {
+    return getAuth(appInstance);
+  }
+  try {
+    // Lazy-require so Metro/Web don’t need to resolve the subpath on web
+    // Requires firebase >= 9.13 (recommend 10+)
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getReactNativePersistence } = require("firebase/auth/react-native");
+    return initializeAuth(appInstance, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch (e) {
+    console.warn(
+      "[firebase] 'firebase/auth/react-native' not found; falling back to default getAuth (no RN persistence).",
+      String(e && e.message ? e.message : e)
+    );
+    return getAuth(appInstance);
+  }
+}
 
+const auth = createAuth(app);
+export { auth };
+
+// ---- Other services ----
 export const firestore = getFirestore(app);
 export const database = getDatabase(app);
 
 const REGION = "us-central1";
 export const functions = getFunctions(app, REGION);
 
+// ---- Auth helpers ----
 export async function ensureSignedIn() {
   if (auth.currentUser) return auth.currentUser;
   try {
@@ -40,46 +74,51 @@ export async function ensureSignedIn() {
 
 export async function getIdTokenSafely(forceRefresh = false) {
   await ensureSignedIn();
-  const token = await auth.currentUser?.getIdToken(forceRefresh);
+  const user = auth.currentUser;
+  if (!user) throw new Error("No user");
+  const token = await user.getIdToken(forceRefresh);
   if (!token) throw new Error("No ID token available");
   return token;
 }
 
+// Keep an anonymous user around automatically
 onAuthStateChanged(auth, (u) => {
   if (!u) {
-    // fire and forget; errors will surface when you hit a callable
+    // fire-and-forget; errors surface when calling functions
     signInAnonymously(auth).catch(() => {});
   }
 });
 
-
-// simple logger you can leave in for now
+// ---- Small diagnostics ----
 export const logFnsEnv = () => {
   console.log("[moneys] projectId:", app.options.projectId);
   console.log("[moneys] region bound:", REGION);
 };
 
-// A tiny client wrapper for the new ping:
+// ---- Callable helpers ----
 export async function callPing() {
-  await ensureSignedIn(); 
+  await ensureSignedIn();
   logFnsEnv();
   const call = httpsCallable(functions, "ping");
   const res = await call({});
   return res.data;
 }
 
-// Your spend helper (keep this; we’ll test after ping)
 export async function callSpendMoneys(payload) {
-  await ensureSignedIn(); 
+  await ensureSignedIn();
   logFnsEnv();
   try {
     const call = httpsCallable(functions, "spendMoneys");
     const res = await call(payload);
     return res.data;
   } catch (e) {
-    console.warn("[moneys] spendMoneys named-callable failed:", e.code, e.message);
+    console.warn(
+      "[moneys] spendMoneys named-callable failed:",
+      e.code,
+      e.message
+    );
 
-    // Optional fallback (use the v2 callable endpoint explicitly)
+      // Optional fallback: direct URL callable
     const url = `https://us-central1-${app.options.projectId}.cloudfunctions.net/spendMoneys`;
     console.log("[moneys] Retrying via URL:", url);
     const call2 = httpsCallableFromURL(functions, url);

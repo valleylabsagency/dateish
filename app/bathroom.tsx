@@ -30,7 +30,7 @@ import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 import closeIcon from '../assets/images/x.png'
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
-import { Camera, useCameraDevice } from "react-native-vision-camera";
+//import { Camera, useCameraDevice } from "react-native-vision-camera";
 import FaceDetector from "@react-native-ml-kit/face-detection";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -74,26 +74,56 @@ export default function BathroomScreen() {
   const [mustAnswer, setMustAnswer] = useState(false)
 
   const [cameraVisible, setCameraVisible] = useState(false);
-  const cameraRef = useRef<Camera>(null);
-  const device = useCameraDevice("front");
+  //const cameraRef = useRef<Camera>(null);
+  //const device = useCameraDevice("front");
   const [noFaceVisible, setNoFaceVisible] = useState(false);
   const [validating, setValidating] = useState(false);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
 
   
-  const scaleFit = Math.min(
-    stageSize.w / imgW || 0,
-    stageSize.h / imgH || 0
-  );
-  const dispW = imgW * scaleFit;      // drawn image width
-  const dispH = imgH * scaleFit;      // drawn image height
-  const imgLeft = (stageSize.w - dispW) / 2; // left offset inside stage
-  const imgTop  = (stageSize.h - dispH) / 2; // top offset inside stage
-
+  const scaleCover = Math.max(stageSize.w / imgW || 0, stageSize.h / imgH || 0);
+  const dispW = stageSize.w;
+  const dispH = stageSize.h;
+  const imgLeft = 0;
+  const imgTop  = 0;
+  
   // Mirror placement (TWEAK these 3 numbers to nudge as needed)
   const mirrorX = 0.06;  // left edge of mirror, in image % (0..1)
   const mirrorY = 0.19;  // top edge of mirror, in image % (0..1)
   const mirrorW = .9;  // width of mirror, in image % (0..1)
+
+  // Scale fonts based on mirror width (360 is a comfy baseline)
+  const mirrorScale = dispW > 0 ? Math.min(1.25, Math.max(0.8, (dispW * mirrorW) / 360)) : 1;
+
+// Reusable scaled sizes (clamped)
+  const fs = (base: number) => Math.round(Math.min(24, Math.max(10, base * mirrorScale)));
+  // Mirror box actual width in pixels
+  const mirrorBoxW = dispW * mirrorW;
+
+    // Photo size: ~42% of mirror width, clamped between 80–160 px
+  // helpers (put near other small utils)
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const remap = (v: number, inMin: number, inMax: number, outMin: number, outMax: number) =>
+  outMin + ((clamp(v, inMin, inMax) - inMin) * (outMax - outMin)) / (inMax - inMin);
+
+// ---- Avatar size (responsive) ----
+const shortSidePx = Math.min(dispW || 0, dispH || 0);
+
+// Base size relative to mirror width (tweak 0.38..0.44 if needed)
+const baseAvatar = mirrorBoxW * 0.40;
+
+// Smaller screens (shortSide~340) get ~-10%, tall phones (shortSide~430) get ~+18%
+let mult = remap(shortSidePx, 340, 430, 0.90, 1.18);
+
+// Extra haircut for *very* small screens
+if (shortSidePx < 380) {
+  // 300→0.78x … 330→0.86x (keeps really tiny devices in check)
+  mult = remap(shortSidePx, 250, 230, 0.68, 0.80);
+}
+
+// Final size with sane clamps
+const photoSize = Math.round(clamp(baseAvatar * mult, 82, 168));
+
 
 
 
@@ -763,28 +793,31 @@ useEffect(() => {
           backgroundColor: "transparent",
         }}
       >
-       <ImageBackground
-        source={bathroomImg}
-        style={{ flex: 1 }}
-        resizeMode="cover"
-        blurRadius={Platform.OS === "ios" ? 20 : 12}   
-        fadeDuration={0}
-       >
-          <ImageBackground
-            source={bathroomImg}
-            style={{ flex: 1 }}
-            resizeMode="contain"
-            fadeDuration={0}
-          >
-            <View style={[
+        <View style={{ flex: 1 }}>
+          
+        <Image
+          source={bathroomImg}
+          fadeDuration={0}
+          style={{
+            position: "absolute",
+            left:  imgLeft,   // 0
+            top:   imgTop,    // 0
+            width: dispW,     // stage width
+            height:dispH,     // stage height
+          }}
+          resizeMode="stretch"
+        />
+          <View
+            style={[
               styles.formContainer,
               dispW > 0 && {
-                left: imgLeft + dispW * mirrorX,
-                top:  imgTop  + dispH * mirrorY,
+                left:  imgLeft + dispW * mirrorX,
+                top:   imgTop  + dispH * mirrorY,
                 width: dispW * mirrorW,
               },
-            ]}>
-              <TextInput
+            ]}
+          >
+            <TextInput
                 style={styles.input}
                 placeholder="Name"
                 placeholderTextColor="#999"
@@ -834,11 +867,19 @@ useEffect(() => {
                 </View>
 
               <View style={styles.photoContainer}>
-                {photoUri ? (
-                  <Image source={{ uri: photoUri }} style={styles.photo} />
-                ) : (
-                  <MaterialIcons name="person" size={scale(125)} color="grey" />
-                )} 
+              {photoUri ? (
+                <Image
+                  source={{ uri: photoUri }}
+                  style={{
+                    width: photoSize,
+                    height: photoSize,
+                    borderRadius: photoSize / 2,
+                  }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <MaterialIcons name="person" size={photoSize * 0.96} color="grey" />
+              )}
                 <TouchableOpacity
                   style={[styles.editButton, styles.editButtonPhoto]}
                   onPress={handleTakePhoto}
@@ -860,7 +901,12 @@ useEffect(() => {
                   <Text style={styles.editButtonText}>EDIT</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+          </View>
+
+        </View>
+       
+          
+            
             {/* Existing Incomplete Profile Warning Modal */}
             <Modal transparent visible={modalVisible} animationType="slide">
               <View style={modalStyles.modalOverlay}>
@@ -897,7 +943,8 @@ useEffect(() => {
                 {renderOnboardingContent()}
               </View>
             </Modal>
-    
+            {/*
+
           <Modal visible={cameraVisible} animationType="slide" transparent={false}>
               <View style={{ flex: 1, backgroundColor: "black" }}>
                 {device ? (
@@ -943,7 +990,7 @@ useEffect(() => {
                   </TouchableOpacity>
                 </View>
               </View>
-            </Modal> 
+            </Modal> */}
 
             {/* No-face “Mr. Mingles” popup */}
             <Modal transparent visible={noFaceVisible} animationType="fade">
@@ -1011,8 +1058,7 @@ useEffect(() => {
               </TouchableOpacity>
             )}
         
-          </ImageBackground>
-        </ImageBackground>
+  
       </View>
         
       </View>
@@ -1028,6 +1074,8 @@ const styles = StyleSheet.create({
   formContainer: {
     position: "absolute",
     width: "90%",
+    overflow: "hidden",              
+    paddingHorizontal: scale(6),
   },
   closeIcon: {
     width: 24,
@@ -1096,6 +1144,8 @@ const styles = StyleSheet.create({
     color: "gray",
     textAlign: "center",
     fontFamily: FontNames.MontSerratSemiBold,
+    maxWidth: "100%",
+    flexShrink: 1,
   },
   bottomEdit: {
     marginTop: verticalScale(5),
