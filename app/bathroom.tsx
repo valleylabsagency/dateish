@@ -30,7 +30,7 @@ import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 import closeIcon from '../assets/images/x.png'
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
-import { Camera, useCameraDevice } from "react-native-vision-camera";
+//import { Camera, useCameraDevice } from "react-native-vision-camera";
 import FaceDetector from "@react-native-ml-kit/face-detection";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -74,8 +74,8 @@ export default function BathroomScreen() {
   const [mustAnswer, setMustAnswer] = useState(false)
 
   const [cameraVisible, setCameraVisible] = useState(false);
-  const cameraRef = useRef<Camera>(null);
-  const device = useCameraDevice("front");
+  //const cameraRef = useRef<Camera>(null);
+  //const device = useCameraDevice("front");
   const [noFaceVisible, setNoFaceVisible] = useState(false);
   const [validating, setValidating] = useState(false);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
@@ -116,7 +116,7 @@ const baseAvatar = mirrorBoxW * 0.40;
 let mult = remap(shortSidePx, 340, 430, 0.90, 1.18);
 
 // Extra haircut for *very* small screens
-if (shortSidePx < 380) {
+if (shortSidePx < 360) {
   // 300→0.78x … 330→0.86x (keeps really tiny devices in check)
   mult = remap(shortSidePx, 250, 230, 0.68, 0.80);
 }
@@ -944,7 +944,7 @@ useEffect(() => {
               </View>
             </Modal>
        
-
+{/*}
           <Modal visible={cameraVisible} animationType="slide" transparent={false}>
               <View style={{ flex: 1, backgroundColor: "black" }}>
                 {device ? (
@@ -990,7 +990,7 @@ useEffect(() => {
                   </TouchableOpacity>
                 </View>
               </View>
-            </Modal> 
+            </Modal> */}
 
             {/* No-face “Mr. Mingles” popup */}
             <Modal transparent visible={noFaceVisible} animationType="fade">

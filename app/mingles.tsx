@@ -314,17 +314,11 @@ const tapExtraGap = 0.02 * dispH;
 
 const shortSide = Math.min(sw, sh);
 
-// Default position (good for normal/tall phones)
-let drinkY = 0.33;
+// Stick the drink to the TOP of the FRONT image.
+// Small positive y keeps it just below the glass edge across devices.
+const DRINK_TOP_FRAC = shortSide < 400 ? 0.30 : 0.33; // tweak to taste (0 = exactly at top)
+const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
 
-// Nudge downward on compact devices
-if (shortSide < 400) drinkY = 0.30;   // small
-if (shortSide < 380) drinkY = 0.29;   // very small
-if (shortSide < 360) drinkY = 0.28;   // tiniest
-// You can tweak the numbers to taste, higher = lower placement
-
-// One place to control drink box geometry
-const DRINK_BOX = rectInFront(0.53, drinkY, 0.13, 0.22);
 
 
 

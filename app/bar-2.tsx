@@ -323,6 +323,34 @@ const minglesFrontY =
 // Width/height as a fraction of FRONT; tweak to taste
 const MINGLES_F = { x: 0.18, y: minglesFrontY, w: 0.68, h: 0.95 };
 
+// Hit area independent of the image (same FRONT-anchored logic).
+// Tweak these if you want the tappable box tighter/looser than the art.
+const MINGLES_TAP = {
+  x: MINGLES_F.x + 0.02,
+  y: MINGLES_F.y + 0.06,
+  w: MINGLES_F.w * 0.96,
+  h: MINGLES_F.h * 0.72,
+};
+
+// Handy pixel helpers for pointer placement derived from FRONT coords
+const toPxLeft = (xf: number) => frontLeft + xf * frontWidth;
+const toPxTop  = (yf: number) => frontTop  + yf * frontHeight;
+
+// How much to raise the background art (in px; tweak to taste)
+const BAR_BACK_SHIFT = 60;
+
+const rectOnBack = (
+  x: number, y: number, w: number, h: number, extra?: any
+) => ({
+  position: "absolute" as const,
+  left:  offsetX + x * dispW,
+  top:   (offsetY - BAR_BACK_SHIFT) + y * dispH, // 👈 match the raised BG
+  width: w * dispW,
+  height:h * dispH,
+  ...(extra || {}),
+});
+
+
 
 
 
@@ -1082,8 +1110,13 @@ const MINGLES_F = { x: 0.18, y: minglesFrontY, w: 0.68, h: 0.95 };
         {/* Back layer (cover) */}
         <Image
           source={BG_IMG}
-          
-          style={{ position: "absolute", left: offsetX, top: offsetY, width: dispW, height: dispH }}
+          style={{
+            position: "absolute",
+            left: offsetX,
+            top: offsetY - BAR_BACK_SHIFT, // 👈 raise it
+            width: dispW,
+            height: dispH + BAR_BACK_SHIFT, // 👈 extend height so bottom doesn't show a gap
+          }}
           resizeMode="stretch"
         />
         {profileComplete && !started && (
@@ -1172,46 +1205,46 @@ const MINGLES_F = { x: 0.18, y: minglesFrontY, w: 0.68, h: 0.95 };
 
             {/* Speech bubble (typed) */}
             <View
-  pointerEvents="none"
-  style={{
-    position: "absolute",
-    left: offsetX + dispW * 0.05,        // keep same side margins relative to art width
-    top: 2,                               // 👈 2px under the stage top (stage already sits under Navbar)
-    width: dispW * 0.90,
-    height: BUBBLE_HEIGHT,
-    zIndex: 30,
-  }}
->
-  <ImageBackground
-    source={require("../assets/images/speech-bubble.png")}
-    style={{ flex: 1 }}
-    resizeMode="stretch"
-  >
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
-      <Text style={styles.bubbleText}>{welcomeDisplayed}</Text>
-    </View>
-  </ImageBackground>
-</View>
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                left: offsetX + dispW * 0.05,        // keep same side margins relative to art width
+                top: 2,                               // 👈 2px under the stage top (stage already sits under Navbar)
+                width: dispW * 0.90,
+                height: BUBBLE_HEIGHT,
+                zIndex: 30,
+              }}
+            >
+              <ImageBackground
+                source={require("../assets/images/speech-bubble.png")}
+                style={{ flex: 1 }}
+                resizeMode="stretch"
+              >
+                <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
+                  <Text style={styles.bubbleText}>{welcomeDisplayed}</Text>
+                </View>
+              </ImageBackground>
+            </View>
 
-            <TouchableOpacity style={styles.skipButton} onPress={skipWelcome}>
-              <Text style={styles.skipText}>Skip</Text>
-            </TouchableOpacity>
+  
           </>
         )}
-        {!profileComplete && pointerTarget === 'mingles' && minglesBox.width > 0 && (
+        {!profileComplete && pointerTarget === 'mingles' && (
           <Animated.View
             pointerEvents="none"
             style={{
               position: 'absolute',
-              left: minglesBox.left + minglesBox.width * 0.78 - 28,  // near face/hand
-              top:  minglesBox.top  + minglesBox.height * 0.14 - 28 + pointerNudgeY,
-              zIndex: 999,
+              // near face/hand inside the tap box
+              left: toPxLeft(MINGLES_TAP.x + MINGLES_TAP.w * 0.78) - 150,
+              top:  toPxTop (MINGLES_TAP.y + MINGLES_TAP.h * 0.22) + 28,
+              zIndex: 2000,
               transform: [{ scale: pointerScale }, { rotate: '85deg' }],
             }}
           >
             <MaterialIcons name="pan-tool-alt" size={56} color="#ffe3d0" />
           </Animated.View>
         )}
+
         {!profileComplete && pointerTarget === 'bathroom' && (
           <Animated.View
             pointerEvents="none"
@@ -1229,7 +1262,7 @@ const MINGLES_F = { x: 0.18, y: minglesFrontY, w: 0.68, h: 0.95 };
         {profileComplete && started && (
           <Pressable
             onPress={toggleTV}
-            style={rect(TV.x, TV.y, TV.w, TV.h)}
+            style={[{zIndex: 1000}, rectOnBack(TV.x, TV.y, TV.w, TV.h, { top: (offsetY - 48) + TV.y * dispH })]}
             accessibilityRole="button"
             accessibilityLabel={tvOn ? "Turn TV off" : "Turn TV on"}
           >
@@ -1250,6 +1283,7 @@ const MINGLES_F = { x: 0.18, y: minglesFrontY, w: 0.68, h: 0.95 };
             )}
           </Pressable>
         )}
+
 
         {/* ONLINE ROW — anchored over stools */}
         {profileComplete && started && onlineProfiles.length > 0 && (
@@ -1305,24 +1339,24 @@ const MINGLES_F = { x: 0.18, y: minglesFrontY, w: 0.68, h: 0.95 };
 
         {profileComplete && !started && (
 
-<View
-  pointerEvents="none"
-  style={rectInFront(MINGLES_F.x, MINGLES_F.y, MINGLES_F.w, MINGLES_F.h, { zIndex: 9 })}
-  onLayout={e => setMinglesBox(e.nativeEvent.layout)}  // ← capture absolute rect for pointers/hitboxes
->
-  <MMAnimated
-    showBackground={false}
-    showBarFront={false}
-    showControls={false}
-    enterOnMount
-    leaving={leaving}
-    onLeaveComplete={() => {
-      setLeaving(false);
-      setStarted(true);
-    }}
-    style={StyleSheet.absoluteFill}
-  />
-</View>
+          <View
+            pointerEvents="none"
+            style={rectInFront(MINGLES_F.x, MINGLES_F.y, MINGLES_F.w, MINGLES_F.h, { zIndex: 9 })}
+            onLayout={e => setMinglesBox(e.nativeEvent.layout)}  // ← capture absolute rect for pointers/hitboxes
+          >
+            <MMAnimated
+              showBackground={false}
+              showBarFront={false}
+              showControls={false}
+              enterOnMount
+              leaving={leaving}
+              onLeaveComplete={() => {
+                setLeaving(false);
+                setStarted(true);
+              }}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
 
         )}
 
@@ -1343,7 +1377,8 @@ const MINGLES_F = { x: 0.18, y: minglesFrontY, w: 0.68, h: 0.95 };
           resizeMode="contain"   // show the whole asset without distortion
           pointerEvents="none"
         />
-        {!profileComplete && minglesBox.width > 0 && (
+        {/* FRONT-anchored tap area for Mingles (debug color shown) */}
+        {!profileComplete && (
           <Pressable
             onPress={() => {
               if (welcomeTyping) {
@@ -1354,21 +1389,49 @@ const MINGLES_F = { x: 0.18, y: minglesFrontY, w: 0.68, h: 0.95 };
               setPointerTarget(null);
               handleWelcomeAdvance();
             }}
-            style={{
-              position: "absolute",
-              left: minglesBox.left + minglesBox.width * 0.02,
-              top:  minglesBox.top  + minglesBox.height * 0.08,
-              width:  minglesBox.width * 0.96,
-              height: minglesBox.height * 0.72,    // reliable hitbox, scales with asset
-              zIndex: 999,
-              backgroundColor: "transparent",
-            }}
+            style={rectInFront(
+              MINGLES_TAP.x,
+              MINGLES_TAP.y,
+              MINGLES_TAP.w,
+              MINGLES_TAP.h,
+              {
+                zIndex: 50,           // > bar-front zIndex(10) so it's definitely above
+                
+               
+              }
+            )}
+            // Optional: keep layout for future diagnostics
+            onLayout={(e) => setMinglesBox(e.nativeEvent.layout)}
           />
         )}
 
+
       </View>
 
-     
+     {/* Skip (always above stage so it can't be covered) */}
+      {!profileComplete && (
+        <TouchableOpacity
+          onPress={skipWelcome}
+          style={{
+            position: "absolute",
+            // align to the same visual spot: ~22% down from navbar, ~6% from right edge
+            top: topNavH + sh * 0.22,
+            right: sw * 0.40,
+            backgroundColor: "#6e1944",
+            borderWidth: 4,
+            borderColor: "#460b2a",
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 12,
+            zIndex: 3000,
+            elevation: 3000,
+            width: 70,
+          }}
+        >
+          <Text style={styles.skipText}>Skip</Text>
+        </TouchableOpacity>
+      )}
+
       
 
       {/* ─── PROFILE DETAIL MODAL ──────────────────── */}
