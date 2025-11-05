@@ -943,7 +943,7 @@ useEffect(() => {
                 {renderOnboardingContent()}
               </View>
             </Modal>
-      
+  
           <Modal visible={cameraVisible} animationType="slide" transparent={false}>
               <View style={{ flex: 1, backgroundColor: "black" }}>
                 {device ? (
@@ -1089,7 +1089,7 @@ const styles = StyleSheet.create({
     textAlignVertical: "center",
     color: "#908db3",
     fontFamily: FontNames.MontserratBold,
-    paddingVertical: verticalScale(0),
+    paddingVertical: verticalScale(3),
     includeFontPadding: false,
   },
   locationContainer: {

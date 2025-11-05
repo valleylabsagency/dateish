@@ -1372,7 +1372,7 @@ const rectOnBack = (
             left:  frontLeft,
             top:   frontTop,
             width: frontWidth,
-            height: frontHeight + 50,
+            height: frontHeight + 15,
             zIndex: 10,
           }}
           resizeMode="contain"   // show the whole asset without distortion

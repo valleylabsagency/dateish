@@ -377,7 +377,7 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
       onPress={back}
       style={{
         position: "absolute",
-        left: 0, top: 0, bottom: 0, width: 40,
+        left: 0, top: 0, bottom: 20, width: 40,
         alignItems: "center", justifyContent: "center",
         zIndex: 2, ...Platform.select({ android: { elevation: 2 } }),
       }}
@@ -390,7 +390,7 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
       onPress={cycle}
       style={{
         position: "absolute",
-        right: 0, top: 0, bottom: 0, width: 40,
+        right: 0, top: 0, bottom: 20, width: 40,
         alignItems: "center", justifyContent: "center",
         zIndex: 2, ...Platform.select({ android: { elevation: 2 } }),
       }}
