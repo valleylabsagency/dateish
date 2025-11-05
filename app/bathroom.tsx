@@ -1051,11 +1051,11 @@ useEffect(() => {
                 />
               </View>
             )}
-            {!hasSavedInSession && (
+       
               <TouchableOpacity style={styles.saveBtn} onPress={() => handleSubmit()}>
                 <Text style={styles.saveBtnText}>Save Profile</Text>
               </TouchableOpacity>
-            )}
+  
         
   
       </View>
@@ -1084,11 +1084,13 @@ const styles = StyleSheet.create({
   input: {
     width: "100%",
     fontSize: scale(16),
+    lineHeight: scale(18),
     textAlign: "center",
     textAlignVertical: "center",
     color: "#908db3",
     fontFamily: FontNames.MontserratBold,
-    paddingVertical: verticalScale(0)
+    paddingVertical: verticalScale(0),
+    includeFontPadding: false,
   },
   locationContainer: {
     alignItems: "center",
@@ -1111,7 +1113,7 @@ const styles = StyleSheet.create({
   },
   editButton: {
     paddingHorizontal: scale(8),
-    paddingVertical: verticalScale(3),
+    paddingVertical: verticalScale(2),
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "black",
@@ -1139,12 +1141,13 @@ const styles = StyleSheet.create({
     marginVertical: verticalScale(5),
   },
   aboutText: {
-    fontSize: scale(12),
+    fontSize: scale(11),
     color: "gray",
     textAlign: "center",
     fontFamily: FontNames.MontSerratSemiBold,
     maxWidth: "100%",
     flexShrink: 1,
+    paddingHorizontal: 8
   },
   bottomEdit: {
     marginTop: verticalScale(5),

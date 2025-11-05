@@ -230,7 +230,8 @@ const frontLeft = offsetX
 
 // Anchor to the **bottom of the stage**, not the bottom of the bg art,
 // so it never “floats” off-screen on short devices.
-const frontTop = (stageAvailH - frontHeight);
+const FRONT_Y_NUDGE_PX = 120;
+const frontTop = (stageAvailH - frontHeight) + FRONT_Y_NUDGE_PX;
 
 const STOOLS_ROW_Y_FRAC = 0.45; 
   const STOOLS_ROW_NUDGE_PX = 16;   
@@ -1145,7 +1146,7 @@ const rectOnBack = (
               {
                 position: "absolute",
                 left: btnLeft,
-                top: btnTop,
+                top: btnTop - 50,
                 width: btnW,
                 height: btnH,
                 zIndex: 40,
