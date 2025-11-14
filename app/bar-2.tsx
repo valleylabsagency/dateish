@@ -1811,7 +1811,18 @@ const rectOnBack = (
               <View style={creepStyles.mingInnerTriangle} />
             </View>
 
-            <MMAnimated />
+            <MMAnimated
+              showBackground={false}
+              showBarFront={false}
+              showControls={false} 
+              enterOnMount
+              leaving={leaving}
+              onLeaveComplete={() => {
+                setLeaving(false);
+                setStarted(true);
+              }}
+              style={{position: "absolute", top: "80%", left: "10%"}}
+            />
           </View>
         </View>
       </Modal>
