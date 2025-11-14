@@ -22,7 +22,7 @@ import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
 import { firestore, auth } from "../firebase";
 import { getDatabase, ref as rtdbRef, onValue, update as rtdbUpdate } from "firebase/database";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { scale, ScaledSheet } from "react-native-size-matters";
 import { ChatType, SavedChat } from "./ChitChats";
@@ -118,6 +118,13 @@ const LAST_WELCOME_INDEX = WELCOME_MESSAGES.length - 1;
 
 export default function Bar2Screen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ cameFromEntrance?: string }>();
+
+  const cameFromEntrance =
+    params.cameFromEntrance === "true" ||
+    params.cameFromEntrance === "1" ||
+    params.cameFromEntrance === true;
+
   const { profileComplete } = useContext(ProfileContext);
 
   const [fontsLoaded] = useFonts({
@@ -266,7 +273,7 @@ const STOOLS_ROW_Y_FRAC = 0.45;
   const [pointerTarget, setPointerTarget] = useState<'mingles'|'bathroom'|null>(null);
   const [minglesFrame, setMinglesFrame] = useState<{x:number,y:number,width:number,height:number} | null>(null);
   const [minglesBox, setMinglesBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
-
+  
 
   // pre-start bubble (blank) visibility
   const [bubbleVisible, setBubbleVisible] = useState(false);
@@ -461,13 +468,19 @@ const rectOnBack = (
 
   // restore started flag on focus
   useEffect(() => {
+    // ⛔ If we came from entrance, always force a fresh pre-start state
+    if (cameFromEntrance) {
+      setStarted(false);
+      return;
+    }
+  
     (async () => {
       try {
         const v = await AsyncStorage.getItem("bar2Started");
         setStarted(v === "true");
       } catch {}
     })();
-  }, [isFocused]);
+  }, [isFocused, cameFromEntrance]);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
@@ -524,7 +537,12 @@ const rectOnBack = (
 
 
   // start state
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(() => {
+    // If this screen is opened from Entrance, ALWAYS start in pre-start mode
+    if (cameFromEntrance) return false;
+    // Otherwise default to "started" so direct navigation shows profiles
+    return true;
+  });
   const [leaving, setLeaving] = useState(false);
 
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
@@ -551,36 +569,55 @@ const rectOnBack = (
   // presence
   useEffect(() => {
     if (!auth.currentUser) return;
+
     const db = getDatabase();
     const statusRef = rtdbRef(db, `status/${auth.currentUser.uid}`);
 
     let hb: any = null;
 
-    const goOnline = () => {
-      rtdbUpdate(statusRef, { online: true, bar: true, lastActive: Date.now() }).catch(() => {});
+    const startPresence = () => {
+      rtdbUpdate(statusRef, {
+        online: true,
+        bar: true,
+        lastActive: Date.now(),
+      }).catch(() => {});
       hb = setInterval(() => {
         rtdbUpdate(statusRef, { lastActive: Date.now() }).catch(() => {});
       }, 30_000);
     };
 
-    const goOffline = () => {
-      if (hb) { clearInterval(hb); hb = null; }
-      rtdbUpdate(statusRef, { online: false, bar: false, lastActive: Date.now() }).catch(() => {});
+    const stopPresence = () => {
+      if (hb) {
+        clearInterval(hb);
+        hb = null;
+      }
+      // Don’t immediately flip online=false here – let the 10-min freshness hide them
+      rtdbUpdate(statusRef, {
+        lastActive: Date.now(),
+      }).catch(() => {});
     };
 
-    if (started && isFocused) {
-      goOnline();
+    // Online as soon as they enter from the entrance OR once they've started browsing
+    if (cameFromEntrance || started) {
+      startPresence();
     } else {
-      goOffline();
+      stopPresence();
     }
 
     return () => {
-      if (hb) { clearInterval(hb); hb = null; }
-      if (auth.currentUser) {
-        rtdbUpdate(statusRef, { online: false, bar: false, lastActive: Date.now() }).catch(() => {});
+      if (hb) {
+        clearInterval(hb);
+        hb = null;
       }
+      // On full unmount (e.g. app closed), explicitly mark offline
+      rtdbUpdate(statusRef, {
+        online: false,
+        bar: false,
+        lastActive: Date.now(),
+      }).catch(() => {});
     };
-  }, [started, isFocused, auth.currentUser?.uid]);
+  }, [cameFromEntrance, started, auth.currentUser?.uid]);
+
 
   useEffect(() => {
     let alive = true;
@@ -1025,9 +1062,11 @@ const rectOnBack = (
     setSendingFirstMessage(true);
 
     try {
-      const cost = getMessageCost();
-      await spendMoneys({ amount: cost, reason: "start-chat-first-message" });
-      triggerSpend(cost);
+      // NOTE: Temporarily disable charging Moneys to start a chat.
+      // When you want to turn this back on, restore:
+      //   const cost = getMessageCost();
+      //   await spendMoneys({ amount: cost, reason: "start-chat-first-message" });
+      //   triggerSpend(cost);
 
       const currentUserId = auth.currentUser!.uid;
       const partnerId = selectedProfile.id;
@@ -1060,23 +1099,20 @@ const rectOnBack = (
         }
       );
 
-      // (toast replaces blocking alert)
+      // Stay in browse – just close modal and show toast
       setFirstMessageText("");
       setFirstMessageModalVisible(false);
       setModalVisible(false);
       setSentToast(true);
       setTimeout(() => setSentToast(false), 2000);
     } catch (err: any) {
-      if (err?.code === "functions/failed-precondition" || /Insufficient moneys/i.test(err?.message)) {
-        Alert.alert("Out of moneys", "You don’t have enough moneys to start a new chat. Visit the shop to top up.");
-      } else {
-        Alert.alert("Error", "Could not send message. Please try again.");
-      }
       console.error(err);
+      Alert.alert("Error", "Could not send message. Please try again.");
     } finally {
       setSendingFirstMessage(false);
     }
   };
+
 
   
 
@@ -1120,7 +1156,7 @@ const rectOnBack = (
           }}
           resizeMode="stretch"
         />
-        {profileComplete && !started && (
+        {profileComplete && cameFromEntrance && !started && (
         <>
           {/* Blank bubble above the stage (same position as onboarding bubble) */}
           {bubbleVisible && (
@@ -1180,7 +1216,7 @@ const rectOnBack = (
 
 
         {/* (WELCOME) Mr. Mingles image (static) + typed bubble only during onboarding */}
-        {!profileComplete && (
+        {!profileComplete && cameFromEntrance && (
           <>
             {/* Mr. Mingles (FRONT-anchored) */}
             <View
@@ -1230,7 +1266,7 @@ const rectOnBack = (
   
           </>
         )}
-        {!profileComplete && pointerTarget === 'mingles' && (
+        {!profileComplete && cameFromEntrance && pointerTarget === 'mingles' && (
           <Animated.View
             pointerEvents="none"
             style={{
@@ -1246,7 +1282,7 @@ const rectOnBack = (
           </Animated.View>
         )}
 
-        {!profileComplete && pointerTarget === 'bathroom' && (
+        {!profileComplete && cameFromEntrance && pointerTarget === 'bathroom' && (
           <Animated.View
             pointerEvents="none"
             style={[
@@ -1338,7 +1374,7 @@ const rectOnBack = (
           </Animated.View>
         )}
 
-        {profileComplete && !started && (
+        {profileComplete && cameFromEntrance && !started && (
 
           <View
             pointerEvents="none"
@@ -1410,7 +1446,7 @@ const rectOnBack = (
       </View>
 
      {/* Skip (always above stage so it can't be covered) */}
-      {!profileComplete && (
+      {!profileComplete && cameFromEntrance && (
         <TouchableOpacity
           onPress={skipWelcome}
           style={{
@@ -1640,26 +1676,42 @@ const rectOnBack = (
               </View>
             )}
 
-            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeButton}>
-              <Image style={{ width: 20, height: 20 }} source={require("../assets/images/x.png")} />
+            {/* 🔴 this should close the FIRST MESSAGE modal, not the profile modal */}
+            <TouchableOpacity
+              onPress={() => setFirstMessageModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <Image
+                style={{ width: 20, height: 20 }}
+                source={require("../assets/images/x.png")}
+              />
             </TouchableOpacity>
 
             {selectedProfile && (
               <>
                 {/* BODY SCROLLS IF NEEDED */}
                 <ScrollView
-                  contentContainerStyle={[styles.modalBody, { paddingBottom: 28 + insets.bottom }]}
+                  contentContainerStyle={[
+                    styles.modalBody,
+                    { paddingBottom: 28 + insets.bottom }
+                  ]}
                   showsVerticalScrollIndicator={false}
                 >
-                  {/* Photo wrapper so drink icon can anchor to its bottom-right reliably */}
+                  {/* Photo + drink */}
                   <View style={styles.photoWrap}>
-                    <Image source={{ uri: selectedProfile.photoUri }} style={styles.modalImage} />
+                    <Image
+                      source={{ uri: selectedProfile.photoUri }}
+                      style={styles.modalImage}
+                    />
 
                     <TouchableOpacity
-                      style={[styles.drinkIcon, { right: "33%", bottom: "12%" }]} // ⬅️ key change
+                      style={[styles.drinkIcon, { right: "33%", bottom: "12%" }]}
                       onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}
                     >
-                      <Image source={drinkIcon} style={{ width: "100%", height: "100%" }} />
+                      <Image
+                        source={drinkIcon}
+                        style={{ width: "100%", height: "100%" }}
+                      />
                       {showDrinkSpeech && (
                         <View style={styles.drinkSpeechBubble}>
                           <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
@@ -1672,54 +1724,56 @@ const rectOnBack = (
                     <Text style={styles.modalName}>
                       {selectedProfile.name}, {selectedProfile.age}
                     </Text>
-                    <Text style={styles.modalLocation}>{selectedProfile.location}</Text>
-                    <Text style={styles.modalDescription}>{selectedProfile.about}</Text>
+                    <Text style={styles.modalLocation}>
+                      {selectedProfile.location}
+                    </Text>
+                    <Text style={styles.modalDescription}>
+                      {selectedProfile.about}
+                    </Text>
                   </View>
+
+                  {/* ✏️ FIRST MESSAGE INPUT */}
+                  <Text
+                    style={[
+                      styles.modalLocation,
+                      { marginTop: 12, marginBottom: 4, fontSize: 18 }
+                    ]}
+                  >
+                    Your first message
+                  </Text>
+                  <TextInput
+                    style={styles.replyInput}
+                    value={firstMessageText}
+                    onChangeText={(t) => stripLinksAndWarn(t, setFirstMessageText)}
+                    placeholder="Say something nice…"
+                    placeholderTextColor="#7A4C6E"
+                    multiline
+                  />
                 </ScrollView>
 
-                {/* FOOTER PINNED TO BOTTOM OF CARD */}
+                {/* FOOTER: send first message */}
                 <View
                   style={[
                     styles.modalFooter,
-                    (showChatButton !== showChitChatButton)
-                      ? { justifyContent: "center" }
-                      : { justifyContent: "space-around" },
-                  ]}                
+                    { justifyContent: "center" } // only one button here
+                  ]}
                 >
-                  {showChatButton && (
-                    <TouchableOpacity
-                      style={styles.modalChatButton}
-                      onPress={handleChatPress}
-                      disabled={messagingBlocked}
-                    >
-                      <Text style={styles.modalChatButtonText}>Chat</Text>
-                    </TouchableOpacity>
-                  )}
-                  {showChitChatButton && (
-                    <TouchableOpacity
-                      style={styles.modalChatButton}
-                      onPress={openChitChatModal}
-                      disabled={messagingBlocked}
-                    >
-                      <Text style={styles.modalChatButtonText}>Chit Chat</Text>
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity
+                    style={styles.modalChatButton}
+                    onPress={sendFirstMessage}     // ✅ actually use it
+                    disabled={sendingFirstMessage || messagingBlocked}
+                  >
+                    <Text style={styles.modalChatButtonText}>
+                      {sendingFirstMessage ? "Sending..." : "Send"}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </>
             )}
           </View>
         </View>
-
       </Modal>
-
-      {/* “Don’t be a creep” popup */}
-      <Modal
-        visible={creepVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setCreepVisible(false)}
-      >
-        <Modal transparent visible={noLinksVisible} animationType="fade" onRequestClose={() => setNoLinksVisible(false)}>
+      <Modal transparent visible={noLinksVisible} animationType="fade" onRequestClose={() => setNoLinksVisible(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.ccContainer}>
               <Text style={[styles.ccLabel, { marginBottom: 8 }]}>Mr. Mingles</Text>
@@ -1733,6 +1787,14 @@ const rectOnBack = (
           </View>
         </Modal>
 
+
+      {/* “Don’t be a creep” popup */}
+      <Modal
+        visible={creepVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setCreepVisible(false)}
+      >
         <View style={creepStyles.mingModalOverlay}>
           <View style={creepStyles.mingModalContainer}>
             <TouchableOpacity

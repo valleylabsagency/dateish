@@ -82,9 +82,9 @@ const OPEN_HOUR = 17; // 5pm
 const CLOSE_HOUR = 5; // 5am
 
 function isBarOpenNow(d = new Date()) {
-const h = d.getHours();
-// 17..23 or 0..4 => OPEN, exactly 05:00:00 and after => CLOSED
-return  true//(h >= OPEN_HOUR) || (h < CLOSE_HOUR);
+  const h = d.getHours();
+  // 17..23 or 0..4 => OPEN, exactly 05:00:00 and after => CLOSED
+  return (h >= OPEN_HOUR) || (h < CLOSE_HOUR);
 }
 
 

@@ -17,7 +17,7 @@ export default function EntranceAnimation() {
   const [ready, setReady] = useState(false);
   const video = useRef<Video>(null);
 
-  const goNext = () => router.replace('/bar-2');
+  const goNext = () => router.replace({ pathname: "/bar-2", params: { cameFromEntrance: "true" } });
 
   const onPlaybackStatusUpdate = (status: any) => {
     // Defensive: only access props when loaded
