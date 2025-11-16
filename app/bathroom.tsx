@@ -30,7 +30,7 @@ import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 import closeIcon from '../assets/images/x.png'
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
-import { Camera, useCameraDevice } from "react-native-vision-camera";
+//import { Camera, useCameraDevice } from "react-native-vision-camera";
 import FaceDetector from "@react-native-ml-kit/face-detection";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -74,8 +74,8 @@ export default function BathroomScreen() {
   const [mustAnswer, setMustAnswer] = useState(false)
 
   const [cameraVisible, setCameraVisible] = useState(false);
-  const cameraRef = useRef<Camera>(null);
-  const device = useCameraDevice("front");
+  //const cameraRef = useRef<Camera>(null);
+  //const device = useCameraDevice("front");
   const [noFaceVisible, setNoFaceVisible] = useState(false);
   const [validating, setValidating] = useState(false);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
@@ -501,6 +501,42 @@ useEffect(() => {
     }
   };
 
+    // Auto-save after first profile creation: only save if something changed
+    const saveProfileIfChanged = async () => {
+      // If we don't even have a loaded profile yet, just bail
+      if (!profile) return true;
+  
+      const orig = profile || {};
+      const current = { name, age, location, about, photoUri };
+  
+      const changed =
+        current.name !== orig.name ||
+        current.age !== orig.age ||
+        current.location !== orig.location ||
+        current.about !== orig.about ||
+        current.photoUri !== orig.photoUri;
+  
+      if (!changed) {
+        // Nothing to do, allow navigation
+        return true;
+      }
+  
+      try {
+        setIsSaving(true);
+        await saveProfile(current);
+        // Profile is already considered "created", just keep the flag true
+        setProfileComplete(true);
+        return true;
+      } catch (e) {
+        console.error(e);
+        Alert.alert("Error", "Could not save your changes. Please try again.");
+        return false;
+      } finally {
+        setIsSaving(false);
+      }
+    };
+  
+
   // Helpers
   function computeAgeFromDob(dd: string, mm: string, yyyy: string) {
     const d = parseInt(dd, 10);
@@ -774,8 +810,20 @@ useEffect(() => {
     <View style={{ flex: 1, backgroundColor: "black" }}>
       <View onLayout={e => setNavH(e.nativeEvent.layout.height)}>
         <ProfileNavbar
-          onBack={() => router.replace("/bar-2")}
           showBack={hasSavedInSession}
+          onBack={async () => {
+            // Before initial save, just behave like before (no auto-save).
+            if (!hasSavedInSession) {
+              router.replace("/bar-2");
+              return;
+            }
+
+            // After initial profile creation: auto-save any changes, then go back.
+            const ok = await saveProfileIfChanged();
+            if (ok) {
+              router.replace("/bar-2");
+            }
+          }}
         />
       </View>
       <View
@@ -943,7 +991,7 @@ useEffect(() => {
                 {renderOnboardingContent()}
               </View>
             </Modal>
-  
+  {/*}
           <Modal visible={cameraVisible} animationType="slide" transparent={false}>
               <View style={{ flex: 1, backgroundColor: "black" }}>
                 {device ? (
@@ -990,7 +1038,7 @@ useEffect(() => {
                 </View>
               </View>
             </Modal> 
-
+*/}
             {/* No-face “Mr. Mingles” popup */}
             <Modal transparent visible={noFaceVisible} animationType="fade">
               <View style={modalStyles.modalOverlay}>
@@ -1018,16 +1066,21 @@ useEffect(() => {
             </Modal>
 
 
-            {hasSavedInSession && (
+            <View style={styles.floatingHitboxes} pointerEvents="box-none">
+              {hasSavedInSession && (
+                <TouchableOpacity
+                  style={styles.hitbox}
+                  onPress={() => router.push("/settings")}
+                  pointerEvents="auto"
+                />
+              )}
+
               <TouchableOpacity
-                style={styles.hitbox}
-                onPress={() => router.push('/settings')}
+                style={styles.hitboxChats}
+                onPress={() => setShowChitChats(true)}
+                pointerEvents="auto"
               />
-            )}
-            <TouchableOpacity
-              style={styles.hitboxChats}
-              onPress={() => setShowChitChats(true)}
-            />
+            </View>
 
             <ChitChats
               visible={showChitChats}
@@ -1051,12 +1104,12 @@ useEffect(() => {
                 />
               </View>
             )}
-       
-              <TouchableOpacity style={styles.saveBtn} onPress={() => handleSubmit()}>
+
+            {!hasSavedInSession && (
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSubmit}>
                 <Text style={styles.saveBtnText}>Save Profile</Text>
               </TouchableOpacity>
-  
-        
+            )}        
   
       </View>
         
@@ -1161,10 +1214,11 @@ const styles = StyleSheet.create({
   },
   hitboxChats: {
     position: 'absolute',
-    top: "78%",
+    top: "71%",
     right: "10%",
     width: 120,
     height: 80,
+   //backgroundColor: "rgba(0,255,0,0.2)"   --DEBUG COLOR
   },
   bottomNavbarContainer: {
     position: "absolute",
@@ -1204,6 +1258,15 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     textAlign: "center",
   },
+  floatingHitboxes: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 300,            // make sure it's above everything else
+  },
+
   
 });
 
