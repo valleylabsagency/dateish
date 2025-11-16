@@ -18,11 +18,11 @@ import PopUp from "../components/PopUp";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 import { ProfileContext } from '../contexts/ProfileContext';
-import { MoneysContext } from "../contexts/MoneysContext";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { doc, updateDoc, increment } from "firebase/firestore";
-import { auth, firestore } from "@/firebase";
-import { showRewarded } from "@/services/ads";
+//import { MoneysContext } from "../contexts/MoneysContext";
+//import AsyncStorage from "@react-native-async-storage/async-storage";
+//import { doc, updateDoc, increment } from "firebase/firestore";
+//import { auth, firestore } from "@/firebase";
+//import { showRewarded } from "@/services/ads";
 
 
 const { width, height } = Dimensions.get("window");
@@ -47,6 +47,7 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
   const { showWcButton } = useContext(NavbarContext);
 
   const { profile } = useContext(ProfileContext);
+  /*
   const { activeDrops } = useContext(MoneysContext);
 
   const isVip = !!profile?.isVip;
@@ -55,7 +56,7 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
     typeof profile?.moneys === "number"
       ? profile!.moneys!
       : (isVip ? 300 : 100);
-
+*/
   type RewardState = { remaining: number; resetAt: number };
 
   const [rewardRemaining, setRewardRemaining] = useState<number>(5);
@@ -201,7 +202,7 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
         </TouchableOpacity>
      
 
-      <View style={styles.navSpacer} />
+      <View style={styles.navSpacer} /> {/*}
       <TouchableOpacity 
         style={styles.moneysBar}
         disabled={!!lockNonBathroom}
@@ -232,7 +233,7 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
             </Animated.Text>
           ))}
         
-      </TouchableOpacity>
+      </TouchableOpacity> */}
 
       {/* Speaker icon area */}
       {soundLoading ? (
@@ -274,7 +275,7 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
         </TouchableOpacity>
       )}
     </View>
-
+{/*}
     <PopUp
   visible={showPopup}
   flag={popupFlag || undefined}
@@ -314,7 +315,7 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
       </TouchableOpacity>
     </View>
   )}
-</PopUp>
+</PopUp> */}
 
 
 </>

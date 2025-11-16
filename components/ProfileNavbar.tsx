@@ -58,12 +58,13 @@ export default function ProfileNavbar({ onBack, showBack = true }: ProfileNavbar
   const [rewardLoading, setRewardLoading] = useState(false);
 
   const { profile } = useContext(ProfileContext);
+  /*
   const isVip = !!profile?.isVip;
 const displayMoneys =
 typeof profile?.moneys === "number"
   ? profile!.moneys!
   : (isVip ? 300 : 100);
-
+*/
 const { width, height } = Dimensions.get("window");
 
 
@@ -177,7 +178,7 @@ const { width, height } = Dimensions.get("window");
         )}
 
       <View style={profileNavbarStyles.navSpacer} />
-        
+        {/*}
      <TouchableOpacity 
              style={styles.moneysBar}
              onPress={() => {
@@ -190,7 +191,7 @@ const { width, height } = Dimensions.get("window");
              <Text style={styles.moneysAmount}>{displayMoneys}</Text>
              <Image style={styles.moneysImage} source={require("../assets/images/moneys.png")} />
              
-           </TouchableOpacity>
+           </TouchableOpacity> */}
 
       {/* Speaker icon area */}
       {soundLoading ? (
@@ -223,6 +224,7 @@ const { width, height } = Dimensions.get("window");
         </TouchableOpacity>
       )}
     </View>
+    {/*}
       <PopUp
       visible={showPopup}
       flag={popupFlag || undefined}
@@ -262,7 +264,7 @@ const { width, height } = Dimensions.get("window");
           </TouchableOpacity>
         </View>
       )}
-    </PopUp>
+    </PopUp> */}
 
        </>
   );

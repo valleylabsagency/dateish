@@ -21,8 +21,8 @@ import PopUp from "../components/PopUp";
 import { verticalScale } from "react-native-size-matters";
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
-import { spendMoneys } from '../services/moneys';
-import { MoneysContext } from "../contexts/MoneysContext";
+//import { spendMoneys } from '../services/moneys';
+//import { MoneysContext } from "../contexts/MoneysContext";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { auth, firestore } from "../firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -113,7 +113,7 @@ const hit = (color = "lime") =>
   // toggles the drink‐speech bubble
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
 
-  const { triggerSpend } = useContext(MoneysContext);
+  //const { triggerSpend } = useContext(MoneysContext);
 
   useEffect(() => {
     if (params.open === "shop") {
@@ -210,6 +210,8 @@ async function handleRateNo() {
   };
 
   const handleTipJar = async () => {
+    
+    /*
     try {
       // Spend exactly 1 for the tip jar
       const result = await spendMoneys({ amount: 1, reason: "tip-jar" });
@@ -223,7 +225,7 @@ async function handleRateNo() {
       console.error("Tip jar failed:", e.code, e.message);
       // If e.code === 'functions/not-found', the URL retry in the helper should have caught it;
       // If it still fails, check project/region and any App Check enforcement.
-    }
+    }*/
   };
 
   // ─── Derive drink icon + text ───────────────

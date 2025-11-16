@@ -961,6 +961,7 @@ useEffect(() => {
                 <TouchableOpacity
                   style={modalStyles.closeButton}
                   onPress={() => setModalVisible(false)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <Image source={closeIcon} style={styles.closeIcon} />
                 </TouchableOpacity>
@@ -985,6 +986,7 @@ useEffect(() => {
                 <TouchableOpacity
                   style={modalStyles.closeButton}
                   onPress={() => setOnboardingVisible(false)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <Image source={closeIcon} style={styles.closeIcon} />
                 </TouchableOpacity>
@@ -1045,6 +1047,7 @@ useEffect(() => {
                 <TouchableOpacity
                   style={modalStyles.closeButton}
                   onPress={() => setNoFaceVisible(false)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <Image source={closeIcon} style={styles.closeIcon} />
                 </TouchableOpacity>
@@ -1334,7 +1337,12 @@ const modalStyles = StyleSheet.create({
     top: verticalScale(40),
     right: scale(20),
     zIndex: 100,
+    width: scale(40),          
+    height: scale(40),
+    justifyContent: "center",
+    alignItems: "center",
   },
+
   closeButtonText: {
     color: "#fff",
     fontSize: moderateScale(35),

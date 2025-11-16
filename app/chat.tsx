@@ -663,15 +663,16 @@ useEffect(() => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <TouchableOpacity
-              onPress={() => setShowPartnerModal(false)}
-              style={styles.closeButton}
-            >
-              <Image
-                style={{ width: 20, height: 20 }}
-                source={require("../assets/images/x.png")}
-              />
-            </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setShowPartnerModal(false)}
+            style={styles.closeButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Image
+              style={styles.closeIcon}
+              source={require("../assets/images/x.png")}
+            />
+          </TouchableOpacity>
 
             {partnerProfile && (
               <>
@@ -732,12 +733,17 @@ useEffect(() => {
       >
         <View style={styles.mingModalOverlay}>
           <View style={styles.mingModalContainer}>
-            <TouchableOpacity
-              style={styles.mingModalCloseButton}
-              onPress={() => setMingModalVisible(false)}
-            >
-              <Text style={styles.mingModalCloseButtonText}>X</Text>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.mingModalCloseButton}
+            onPress={() => setMingModalVisible(false)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Image
+              source={require("../assets/images/x.png")}
+              style={styles.closeIcon}
+            />
+          </TouchableOpacity>
+
             <Text style={styles.mingModalText}>{mingDisplayedText}</Text>
             <View style={styles.mingTriangleContainer}>
               <View style={styles.mingOuterTriangle} />
@@ -994,7 +1000,19 @@ const styles = ScaledSheet.create({
     position: "absolute",
     top: "12@ms",
     right: "12@ms",
+    width: "40@ms",          
+    height: "40@ms",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 100,
   },
+
+  closeIcon: {
+    width: "24@ms",
+    height: "24@ms",
+    tintColor: "#F5E1C4",
+  },
+
   modalImage: {
     width: "180@ms",
     height: "180@ms",
@@ -1064,8 +1082,13 @@ const styles = ScaledSheet.create({
     position: "absolute",
     top: "2%",
     right: "5%",
+    width: "40@ms",          
+    height: "40@ms",
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 100,
   },
+
   mingModalCloseButtonText: {
     color: "#fff",
     fontSize: "32@ms",

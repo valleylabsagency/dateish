@@ -962,13 +962,18 @@ export default function EntranceScreen() {
       {/* Mr. Mingles VIP Upsell (bathroom-style) */}
       <Modal transparent visible={notVipVisible} animationType="fade">
         <View style={mmStyles.modalOverlay}>
-          <TouchableOpacity
-            style={mmStyles.closeButton}
-            onPress={() => setNotVipVisible(false)}
-            activeOpacity={0.8}
-          >
-            <Image source={require("../assets/images/x.png")} style={styles.closeIcon} />
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={mmStyles.closeButton}
+          onPress={() => setNotVipVisible(false)}
+          activeOpacity={0.8}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Image
+            source={require("../assets/images/x.png")}
+            style={mmStyles.closeIcon}
+          />
+        </TouchableOpacity>
+
 
           <View style={mmStyles.modalContainer}>
             {/* Mingles speech (typewriter) */}
@@ -1273,11 +1278,15 @@ paperBox: {
   loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
   closeButton: {
     position: "absolute",
-    top: -5,
-    right: -3,
+    top: -10,
+    right: -10,
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 10,
-    padding: 6, // increases touch target
   },
+  
   closeIcon: {
     width: CLOSE_ICON_PX,
     height: CLOSE_ICON_PX,
@@ -1335,8 +1344,19 @@ const mmStyles = StyleSheet.create({
     position: "absolute",
     top: height * 0.05,
     right: width * 0.05,
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 100,
   },
+  closeIcon: {
+    width: 24,
+    height: 24,
+    tintColor: "#fff",
+  },
+  
+  
   modalContainer: {
     width: "90%",
     height: height * 0.45,

@@ -13,8 +13,8 @@ import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
 import PopUp from "../components/PopUp";
-import { spendMoneys } from "../services/moneys";          
-import { MoneysContext } from "../contexts/MoneysContext"; 
+//import { spendMoneys } from "../services/moneys";          
+//import { MoneysContext } from "../contexts/MoneysContext"; 
 import { useRouter } from "expo-router";
 
 
@@ -31,16 +31,16 @@ export default function GamesScreen() {
   const [showPopupArcade, setShowPopupArcade] = useState(false);
   const [paying, setPaying] = useState<"darts" | "arcade" | null>(null);
 
-  const { triggerSpend } = useContext(MoneysContext);       // ⬅️ to animate the navbar
+  //const { triggerSpend } = useContext(MoneysContext);       // ⬅️ to animate the navbar
 
   if (!fontsLoaded) return null;
 
   const handlePlay = async (which: "darts" | "arcade") => {
     if (paying) return; // debounce
     setPaying(which);
-    try {
+    try {/*
       await spendMoneys({ amount: 2, reason: `game-${which}` });
-      triggerSpend(2);
+      triggerSpend(2);*/
 
       if (which === "darts") setShowPopupDarts(false);
       if (which === "arcade") setShowPopupArcade(false);
@@ -94,7 +94,7 @@ export default function GamesScreen() {
       >
         <View style={styles.popupBody}>
           <Text style={styles.popupLine}>Throw some darts! 🎯</Text>
-          <Text style={styles.popupSub}>Cost: 2 moneys</Text>
+         {/*} <Text style={styles.popupSub}>Cost: 2 moneys</Text> */}
           <TouchableOpacity
             style={[styles.playButton, paying === "darts" && { opacity: 0.6 }]}
             disabled={paying === "darts"}
@@ -115,7 +115,7 @@ export default function GamesScreen() {
       >
         <View style={styles.popupBody}>
           <Text style={styles.popupLine}>Fire up the cabinet! 🕹️</Text>
-          <Text style={styles.popupSub}>Cost: 2 moneys</Text>
+          {/*<Text style={styles.popupSub}>Cost: 2 moneys</Text> */}
           <TouchableOpacity
             style={[styles.playButton, paying === "arcade" && { opacity: 0.6 }]}
             disabled={paying === "arcade"}

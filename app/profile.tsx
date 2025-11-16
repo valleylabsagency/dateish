@@ -733,12 +733,14 @@ const modalStyles = StyleSheet.create({
     top: verticalScale(40),
     right: scale(20),
     zIndex: 100,
-    width: "8%",
-    height: "5%",
+    width: scale(40),
+    height: scale(40),
+    justifyContent: "center",
+    alignItems: "center",
   },
   closeButtonText: {
     color: "#fff",
-    fontSize: largeFont,
+    fontSize: scale(26), 
     fontFamily: FontNames.MontserratExtraLight,
   },
   mrMingles: {

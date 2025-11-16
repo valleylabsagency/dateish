@@ -175,7 +175,11 @@ export default function ChitChats({
       <View style={styles.overlay}>
         <View style={styles.container}>
           {/* Close / Back */}
-          <TouchableOpacity style={styles.closeButton} onPress={handleClosePress}>
+          <TouchableOpacity 
+            style={styles.closeButton} 
+            onPress={handleClosePress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <Image source={closeIcon} style={styles.closeIcon} />
           </TouchableOpacity>
 
@@ -361,11 +365,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     right: 16,
-    padding: 4,
+    width: 40,           
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
   },
+
   closeIcon: {
-    width: 20,
-    height: 18,
+    width: 24,
+    height: 24,
     tintColor: '#F5E1C4',
   },
 

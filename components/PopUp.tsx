@@ -40,9 +40,14 @@ export default function PopUp({
     >
       <View style={styles.overlay}>
         <View style={styles.container}>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                      <Image source={closeIcon} style={styles.closeIcon} />
-                    </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={onClose}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Image source={closeIcon} style={styles.closeIcon} />
+        </TouchableOpacity>
+
 
           {title && <Text style={styles.title}>{title}</Text>}
 
@@ -77,13 +82,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 20,
     right: 12,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 10,
   },
+  
   closeIcon: {
-    width: 24,
-    height: 24,
+    width: 26,
+    height: 26,
     tintColor: '#F5E1C4',
   },
+  
   title: {
     fontSize: 46,
     fontFamily: FontNames.MontserratBold,

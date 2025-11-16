@@ -1471,111 +1471,111 @@ const rectOnBack = (
 
       
 
-      {/* ─── PROFILE DETAIL MODAL ──────────────────── */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {deletionFlag && (
-              <View style={styles.deletionBanner}>
-                <Text style={styles.deletionBannerText}>
-                  {deletionFlag === 'you' ? 'You deleted this chat' : 'They deleted this chat'}
-                </Text>
-              </View>
-            )}
-            <TouchableOpacity
-              onPress={() => setModalVisible(false)}
-              style={styles.closeButton}
+     
+      {/* ─── PROFILE DETAIL OVERLAY (non-blocking) ──────────────────── */}
+      {modalVisible && (
+        <View
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="box-none"          
+        >
+          <View
+            style={styles.modalOverlay}
+            pointerEvents="box-none"
+          >
+            <View
+              style={styles.modalContent}
+              pointerEvents="auto"          
             >
-              <Image style={{ width: 20, height: 20 }} source={require("../assets/images/x.png")} />
-            </TouchableOpacity>
+              {deletionFlag && (
+                <View style={styles.deletionBanner}>
+                  <Text style={styles.deletionBannerText}>
+                    {deletionFlag === 'you' ? 'You deleted this chat' : 'They deleted this chat'}
+                  </Text>
+                </View>
+              )}
 
-            {selectedProfile && (
-              <>
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                style={styles.closeButton}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <Image
-                  source={{ uri: selectedProfile.photoUri }}
-                  style={styles.modalImage}
+                  style={{ width: 20, height: 20 }}
+                  source={require("../assets/images/x.png")}
                 />
+              </TouchableOpacity>
 
-                {/* Drink icon + speech bubble */}
-                <TouchableOpacity
-                  style={[
-                    styles.drinkIcon,
-                    { width: drinkWidth, height: drinkHeight},
-                  ]}
-                  onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}
-                >
+              {selectedProfile && (
+                <>
                   <Image
-                    source={drinkIcon}
-                    style={{ width: "100%", height: "100%", position: "relative" }}
+                    source={{ uri: selectedProfile.photoUri }}
+                    style={styles.modalImage}
                   />
-                  {showDrinkSpeech && (
-                    <View style={styles.drinkSpeechBubble}>
-                      <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
 
-                <View style={styles.modalText}>
-                  <Text style={styles.modalName}>
-                    {selectedProfile.name}, {selectedProfile.age}
-                  </Text>
-                  <Text style={styles.modalLocation}>
-                    {selectedProfile.location}
-                  </Text>
-                  <Text style={styles.modalDescription}>
-                    {selectedProfile.about}
-                  </Text>
-                </View>
+                  {/* Drink icon + speech bubble */}
+                  <TouchableOpacity
+                    style={[
+                      styles.drinkIcon,
+                      { width: drinkWidth, height: drinkHeight },
+                    ]}
+                    onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}
+                  >
+                    <Image
+                      source={drinkIcon}
+                      style={{ width: "100%", height: "100%", position: "relative" }}
+                    />
+                    {showDrinkSpeech && (
+                      <View style={styles.drinkSpeechBubble}>
+                        <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
 
-                <View style={buttonContainerStyle}>
-                  {showChatButton && (
-                    <TouchableOpacity
-                      style={styles.modalChatButton}
-                      onPress={handleChatPress}
-                      disabled={messagingBlocked}
-                    >
-                      <Text style={styles.modalChatButtonText}>Chat</Text>
-                    </TouchableOpacity>
-                  )}
+                  <View style={styles.modalText}>
+                    <Text style={styles.modalName}>
+                      {selectedProfile.name}, {selectedProfile.age}
+                    </Text>
+                    <Text style={styles.modalLocation}>
+                      {selectedProfile.location}
+                    </Text>
+                    <Text style={styles.modalDescription}>
+                      {selectedProfile.about}
+                    </Text>
+                  </View>
 
-                  {showChitChatButton && (
-                    <TouchableOpacity
-                      style={styles.modalChatButton}
-                      onPress={openChitChatModal}
-                      disabled={messagingBlocked}
-                    >
-                      <Text style={styles.modalChatButtonText}>Chit Chat</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </>
-            )}
+                  <View style={buttonContainerStyle}>
+                    {showChatButton && (
+                      <TouchableOpacity
+                        style={styles.modalChatButton}
+                        onPress={handleChatPress}
+                        disabled={messagingBlocked}
+                      >
+                        <Text style={styles.modalChatButtonText}>Chat</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {showChitChatButton && (
+                      <TouchableOpacity
+                        style={styles.modalChatButton}
+                        onPress={openChitChatModal}
+                        disabled={messagingBlocked}
+                      >
+                        <Text style={styles.modalChatButtonText}>Chit Chat</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </>
+              )}
+            </View>
           </View>
         </View>
-      </Modal>
+      )}
 
-      {selectedProfile && (
-        <Modal
-          visible={chitChatModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => {
-            if (ccStep === 'show') {
-              setCcStep('choose');
-              setSelectedCc(null);
-              setReplyText('');
-            } else {
-              setChitChatModalVisible(false);
-            }
-          }}
-        >
-          <View style={styles.overlay}>
-            <View style={styles.ccContainer}>
+
+      {selectedProfile && chitChatModalVisible && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+          <View style={styles.overlay} pointerEvents="box-none">
+            <View style={styles.ccContainer} pointerEvents="auto">
               {profileChats.length === 0 ? (
                 <View style={styles.noChatsContainer}>
                   <Text style={styles.noChatsText}>No Chit Chats found</Text>
@@ -1586,8 +1586,8 @@ const rectOnBack = (
                     key={idx}
                     style={styles.listItem}
                     onPress={() => {
-                      setSelectedCc(cc)
-                      setCcStep('show')
+                      setSelectedCc(cc);
+                      setCcStep('show');
                     }}
                   >
                     <Text
@@ -1652,180 +1652,188 @@ const rectOnBack = (
                     setChitChatModalVisible(false);
                   }
                 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Image source={closeIcon} style={styles.closeIcon} />
               </TouchableOpacity>
             </View>
           </View>
-        </Modal>
+        </View>
       )}
 
-      <Modal visible={firstMessageModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalContent,
-              { maxHeight: Math.round(sh * 0.78), paddingBottom: 20 + insets.bottom }
-            ]}
-          >
-            {deletionFlag && (
-              <View style={styles.deletionBanner}>
-                <Text style={styles.deletionBannerText}>
-                  {deletionFlag === 'you' ? 'You deleted this chat' : 'They deleted this chat'}
-                </Text>
-              </View>
-            )}
 
-            {/* 🔴 this should close the FIRST MESSAGE modal, not the profile modal */}
-            <TouchableOpacity
-              onPress={() => setFirstMessageModalVisible(false)}
-              style={styles.closeButton}
+      {firstMessageModalVisible && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+          <View style={styles.modalOverlay} pointerEvents="box-none">
+            <View
+              style={[
+                styles.modalContent,
+                { maxHeight: Math.round(sh * 0.78), paddingBottom: 20 + insets.bottom },
+              ]}
+              pointerEvents="auto"
             >
-              <Image
-                style={{ width: 20, height: 20 }}
-                source={require("../assets/images/x.png")}
-              />
-            </TouchableOpacity>
+              {deletionFlag && (
+                <View style={styles.deletionBanner}>
+                  <Text style={styles.deletionBannerText}>
+                    {deletionFlag === 'you' ? 'You deleted this chat' : 'They deleted this chat'}
+                  </Text>
+                </View>
+              )}
 
-            {selectedProfile && (
-              <>
-                {/* BODY SCROLLS IF NEEDED */}
-                <ScrollView
-                  contentContainerStyle={[
-                    styles.modalBody,
-                    { paddingBottom: 28 + insets.bottom }
-                  ]}
-                  showsVerticalScrollIndicator={false}
-                >
-                  {/* Photo + drink */}
-                  <View style={styles.photoWrap}>
-                    <Image
-                      source={{ uri: selectedProfile.photoUri }}
-                      style={styles.modalImage}
-                    />
+              <TouchableOpacity
+                onPress={() => setFirstMessageModalVisible(false)}
+                style={styles.closeButton}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Image
+                  style={{ width: 20, height: 20 }}
+                  source={require("../assets/images/x.png")}
+                />
+              </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[styles.drinkIcon, { right: "33%", bottom: "12%" }]}
-                      onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}
-                    >
+              {selectedProfile && (
+                <>
+                  <ScrollView
+                    contentContainerStyle={[
+                      styles.modalBody,
+                      { paddingBottom: 28 + insets.bottom },
+                    ]}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    <View style={styles.photoWrap}>
                       <Image
-                        source={drinkIcon}
-                        style={{ width: "100%", height: "100%" }}
+                        source={{ uri: selectedProfile.photoUri }}
+                        style={styles.modalImage}
                       />
-                      {showDrinkSpeech && (
-                        <View style={styles.drinkSpeechBubble}>
-                          <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  </View>
 
-                  <View style={styles.modalText}>
-                    <Text style={styles.modalName}>
-                      {selectedProfile.name}, {selectedProfile.age}
-                    </Text>
-                    <Text style={styles.modalLocation}>
-                      {selectedProfile.location}
-                    </Text>
-                    <Text style={styles.modalDescription}>
-                      {selectedProfile.about}
-                    </Text>
-                  </View>
+                      <TouchableOpacity
+                        style={[styles.drinkIcon, { right: "33%", bottom: "12%" }]}
+                        onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}
+                      >
+                        <Image
+                          source={drinkIcon}
+                          style={{ width: "100%", height: "100%" }}
+                        />
+                        {showDrinkSpeech && (
+                          <View style={styles.drinkSpeechBubble}>
+                            <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    </View>
 
-                  {/* ✏️ FIRST MESSAGE INPUT */}
-                  <Text
+                    <View style={styles.modalText}>
+                      <Text style={styles.modalName}>
+                        {selectedProfile.name}, {selectedProfile.age}
+                      </Text>
+                      <Text style={styles.modalLocation}>
+                        {selectedProfile.location}
+                      </Text>
+                      <Text style={styles.modalDescription}>
+                        {selectedProfile.about}
+                      </Text>
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.modalLocation,
+                        { marginTop: 12, marginBottom: 4, fontSize: 18 },
+                      ]}
+                    >
+                      Your first message
+                    </Text>
+                    <TextInput
+                      style={styles.replyInput}
+                      value={firstMessageText}
+                      onChangeText={(t) => stripLinksAndWarn(t, setFirstMessageText)}
+                      placeholder="Say something nice…"
+                      placeholderTextColor="#7A4C6E"
+                      multiline
+                    />
+                  </ScrollView>
+
+                  <View
                     style={[
-                      styles.modalLocation,
-                      { marginTop: 12, marginBottom: 4, fontSize: 18 }
+                      styles.modalFooter,
+                      { justifyContent: "center" },
                     ]}
                   >
-                    Your first message
-                  </Text>
-                  <TextInput
-                    style={styles.replyInput}
-                    value={firstMessageText}
-                    onChangeText={(t) => stripLinksAndWarn(t, setFirstMessageText)}
-                    placeholder="Say something nice…"
-                    placeholderTextColor="#7A4C6E"
-                    multiline
-                  />
-                </ScrollView>
-
-                {/* FOOTER: send first message */}
-                <View
-                  style={[
-                    styles.modalFooter,
-                    { justifyContent: "center" } // only one button here
-                  ]}
-                >
-                  <TouchableOpacity
-                    style={styles.modalChatButton}
-                    onPress={sendFirstMessage}     // ✅ actually use it
-                    disabled={sendingFirstMessage || messagingBlocked}
-                  >
-                    <Text style={styles.modalChatButtonText}>
-                      {sendingFirstMessage ? "Sending..." : "Send"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
+                    <TouchableOpacity
+                      style={styles.modalChatButton}
+                      onPress={sendFirstMessage}
+                      disabled={sendingFirstMessage || messagingBlocked}
+                    >
+                      <Text style={styles.modalChatButtonText}>
+                        {sendingFirstMessage ? "Sending..." : "Send"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
           </View>
         </View>
-      </Modal>
-      <Modal transparent visible={noLinksVisible} animationType="fade" onRequestClose={() => setNoLinksVisible(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.ccContainer}>
+      )}
+
+      {noLinksVisible && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+          <View style={styles.modalOverlay} pointerEvents="box-none">
+            <View style={styles.ccContainer} pointerEvents="auto">
               <Text style={[styles.ccLabel, { marginBottom: 8 }]}>Mr. Mingles</Text>
               <Text style={{ color: "#F5E1C4", textAlign: "center", fontSize: 18 }}>
                 No links allowed here, take it outside!
               </Text>
-              <TouchableOpacity style={[styles.replyButton, { marginTop: 16 }]} onPress={() => setNoLinksVisible(false)}>
+              <TouchableOpacity
+                style={[styles.replyButton, { marginTop: 16 }]}
+                onPress={() => setNoLinksVisible(false)}
+              >
                 <Text style={styles.replyButtonText}>OK</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </Modal>
+        </View>
+      )}
 
 
+
+     
       {/* “Don’t be a creep” popup */}
-      <Modal
-        visible={creepVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setCreepVisible(false)}
-      >
-        <View style={creepStyles.mingModalOverlay}>
-          <View style={creepStyles.mingModalContainer}>
-            <TouchableOpacity
-              style={creepStyles.mingModalCloseButton}
-              onPress={() => setCreepVisible(false)}
-            >
-              <Text style={creepStyles.mingModalCloseButtonText}>X</Text>
-            </TouchableOpacity>
+      {creepVisible && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+          <View style={creepStyles.mingModalOverlay} pointerEvents="box-none">
+            <View style={creepStyles.mingModalContainer} pointerEvents="auto">
+              <TouchableOpacity
+                style={creepStyles.mingModalCloseButton}
+                onPress={() => setCreepVisible(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={creepStyles.mingModalCloseButtonText}>X</Text>
+              </TouchableOpacity>
 
-            <Text style={creepStyles.mingModalText}>{creepTyped}</Text>
+              <Text style={creepStyles.mingModalText}>{creepTyped}</Text>
 
-            <View style={creepStyles.mingTriangleContainer}>
-              <View style={creepStyles.mingOuterTriangle} />
-              <View style={creepStyles.mingInnerTriangle} />
+              <View style={creepStyles.mingTriangleContainer}>
+                <View style={creepStyles.mingOuterTriangle} />
+                <View style={creepStyles.mingInnerTriangle} />
+              </View>
+
+              <MMAnimated
+                showBackground={false}
+                showBarFront={false}
+                showControls={false}
+                enterOnMount
+                leaving={leaving}
+                onLeaveComplete={() => {
+                  setLeaving(false);
+                  setStarted(true);
+                }}
+                style={{ position: "absolute", top: "80%", left: "10%" }}
+              />
             </View>
-
-            <MMAnimated
-              showBackground={false}
-              showBarFront={false}
-              showControls={false} 
-              enterOnMount
-              leaving={leaving}
-              onLeaveComplete={() => {
-                setLeaving(false);
-                setStarted(true);
-              }}
-              style={{position: "absolute", top: "80%", left: "10%"}}
-            />
           </View>
         </View>
-      </Modal>
+      )}
+
 
       {/* 2s toast for “Message sent” */}
       {sentToast && (
@@ -1980,7 +1988,12 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 12,
     right: 12,
+    width: 36,              
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
   },
+
   closeIcon: {
     width: 20,
     height: 18,
@@ -2062,7 +2075,6 @@ const styles = StyleSheet.create({
 
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2148,7 +2160,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
+    width: 36,              // same invisible square tap area
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
   },
+
   closeText: {
     color: '#F5E1C4',
     fontSize: 24,
@@ -2242,7 +2259,12 @@ const creepStyles = ScaledSheet.create({
     top: "2%",
     right: "5%",
     zIndex: 100,
+    width: "44@ms",          
+    height: "44@ms",
+    justifyContent: "center",
+    alignItems: "center",
   },
+
   mingModalCloseButtonText: {
     color: "#fff",
     fontSize: "32@ms",
