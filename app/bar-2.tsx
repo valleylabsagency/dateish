@@ -150,7 +150,8 @@ const FRONT_HEIGHT_FRAC =
   const [navHeight, setNavHeight] = useState(0);
   const insets = useSafeAreaInsets();
 // Safe, device-correct visible area above the navbar (or full height if no navbar)
-const [topNavH, setTopNavH] = useState(0);
+const [topNavH, setTopNavH] = useState(0); // fixed navbar height
+
 const [stageH, setStageH] = useState<number | null>(null);
 const hasBottomBar = !!profileComplete;
 const baseStageH = Math.max(0, sh - topNavH);
@@ -818,22 +819,6 @@ const rectOnBack = (
   }, [profileComplete]);
   
 
-  if (!fontsLoaded || loading) {
-    return (
-      <ImageBackground
-        source={require("../assets/images/bar-back.png")}
-        style={styles.background}
-        blurRadius={4}
-      >
-        <LottieView
-          source={withoutBg}
-          autoPlay
-          loop
-          style={{ width: 600, height: 600, backgroundColor: "transparent", margin: "auto", position: "relative", right: "25%", bottom: "10%" }}
-        />
-      </ImageBackground>
-    );
-  }
 
   const startOffsetPx = width * START_OFFSET_RATIO;
 
@@ -1118,18 +1103,19 @@ const rectOnBack = (
 
   // ─────────────────────────── RENDER ───────────────────────────
   return (
-    <View style={{
+    <View
+    style={{
       flex: 1,
       backgroundColor: "#592540",
       // cancel parent SafeArea bottom padding when there’s no BottomNavbar
       marginBottom: hasBottomBar ? 0 : -insets.bottom,
-    }}>
-      <View onLayout={(e) => setTopNavH(e.nativeEvent.layout.height)} collapsable={false}>
-      <Navbar
-        bathroomRoute={!profileComplete ? "/bathroom?onboard=true" : "/bathroom"}
-        lockNonBathroom={isLastWelcome}
-      />
-    </View>
+    }}
+  >
+    <Navbar
+      bathroomRoute={!profileComplete ? "/bathroom?onboard=true" : "/bathroom"}
+      lockNonBathroom={isLastWelcome}
+    />
+
 
       {/* ==== STAGE (locks all layers to the same art space) ==== */}
       <View 
@@ -1854,6 +1840,33 @@ const rectOnBack = (
     <BottomNavbar selectedTab="bar-2" />
   </View>
 )}
+{(!fontsLoaded || loading) && (
+        <View
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        >
+          <ImageBackground
+            source={BG_IMG}
+            style={styles.background}
+            blurRadius={4}
+          >
+            <LottieView
+              source={withoutBg}
+              autoPlay
+              loop
+              style={{
+                width: 600,
+                height: 600,
+                backgroundColor: "transparent",
+                margin: "auto",
+                position: "relative",
+                right: "25%",
+                bottom: "10%",
+              }}
+            />
+          </ImageBackground>
+        </View>
+      )}
 
     </View>
   );

@@ -1,5 +1,5 @@
 // mingles.tsx
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,8 @@ import {
   Dimensions,
   Image,
   Modal,
-  ScrollView
+  ScrollView,
+  Animated
 } from "react-native";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
@@ -31,6 +32,9 @@ import * as StoreReview from "expo-store-review";
 import { Linking, Platform, useWindowDimensions, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 //import { showInterstitial } from "@/services/ads";
+import { useIsFocused } from "@react-navigation/native";
+import * as NavigationBar from "expo-navigation-bar";
+
 
 
 const BG_IMG = require("../assets/images/mm-back.png");
@@ -60,6 +64,7 @@ export default function MinglesScreen() {
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
   });
+  
   const { profile, saveProfile } = useContext(ProfileContext);
   const { setShowWcButton } = useContext(NavbarContext);
 
@@ -69,6 +74,45 @@ export default function MinglesScreen() {
   const [popupFlag, setPopupFlag] = useState<string | null>(null);
   const [vipLoading, setVipLoading] = useState(false);
 
+  const isFocused = useIsFocused();
+  const hasMeasuredStage = useRef(false);
+  const screenOpacity = React.useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
+
+
+  useEffect(() => {
+    if (isFocused) {
+      screenOpacity.stopAnimation();
+      screenOpacity.setValue(0);
+
+      const timeout = setTimeout(() => {
+        Animated.timing(screenOpacity, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+      }, 600);
+
+      return () => {
+        clearTimeout(timeout);
+      };
+    } else {
+      screenOpacity.stopAnimation();
+      Animated.timing(screenOpacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isFocused, screenOpacity]);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+  
+    NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => {});
+    NavigationBar.setBackgroundColorAsync("#592540").catch(() => {});
+    NavigationBar.setButtonStyleAsync("light").catch(() => {});
+  }, []);
   
 
   // Turn on to SEE the touchable overlays (auto-on in dev if you want)
@@ -327,7 +371,7 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
 
   return (
     <>
-      <View style={styles.container}>
+      <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
         <View
           style={{
             flex: 1,
@@ -357,82 +401,82 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
             />
            
 
-{/* Speech bubble — same placement as bar-2 */}
-<View
-  style={{
-    position: "absolute",
-    left:  offsetX + dispW * 0.05,
-    top:   2,                  // 2px under the stage top
-    width: dispW * 0.90,
-    height: bubbleH,           // capped height like bar-2
-    zIndex: 30,
-    ...Platform.select({ android: { elevation: 30 } }),
-  }}
->
-  <ImageBackground
-    source={require("../assets/images/speech-bubble.png")}
-    style={{ flex: 1 }}
-    resizeMode="stretch"
-  >
-    {/* LEFT ARROW */}
-    <TouchableOpacity
-      onPress={back}
-      style={{
-        position: "absolute",
-        left: 0, top: 0, bottom: 20, width: 40,
-        alignItems: "center", justifyContent: "center",
-        zIndex: 2, ...Platform.select({ android: { elevation: 2 } }),
-      }}
-    >
-      <MaterialIcons name="chevron-left" size={32} color="#fff" />
-    </TouchableOpacity>
+            {/* Speech bubble — same placement as bar-2 */}
+            <View
+              style={{
+                position: "absolute",
+                left:  offsetX + dispW * 0.05,
+                top:   2,                  // 2px under the stage top
+                width: dispW * 0.90,
+                height: bubbleH,           // capped height like bar-2
+                zIndex: 30,
+                ...Platform.select({ android: { elevation: 30 } }),
+              }}
+            >
+              <ImageBackground
+                source={require("../assets/images/speech-bubble.png")}
+                style={{ flex: 1 }}
+                resizeMode="stretch"
+              >
+                {/* LEFT ARROW */}
+                <TouchableOpacity
+                  onPress={back}
+                  style={{
+                    position: "absolute",
+                    left: 0, top: 0, bottom: 20, width: 40,
+                    alignItems: "center", justifyContent: "center",
+                    zIndex: 2, ...Platform.select({ android: { elevation: 2 } }),
+                  }}
+                >
+                  <MaterialIcons name="chevron-left" size={32} color="#fff" />
+                </TouchableOpacity>
 
-    {/* RIGHT ARROW */}
-    <TouchableOpacity
-      onPress={cycle}
-      style={{
-        position: "absolute",
-        right: 0, top: 0, bottom: 20, width: 40,
-        alignItems: "center", justifyContent: "center",
-        zIndex: 2, ...Platform.select({ android: { elevation: 2 } }),
-      }}
-    >
-      <MaterialIcons name="chevron-right" size={32} color="#fff" />
-    </TouchableOpacity>
+                {/* RIGHT ARROW */}
+                <TouchableOpacity
+                  onPress={cycle}
+                  style={{
+                    position: "absolute",
+                    right: 0, top: 0, bottom: 20, width: 40,
+                    alignItems: "center", justifyContent: "center",
+                    zIndex: 2, ...Platform.select({ android: { elevation: 2 } }),
+                  }}
+                >
+                  <MaterialIcons name="chevron-right" size={32} color="#fff" />
+                </TouchableOpacity>
 
-    {/* CENTER CONTENT */}
-    <View
-      pointerEvents="box-none"
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        position: "relative",
-        bottom: 10,
-        alignItems: "center",
-        paddingLeft: 40,
-        paddingRight: 40,
-      }}
-    >
-      <Text
-        style={[
-          styles.bubbleText,
-          { includeFontPadding: false },
-        ]}
-      >
-        {messages[idx]}
-      </Text>
+                {/* CENTER CONTENT */}
+                <View
+                  pointerEvents="box-none"
+                  style={{
+                    flex: 1,
+                    justifyContent: "center",
+                    position: "relative",
+                    bottom: 10,
+                    alignItems: "center",
+                    paddingLeft: 40,
+                    paddingRight: 40,
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.bubbleText,
+                      { includeFontPadding: false },
+                    ]}
+                  >
+                    {messages[idx]}
+                  </Text>
 
-      {idx === 0 && (
-        <TouchableOpacity
-          onPress={() => setShowDrinkMenu(true)}
-          style={{ paddingHorizontal: 24, paddingVertical: 8, borderRadius: 8, marginTop: 8 }}
-        >
-          <Text style={styles.tapText}>- TAP -</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  </ImageBackground>
-</View>
+                  {idx === 0 && (
+                    <TouchableOpacity
+                      onPress={() => setShowDrinkMenu(true)}
+                      style={{ paddingHorizontal: 24, paddingVertical: 8, borderRadius: 8, marginTop: 8 }}
+                    >
+                      <Text style={styles.tapText}>- TAP -</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </ImageBackground>
+            </View>
 
 
 
@@ -584,13 +628,20 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
 
         {/* Bottom nav can remain full-width below */}
         <View
-          style={styles.navbarContainer}
-          onLayout={(e) => setStageH(e.nativeEvent.layout.y)}
+          style={[styles.navbarContainer, { paddingBottom: insets.bottom }]}   // 👈 safe-area padding
+          onLayout={(e) => {
+            const y = e.nativeEvent.layout.y;
+            if (!hasMeasuredStage.current || isFocused) {
+              hasMeasuredStage.current = true;
+              setStageH(y);                     // y = height available above navbar
+            }
+          }}
           pointerEvents="box-none"
         >
           <BottomNavbar selectedTab="Mr. Mingles" />
         </View>
-      </View>
+
+      </Animated.View>
 
 
       <PopUp

@@ -46,7 +46,11 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
   const router = useRouter();
   const { showWcButton } = useContext(NavbarContext);
 
-  const { profile } = useContext(ProfileContext);
+  const { profile, profileComplete } = useContext(ProfileContext);
+
+  const bathroomPath =
+    bathroomRoute ?? (!profileComplete ? "/bathroom?onboard=true" : "/bathroom");
+
   /*
   const { activeDrops } = useContext(MoneysContext);
 
@@ -183,17 +187,17 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
       {/* Conditionally render the WC button */}
       
       <TouchableOpacity
-          onPress={() => {
-            if (onBathroomPress) {
-              onBathroomPress();
-            } else {
-              router.push(bathroomRoute ?? "/bathroom");
-            }
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Open bathroom"
-          testID="wc-button"
-        >
+        onPress={() => {
+          if (onBathroomPress) {
+            onBathroomPress();
+          } else {
+            router.push(bathroomPath);
+          }
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Open bathroom"
+        testID="wc-button"
+      >
           <Image
             source={require("../assets/images/icons/WC.png")}
             style={styles.navIcon}

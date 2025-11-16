@@ -346,7 +346,9 @@ useEffect(() => {
   // Do nothing until we can actually tell (avoid false “incomplete” before load)
   if (effectiveComplete === undefined) return;
 
-  const shouldOnboard = params.onboard === "true" && effectiveComplete === false;
+  const shouldOnboard =
+  (params.onboard === "true" || !effectiveComplete) && effectiveComplete === false;
+
 
   if (shouldOnboard) {
     setOnboardingStep(0);

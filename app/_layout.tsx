@@ -194,6 +194,41 @@ TextInputAny.defaultProps.allowFontScaling = false;
 TextInputAny.defaultProps.maxFontSizeMultiplier = 1;
 
 
+const slideFadeHorizontal = ({ current, next, layouts }: any) => {
+  const { width } = layouts.screen;
+
+  // Slide in from right (like forHorizontalIOS)
+  const translateX = current.progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [width, 0],
+  });
+
+  // Incoming screen fades in as it slides in
+  const incomingOpacity = current.progress.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0, 1, 1],
+  });
+
+  // Outgoing screen fades out as it slides away
+  const outgoingOpacity = next
+    ? next.progress.interpolate({
+        inputRange: [0, 0.6, 1],
+        outputRange: [1, 1, 0], // stays solid, then fades near the end
+      })
+    : 1;
+
+  return {
+    cardStyle: {
+      transform: [{ translateX }],
+      // both cards share this interpolator: multiply keeps things smooth
+      opacity: Animated.multiply(incomingOpacity, outgoingOpacity),
+      backgroundColor: "#000",
+    },
+  };
+};
+
+
+
 
 
 export default function Layout() {
@@ -233,7 +268,6 @@ useEffect(() => {
 
   const hideNavbar = [
     "/bathroom",
-    "/bar-2",
     "/profile",
     "/settings",
     "/entrance",
@@ -291,27 +325,19 @@ useEffect(() => {
                                 <OfflineNotice />
                                 {!hideNavbar && <Navbar />}
                                 <Stack
-                                  detachInactiveScreens={false}            // keep previous screen mounted (no flashes)
+                                  detachInactiveScreens={false}
                                   screenOptions={{
                                     headerShown: false,
-                                    // Both screens slide horizontally (iOS-like) on iOS & Android
-                                    cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-
-                                    // Slow it down (tweak to taste)
+                                    cardStyleInterpolator: slideFadeHorizontal,
                                     transitionSpec: {
                                       open:  { animation: 'timing', config: { duration: 600 } },
                                       close: { animation: 'timing', config: { duration: 600 } },
                                     },
-
-                                    // Never show a white/black flash
                                     cardStyle:    { backgroundColor: '#000' },
                                     contentStyle: { backgroundColor: '#000' },
-
                                     gestureEnabled: true,
                                   }}
                                 />
-
-
                                 <StatusBar hidden />
                               </View>
                             </NavbarContext.Provider>
