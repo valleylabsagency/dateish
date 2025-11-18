@@ -1,55 +1,82 @@
-import React, { useEffect, useRef } from "react";
-import { AppState, TouchableWithoutFeedback } from "react-native";
-import { getAuth, signOut } from "firebase/auth";
-import { auth } from "../firebase"; // your firebase config file
+// components/InactivityHandler.tsx
+import React, { useEffect, useRef, PropsWithChildren } from "react";
+import {
+  AppState,
+  AppStateStatus,
+  TouchableWithoutFeedback,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { getDatabase, ref as rtdbRef, update as rtdbUpdate } from "firebase/database";
+import { auth } from "../firebase";
 
-// Duration in milliseconds (10 minutes)
-const INACTIVITY_DURATION = 10 * 60 * 1000;
-type Props = React.PropsWithChildren<{}>;
+const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
-const InactivityHandler = ({ children }: Props) => {
-  const timeoutRef = useRef(null);
+export default function InactivityHandler({ children }: PropsWithChildren<{}>) {
+  const router = useRouter();
+  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Function to clear and restart the timer
-  const resetTimer = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
+  const clearIdleTimer = () => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
     }
-    timeoutRef.current = setTimeout(() => {
-      // Auto logout function after inactivity
-      signOut(auth)
-        .then(() => {
-          console.log("User signed out due to inactivity");
-        })
-        .catch((error) => {
-          console.error("Error signing out:", error);
-        });
-    }, INACTIVITY_DURATION);
+  };
+
+  const handleTimeout = () => {
+    const user = auth.currentUser;
+
+    // Mark them as "out of the bar" but keep them logged in
+    if (user) {
+      try {
+        const db = getDatabase();
+        const statusRef = rtdbRef(db, `status/${user.uid}`);
+        rtdbUpdate(statusRef, {
+          online: false,
+          bar: false,
+          lastActive: Date.now(),
+        }).catch(() => {});
+      } catch {}
+    }
+
+    // Just send to entrance – DO NOT signOut
+    router.replace("/entrance");
+  };
+
+  const resetIdleTimer = () => {
+    clearIdleTimer();
+    idleTimerRef.current = setTimeout(handleTimeout, IDLE_TIMEOUT_MS);
   };
 
   useEffect(() => {
-    // Start timer on mount
-    resetTimer();
+    // Start timer when mounted
+    resetIdleTimer();
 
-    // Listen to app state changes and reset timer when the app becomes active
-    const subscription = AppState.addEventListener("change", (nextAppState) => {
-      if (nextAppState === "active") {
-        resetTimer();
+    const onAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === "active") {
+        // When app comes back to foreground, restart idle timer
+        resetIdleTimer();
+      } else {
+        // In background / inactive, stop counting foreground inactivity
+        clearIdleTimer();
       }
-    });
+    };
 
-    // Cleanup on unmount
+    const sub = AppState.addEventListener("change", onAppStateChange);
+
     return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      subscription.remove();
+      clearIdleTimer();
+      sub.remove();
     };
   }, []);
 
   return (
-    <TouchableWithoutFeedback onPress={resetTimer}>
+    <TouchableWithoutFeedback
+      onPress={resetIdleTimer}
+      // This keeps touches from children counting as “activity”
+      // If you already track gestures another way, you can tweak/remove this
+      onPressIn={resetIdleTimer}
+    >
       {children}
     </TouchableWithoutFeedback>
   );
-};
-
-export default InactivityHandler;
+}

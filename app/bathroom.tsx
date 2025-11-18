@@ -468,12 +468,13 @@ useEffect(() => {
   };
   
 
-  // submit/back handler
+    // submit/back handler
   const handleSubmit = async () => {
     if (!name || !age || !location || !about || !photoUri) {
       setModalVisible(true);
       return;
     }
+
     const orig = profile || {};
     if (
       name === orig.name &&
@@ -482,26 +483,40 @@ useEffect(() => {
       about === orig.about &&
       photoUri === orig.photoUri
     ) {
+      
       router.replace("/bar-2");
       return;
     }
+
+    //  snapshot BEFORE saving 
+    const wasProfileComplete = !!profileComplete;
+
     setIsSaving(true);
     try {
       await saveProfile({ name, age, location, about, photoUri });
       setProfileComplete(true);
       setHasSavedInSession(true);
+
       // Post-save nudge about Chit Chats
       Alert.alert(
         "Pro tip",
         "Tired of ‘Hey’ and ‘Sup’? Check out the Chit Chats for prompts worth replying to!"
       );
-      router.replace("/bar-2");
+
+      // First-ever save → send the special flag to bar-2
+      if (!wasProfileComplete) {
+        router.replace("/bar-2?fromBathroomFirst=1");
+      } else {
+        // Later edits → normal return to bar
+        router.replace("/bar-2");
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setIsSaving(false);
     }
   };
+
 
     // Auto-save after first profile creation: only save if something changed
     const saveProfileIfChanged = async () => {

@@ -118,12 +118,18 @@ const LAST_WELCOME_INDEX = WELCOME_MESSAGES.length - 1;
 
 export default function Bar2Screen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ cameFromEntrance?: string }>();
-
+  const params = useLocalSearchParams<{ cameFromEntrance?: string; fromBathroomFirst?: string }>();
+  
   const cameFromEntrance =
     params.cameFromEntrance === "true" ||
     params.cameFromEntrance === "1" ||
     params.cameFromEntrance === true;
+  
+  const fromBathroomFirst =
+    params.fromBathroomFirst === "true" ||
+    params.fromBathroomFirst === "1" ||
+    params.fromBathroomFirst === true;
+  
 
   const { profileComplete } = useContext(ProfileContext);
 
@@ -467,31 +473,79 @@ const rectOnBack = (
     return () => id && clearInterval(id);
   }, [creepVisible]);
 
-  // restore started flag on focus
+  // restore started + overlay behavior from storage + entrance + first-time bathroom
   useEffect(() => {
-    // ⛔ If we came from entrance, always force a fresh pre-start state
-    if (cameFromEntrance) {
-      setStarted(false);
-      return;
-    }
-  
+    let alive = true;
+
     (async () => {
       try {
-        const v = await AsyncStorage.getItem("bar2Started");
-        setStarted(v === "true");
-      } catch {}
+        const [startedVal, promptVal] = await Promise.all([
+          AsyncStorage.getItem("bar2Started"),      // "true" once they press Start Chatting
+          AsyncStorage.getItem("bar2ShowPrompt"),   // "true" while Start overlay is armed
+        ]);
+
+        if (!alive) return;
+
+        const hasStartedEver = startedVal === "true";
+        const promptArmed    = promptVal === "true";
+
+        if (hasStartedEver) {
+          // They’ve already pressed Start Chatting at least once.
+          setStarted(true);
+          setShowStartOverlay(false);
+          return;
+        }
+
+        if (cameFromEntrance || fromBathroomFirst) {
+          // Either:
+          // - Came from Entrance (onboarding flow), OR
+          // - Came from Bathroom right after saving profile for the FIRST time.
+          //
+          // In both cases, if they haven't started yet, arm the Start Chatting overlay
+          // and keep them "not started" until they tap the button.
+          setStarted(false);
+          setShowStartOverlay(true);
+          await AsyncStorage.setItem("bar2ShowPrompt", "true");
+          return;
+        }
+
+        if (promptArmed) {
+          // We previously armed the prompt (Entrance or first-time Bathroom),
+          // so keep showing it until they actually press Start Chatting.
+          setStarted(false);
+          setShowStartOverlay(true);
+          return;
+        }
+
+        // No entrance/bathroom trigger, never started, no armed prompt:
+        // behave like old logic (assume started so they just see profiles).
+        setStarted(true);
+        setShowStartOverlay(false);
+      } catch {
+        // fall back to "started" so the bar isn't stuck empty
+        setStarted(true);
+        setShowStartOverlay(false);
+      }
     })();
-  }, [isFocused, cameFromEntrance]);
+
+    return () => {
+      alive = false;
+    };
+  }, [isFocused, cameFromEntrance, fromBathroomFirst]);
+
+
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
       if (!u) {
-        await AsyncStorage.removeItem("bar2Started");
+        await AsyncStorage.multiRemove(["bar2Started", "bar2ShowPrompt"]);
         setStarted(false);
+        setShowStartOverlay(false);
       }
     });
     return unsub;
   }, []);
+  
 
   // welcome typing effect
   useEffect(() => {
@@ -538,12 +592,9 @@ const rectOnBack = (
 
 
   // start state
-  const [started, setStarted] = useState(() => {
-    // If this screen is opened from Entrance, ALWAYS start in pre-start mode
-    if (cameFromEntrance) return false;
-    // Otherwise default to "started" so direct navigation shows profiles
-    return true;
-  });
+  const [started, setStarted] = useState(false);
+  const [showStartOverlay, setShowStartOverlay] = useState(false);
+
   const [leaving, setLeaving] = useState(false);
 
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
@@ -568,56 +619,27 @@ const rectOnBack = (
   const [introPlayed, setIntroPlayed] = useState<boolean>(false);
 
   // presence
+
   useEffect(() => {
     if (!auth.currentUser) return;
 
-    const db = getDatabase();
-    const statusRef = rtdbRef(db, `status/${auth.currentUser.uid}`);
+    const q = collection(firestore, "users");
 
-    let hb: any = null;
+    const unsub = onSnapshot(q, (snap) => {
+      const all = snap.docs
+        .filter(d => d.id !== auth.currentUser!.uid)
+        .map(d => ({ id: d.id, ...(d.data() as any) }));
 
-    const startPresence = () => {
-      rtdbUpdate(statusRef, {
-        online: true,
-        bar: true,
-        lastActive: Date.now(),
-      }).catch(() => {});
-      hb = setInterval(() => {
-        rtdbUpdate(statusRef, { lastActive: Date.now() }).catch(() => {});
-      }, 30_000);
-    };
+      setProfiles(all);
+      setLoading(false);
+    }, (err) => {
+      console.error(err);
+      setLoading(false);
+    });
 
-    const stopPresence = () => {
-      if (hb) {
-        clearInterval(hb);
-        hb = null;
-      }
-      // Don’t immediately flip online=false here – let the 10-min freshness hide them
-      rtdbUpdate(statusRef, {
-        lastActive: Date.now(),
-      }).catch(() => {});
-    };
+    return () => unsub();
+  }, [auth.currentUser?.uid]);
 
-    // Online as soon as they enter from the entrance OR once they've started browsing
-    if (cameFromEntrance || started) {
-      startPresence();
-    } else {
-      stopPresence();
-    }
-
-    return () => {
-      if (hb) {
-        clearInterval(hb);
-        hb = null;
-      }
-      // On full unmount (e.g. app closed), explicitly mark offline
-      rtdbUpdate(statusRef, {
-        online: false,
-        bar: false,
-        lastActive: Date.now(),
-      }).catch(() => {});
-    };
-  }, [cameFromEntrance, started, auth.currentUser?.uid]);
 
 
   useEffect(() => {
@@ -754,6 +776,11 @@ const rectOnBack = (
   }, [modalVisible, selectedProfile]);
 
   const messagingBlocked = deletionFlag !== null;
+
+  // If this profile goes offline while their card is open
+  const isSelectedOffline =
+  !!(selectedProfile && onlineStatus[selectedProfile.id] === false);
+
 
   const myUid = auth.currentUser?.uid;
   const filtered = profiles.filter(p => {
@@ -1142,7 +1169,7 @@ const rectOnBack = (
           }}
           resizeMode="stretch"
         />
-        {profileComplete && cameFromEntrance && !started && (
+        {profileComplete && showStartOverlay && (
         <>
           {/* Blank bubble above the stage (same position as onboarding bubble) */}
           {bubbleVisible && (
@@ -1177,12 +1204,20 @@ const rectOnBack = (
             onPress={async () => {
               setBubbleVisible(false);
               setLeaving(true);
-              setTimeout(() => setStarted((s) => s || true), 1100);
+              setShowStartOverlay(false);
+              setTimeout(() => setStarted(true), 1100);
               try {
                 const db = getDatabase();
                 const statusRef = rtdbRef(db, `status/${auth.currentUser!.uid}`);
-                rtdbUpdate(statusRef, { online: true, bar: true, lastActive: Date.now() }).catch(() => {});
-                await AsyncStorage.setItem("bar2Started", "true");
+                rtdbUpdate(statusRef, {
+                  online: true,
+                  bar: true,
+                  lastActive: Date.now(),
+                }).catch(() => {});
+                await AsyncStorage.multiSet([
+                  ["bar2Started", "true"],
+                  ["bar2ShowPrompt", "false"],
+                ]);
               } catch {}
             }}
           >
@@ -1360,7 +1395,7 @@ const rectOnBack = (
           </Animated.View>
         )}
 
-        {profileComplete && cameFromEntrance && !started && (
+        {profileComplete && showStartOverlay && (
 
           <View
             pointerEvents="none"
@@ -1532,27 +1567,56 @@ const rectOnBack = (
                   <View style={buttonContainerStyle}>
                     {showChatButton && (
                       <TouchableOpacity
-                        style={styles.modalChatButton}
+                        style={[
+                          styles.modalChatButton,
+                          (messagingBlocked || isSelectedOffline) && styles.modalChatButtonDisabled,
+                        ]}
                         onPress={handleChatPress}
-                        disabled={messagingBlocked}
+                        disabled={messagingBlocked || isSelectedOffline}
                       >
-                        <Text style={styles.modalChatButtonText}>Chat</Text>
+                        <Text
+                          style={[
+                            styles.modalChatButtonText,
+                            (messagingBlocked || isSelectedOffline) && styles.modalChatButtonTextDisabled,
+                          ]}
+                        >
+                          Chat
+                        </Text>
                       </TouchableOpacity>
                     )}
 
                     {showChitChatButton && (
                       <TouchableOpacity
-                        style={styles.modalChatButton}
+                        style={[
+                          styles.modalChatButton,
+                          (messagingBlocked || isSelectedOffline) && styles.modalChatButtonDisabled,
+                        ]}
                         onPress={openChitChatModal}
-                        disabled={messagingBlocked}
+                        disabled={messagingBlocked || isSelectedOffline}
                       >
-                        <Text style={styles.modalChatButtonText}>Chit Chat</Text>
+                        <Text
+                          style={[
+                            styles.modalChatButtonText,
+                            (messagingBlocked || isSelectedOffline) && styles.modalChatButtonTextDisabled,
+                          ]}
+                        >
+                          Chit Chat
+                        </Text>
                       </TouchableOpacity>
                     )}
                   </View>
+
                 </>
               )}
+              {isSelectedOffline && (
+              <View style={styles.offlineOverlayInModal}>
+                <View style={styles.offlineBadge}>
+                  <Text style={styles.offlineText}>They left the bar</Text>
+                </View>
+              </View>
+            )}
             </View>
+            
           </View>
         </View>
       )}
@@ -2243,6 +2307,37 @@ const styles = StyleSheet.create({
     color: "red",
     fontSize: 12,
     fontFamily: FontNames.MontserratRegular,
+  },
+  modalChatButtonDisabled: {
+    backgroundColor: "#3b2232",
+    borderColor: "#2b1523",
+    shadowOpacity: 0.3,
+    elevation: 1,
+  },
+  modalChatButtonTextDisabled: {
+    color: "#b38eaa",
+  },
+  offlineOverlayInModal: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  offlineBadge: {
+    backgroundColor: "#6e1944",
+    borderWidth: 3,
+    borderColor: "#460b2a",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 24,
+  },
+  offlineText: {
+    color: "#F5E1C4",
+    fontSize: 18,
+    fontFamily: FontNames.MontserratBold,
+    textAlign: "center",
   },
 });
 
