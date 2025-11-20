@@ -15,8 +15,9 @@ import {
   Pressable,
   Alert,
   Animated,
-  Easing
+  Easing,
 } from "react-native";
+
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
@@ -31,7 +32,7 @@ import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
 import { Video } from 'expo-av';
 import {
-  doc, setDoc, updateDoc, collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, arrayUnion, arrayRemove, onSnapshot
+  doc, setDoc, updateDoc, collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, arrayUnion, arrayRemove, onSnapshot, orderBy
 } from "firebase/firestore";
 import { ProfileContext } from "../contexts/ProfileContext";
 import { useIsFocused } from "@react-navigation/native";
@@ -50,7 +51,7 @@ import * as NavigationBar from "expo-navigation-bar";
 // NEW
 import * as MailComposer from "expo-mail-composer";
 import MMAnimated from "@/services/MMAnimated";
-import { Linking, useWindowDimensions, Platform } from "react-native";
+import { Linking, useWindowDimensions, Platform, Keyboard, TouchableWithoutFeedback } from "react-native";
 
 const BG_IMG = require("../assets/images/bar-back.png");
 const FRONT_IMG = require("../assets/images/bar-front.png");
@@ -369,8 +370,10 @@ const rectOnBack = (
 
 
 
-  // toast for “message sent”
-  const [sentToast, setSentToast] = useState(false);
+
+// toast for “message sent / Chit Chat Sent”
+const [toastText, setToastText] = useState<string | null>(null);
+
 
   // “don’t be a creep” popup
   const [creepVisible, setCreepVisible] = useState(false);
@@ -395,6 +398,25 @@ const rectOnBack = (
 
   // Link guard
   const [noLinksVisible, setNoLinksVisible] = useState(false);
+
+  // Automatically mark user "in the bar" when they come from the Entrance
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    if (!cameFromEntrance) return;
+
+    try {
+      const db = getDatabase();
+      const statusRef = rtdbRef(db, `status/${auth.currentUser.uid}`);
+      rtdbUpdate(statusRef, {
+        online: true,
+        bar: true,
+        lastActive: Date.now(),
+      }).catch(() => {});
+    } catch (e) {
+      console.warn("Failed to set bar status on entrance:", e);
+    }
+  }, [cameFromEntrance, auth.currentUser?.uid]);
+
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -599,6 +621,7 @@ const rectOnBack = (
 
   const [deletionFlag, setDeletionFlag] = useState<'you'|'them'|null>(null); // who deleted
   const [checkingDeletion, setCheckingDeletion] = useState(false);
+  const [hasIncomingOnly, setHasIncomingOnly] = useState(false);
 
   const [introPlayed, setIntroPlayed] = useState<boolean>(false);
 
@@ -718,48 +741,92 @@ const rectOnBack = (
     return () => unsub.forEach((u) => u());
   }, [profiles]);
 
-  // When the profile modal opens, figure out if the chat was deleted by you/them
+
+  // When the profile modal opens, figure out deletion + whether they already messaged you
   useEffect(() => {
     let alive = true;
     (async () => {
       if (!modalVisible || !selectedProfile || !auth.currentUser) {
-        if (alive) setDeletionFlag(null);
+        if (alive) {
+          setDeletionFlag(null);
+          setHasIncomingOnly(false);
+        }
         return;
       }
+
       setCheckingDeletion(true);
       const currentUid = auth.currentUser.uid;
       const partnerId = selectedProfile.id;
       const chatId = [currentUid, partnerId].sort().join("_");
+
       try {
         const chatRef = doc(firestore, "chats", chatId);
         const snap = await getDoc(chatRef);
-        if (!snap.exists()) {
-          if (alive) setDeletionFlag(null);
-        } else {
+
+        let localDeletion: 'you' | 'them' | null = null;
+        let incomingOnly = false;
+
+        if (snap.exists()) {
           const data: any = snap.data();
           const vf: string[] = Array.isArray(data?.visibleFor) ? data.visibleFor : [];
+
           if (!vf.includes(partnerId)) {
-            if (alive) setDeletionFlag('them');
+            localDeletion = 'them';
           } else if (!vf.includes(currentUid)) {
-            if (alive) setDeletionFlag('you');
-          } else {
-            if (alive) setDeletionFlag(null);
+            localDeletion = 'you';
+          }
+
+          // Only bother checking messages if the chat exists
+          const msgsRef = collection(firestore, "chats", chatId, "messages");
+          const msgsSnap = await getDocs(
+            query(msgsRef, orderBy("createdAt", "asc"), limit(10))
+          );
+
+          if (!msgsSnap.empty) {
+            let anyFromThem = false;
+            let anyFromMe = false;
+
+            msgsSnap.forEach((d) => {
+              const m = d.data() as any;
+              if (m.sender === currentUid) anyFromMe = true;
+              if (m.sender === partnerId) anyFromThem = true;
+            });
+
+            // “They already sent you a message” = they’ve sent something, you haven’t
+            incomingOnly = anyFromThem && !anyFromMe;
           }
         }
+
+        if (!alive) return;
+
+        setDeletionFlag(localDeletion);
+        // If they deleted the chat, we want the “deleted” UX to win, not “incoming”
+        setHasIncomingOnly(incomingOnly && localDeletion !== 'them');
       } catch (e: any) {
-        if (e?.code === 'permission-denied') {
-          if (alive) setDeletionFlag('you');
+        if (e?.code === "permission-denied") {
+          if (alive) {
+            setDeletionFlag("you");
+            setHasIncomingOnly(false);
+          }
         } else {
-          console.error('checkDeletionStatus error:', e);
+          console.error("checkDeletionStatus error:", e);
         }
       } finally {
         if (alive) setCheckingDeletion(false);
       }
     })();
-    return () => { alive = false; };
+
+    return () => {
+      alive = false;
+    };
   }, [modalVisible, selectedProfile]);
 
-  const messagingBlocked = deletionFlag !== null;
+
+  
+
+  const deletedByThem = deletionFlag === 'them';
+  const deletedByYou = deletionFlag === 'you';
+  const messagingBlocked = deletedByYou;
 
   // If this profile goes offline while their card is open
   const isSelectedOffline =
@@ -847,10 +914,11 @@ const rectOnBack = (
       : { justifyContent: "space-around" },
   ];
 
-  const openFirstMessageModal = () => {
-    setModalVisible(false);
-    setTimeout(() => setFirstMessageModalVisible(true), 50);
-  };
+ const openFirstMessageModal = () => {
+  // Keep the profile modal visible behind
+  setFirstMessageModalVisible(true);
+};
+
 
   const openChitChatModal = () => {
     setCcStep('choose');
@@ -964,6 +1032,22 @@ const rectOnBack = (
     ].join("\n");
   }
 
+  const goToChatFromProfile = () => {
+  if (!auth.currentUser || !selectedProfile) return;
+
+  const currentUserId = auth.currentUser.uid;
+  const partnerId = selectedProfile.id;
+  const chatId = [currentUserId, partnerId].sort().join("_");
+
+  // 🔺 Adjust this route to whatever your actual chat route is
+  // For example, if you have app/ChitChats.tsx and it accepts a chatId:
+    router.push({
+      pathname: "/ChitChats",
+      params: { chatId, fromBar: "true" },
+    } as any);
+  };
+
+
   async function sendReportEmail() {
     try {
       setSendingReport(true);
@@ -1018,33 +1102,57 @@ const rectOnBack = (
   }
 
   const handleChatPress = async () => {
-    if (messagingBlocked) return;
-    try {
-      const currentUserId = auth.currentUser?.uid!;
-      const partnerId = selectedProfile.id;
-      const chatId = [currentUserId, partnerId].sort().join("_");
-      const chatDocRef = doc(firestore, "chats", chatId);
+  if (messagingBlocked) return;
 
-      const chatSnap = await getDoc(chatDocRef);
-      if (!chatSnap.exists()) {
-        openFirstMessageModal();
-        return;
-      }
+  try {
+    const currentUserId = auth.currentUser?.uid!;
+    const partnerId = selectedProfile.id;
+    const chatId = [currentUserId, partnerId].sort().join("_");
+    const chatDocRef = doc(firestore, "chats", chatId);
 
-      const msgsSnap = await getDocs(
-        query(collection(firestore, "chats", chatId, "messages"), limit(1))
-      );
+    const chatSnap = await getDoc(chatDocRef);
 
-      if (msgsSnap.empty) {
-        openFirstMessageModal();
-      } else {
-        setCreepVisible(true);
-      }
-    } catch (err) {
-      console.error("handleChatPress failed:", err);
+    // No chat doc at all → no messages → let them send their first one
+    if (!chatSnap.exists()) {
       openFirstMessageModal();
+      return;
     }
-  };
+
+    // Look at the *first* message (and whether there's a second)
+    const msgsRef = collection(firestore, "chats", chatId, "messages");
+    const msgsSnap = await getDocs(
+      query(msgsRef, orderBy("createdAt", "asc"), limit(2))
+    );
+
+    // Still no messages for some reason → treat as fresh
+    if (msgsSnap.empty) {
+      openFirstMessageModal();
+      return;
+    }
+
+    const docs = msgsSnap.docs;
+    const firstMsg = docs[0].data() as any;
+    const firstSender = firstMsg.sender;
+    const hasAtLeastTwoMessages = docs.length > 1;
+
+    // ✅ CREEP RULE:
+    // Only show "don't be a creep" if there is exactly ONE message
+    // and that ONE message was sent by *this* user.
+    if (!hasAtLeastTwoMessages && firstSender === currentUserId) {
+      setCreepVisible(true);
+      return;
+    }
+
+    // Otherwise (someone else sent first, or convo already going),
+    // allow them to send from the bar.
+    openFirstMessageModal();
+  } catch (err) {
+    console.error("handleChatPress failed:", err);
+    // On error, fall back to letting them try to send a first message
+    openFirstMessageModal();
+  }
+};
+
 
   const onMinglesPress = () => {
     if (welcomeTyping) return;
@@ -1099,8 +1207,8 @@ const rectOnBack = (
       setFirstMessageText("");
       setFirstMessageModalVisible(false);
       setModalVisible(false);
-      setSentToast(true);
-      setTimeout(() => setSentToast(false), 2000);
+      setToastText("Message sent");
+      setTimeout(() => setToastText(null), 2000);
     } catch (err: any) {
       console.error(err);
       Alert.alert("Error", "Could not send message. Please try again.");
@@ -1108,6 +1216,69 @@ const rectOnBack = (
       setSendingFirstMessage(false);
     }
   };
+
+    const sendChitChatReply = async (cc: SavedChat) => {
+    const trimmed = replyText.trim();
+    if (!trimmed || messagingBlocked || !auth.currentUser || !selectedProfile) return;
+
+    try {
+      const currentUserId = auth.currentUser.uid;
+      const partnerId = selectedProfile.id;
+      const chatId = [currentUserId, partnerId].sort().join("_");
+      const chatDocRef = doc(firestore, "chats", chatId);
+      const userIds = [currentUserId, partnerId];
+
+      // Nice readable label
+      const label = chatLabelMap[cc.type] || "Chit Chat";
+
+      // You can tweak how this is formatted in the final message
+      const combined = `${label}: ${cc.content}\n\n${trimmed}`;
+
+      const chatSnap = await getDoc(chatDocRef);
+      if (!chatSnap.exists()) {
+        await setDoc(chatDocRef, {
+          users: userIds,
+          visibleFor: userIds,
+          updatedAt: serverTimestamp(),
+          lastMessage: combined,
+          lastMessageSender: currentUserId,
+        });
+      } else {
+        await updateDoc(chatDocRef, {
+          updatedAt: serverTimestamp(),
+          lastMessage: combined,
+          lastMessageSender: currentUserId,
+          visibleFor: arrayUnion(...userIds),
+        });
+      }
+
+      await addDoc(
+        collection(firestore, "chats", chatId, "messages"),
+        {
+          text: combined,
+          sender: currentUserId,
+          createdAt: serverTimestamp(),
+          chitChat: {
+            type: cc.type,
+            prompt: cc.content,
+            response: trimmed,
+          },
+        }
+      );
+
+      // Reset UI, stay in the bar, show toast
+      setReplyText('');
+      setChitChatModalVisible(false);
+      setCcStep('choose');
+      setSelectedCc(null);
+      setToastText("Chit Chat Sent");
+      setTimeout(() => setToastText(null), 2000);
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Could not send Chit Chat. Please try again.");
+    }
+  };
+
 
 
   
@@ -1545,47 +1716,79 @@ const rectOnBack = (
                     </Text>
                   </View>
 
-                  <View style={buttonContainerStyle}>
-                    {showChatButton && (
-                      <TouchableOpacity
-                        style={[
-                          styles.modalChatButton,
-                          (messagingBlocked || isSelectedOffline) && styles.modalChatButtonDisabled,
-                        ]}
-                        onPress={handleChatPress}
-                        disabled={messagingBlocked || isSelectedOffline}
-                      >
-                        <Text
-                          style={[
-                            styles.modalChatButtonText,
-                            (messagingBlocked || isSelectedOffline) && styles.modalChatButtonTextDisabled,
-                          ]}
+                  {/* Footer: different modes depending on chat status */}
+                  {deletedByThem ? (
+                    <>
+                      <Text style={styles.infoLine}>
+                        {selectedProfile.name} deleted your convo.
+                      </Text>
+                      <View style={[styles.bottomButtons, { justifyContent: "center", marginTop: 10 }]}>
+                        <TouchableOpacity
+                          style={styles.modalChatButton}
+                          onPress={handleChatPress} // behaves like your normal Chat flow
                         >
-                          Chat
-                        </Text>
-                      </TouchableOpacity>
-                    )}
+                          <Text style={styles.modalChatButtonText}>Try Again?</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : hasIncomingOnly ? (
+                    <>
+                      <Text style={styles.infoLine}>
+                        {selectedProfile.name} already sent you a message.
+                      </Text>
+                      <View style={[styles.bottomButtons, { justifyContent: "center", marginTop: 10 }]}>
+                        <TouchableOpacity
+                          style={styles.modalChatButton}
+                          onPress={goToChatFromProfile}
+                        >
+                          <Text style={styles.modalChatButtonText}>Go To Chat</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={buttonContainerStyle}>
+                      {showChatButton && (
+                        <TouchableOpacity
+                          style={[
+                            styles.modalChatButton,
+                            (messagingBlocked || isSelectedOffline) && styles.modalChatButtonDisabled,
+                          ]}
+                          onPress={handleChatPress}
+                          disabled={messagingBlocked || isSelectedOffline}
+                        >
+                          <Text
+                            style={[
+                              styles.modalChatButtonText,
+                              (messagingBlocked || isSelectedOffline) && styles.modalChatButtonTextDisabled,
+                            ]}
+                          >
+                            Chat
+                          </Text>
+                        </TouchableOpacity>
+                      )}
 
-                    {showChitChatButton && (
-                      <TouchableOpacity
-                        style={[
-                          styles.modalChatButton,
-                          (messagingBlocked || isSelectedOffline) && styles.modalChatButtonDisabled,
-                        ]}
-                        onPress={openChitChatModal}
-                        disabled={messagingBlocked || isSelectedOffline}
-                      >
-                        <Text
+                      {showChitChatButton && (
+                        <TouchableOpacity
                           style={[
-                            styles.modalChatButtonText,
-                            (messagingBlocked || isSelectedOffline) && styles.modalChatButtonTextDisabled,
+                            styles.modalChatButton,
+                            (messagingBlocked || isSelectedOffline) && styles.modalChatButtonDisabled,
                           ]}
+                          onPress={openChitChatModal}
+                          disabled={messagingBlocked || isSelectedOffline}
                         >
-                          Chit Chat
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                          <Text
+                            style={[
+                              styles.modalChatButtonText,
+                              (messagingBlocked || isSelectedOffline) && styles.modalChatButtonTextDisabled,
+                            ]}
+                          >
+                            Chit Chat
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+
 
                 </>
               )}
@@ -1605,8 +1808,9 @@ const rectOnBack = (
 
       {selectedProfile && chitChatModalVisible && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-          <View style={styles.overlay} pointerEvents="box-none">
-            <View style={styles.ccContainer} pointerEvents="auto">
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View style={styles.overlay} pointerEvents="box-none">
+              <View style={styles.ccContainer} pointerEvents="auto">
               {profileChats.length === 0 ? (
                 <View style={styles.noChatsContainer}>
                   <Text style={styles.noChatsText}>No Chit Chats found</Text>
@@ -1648,24 +1852,18 @@ const rectOnBack = (
                           placeholder="Write your reply…"
                           placeholderTextColor="#7A4C6E"
                           multiline
+                          blurOnSubmit
+                          returnKeyType="done"
+                          onSubmitEditing={Keyboard.dismiss}
                         />
+
                         <TouchableOpacity
                           style={styles.replyButton}
-                          onPress={() => {
-                            const payload = {
-                              prompt: cc.content,
-                              response: replyText.trim(),
-                            };
-                            const encoded = encodeURIComponent(JSON.stringify(payload));
-                            router.push(`/chat?partner=${selectedProfile.id}&initial=${encoded}`);
-                            setChitChatModalVisible(false);
-                            setCcStep('choose');
-                            setSelectedCc(null);
-                            setReplyText('');
-                          }}
+                          onPress={() => sendChitChatReply(cc)}
                         >
                           <Text style={styles.replyButtonText}>Send</Text>
                         </TouchableOpacity>
+
                       </>
                     );
                   })()}
@@ -1675,34 +1873,44 @@ const rectOnBack = (
               <TouchableOpacity
                 style={styles.ccCloseButton}
                 onPress={() => {
-                  if (ccStep === 'show') {
-                    setCcStep('choose');
-                    setSelectedCc(null);
-                    setReplyText('');
-                  } else {
-                    setChitChatModalVisible(false);
-                  }
-                }}
+                // If we're on the "show" screen and there are multiple Chit Chats,
+                // go back to the list first.
+                if (ccStep === 'show' && profileChats.length > 1) {
+                  setCcStep('choose');
+                  setSelectedCc(null);
+                  setReplyText('');
+                  return;
+                }
+
+                // Otherwise, fully close Chit Chat and bring the profile card back
+                setChitChatModalVisible(false);
+                setCcStep('choose');
+                setSelectedCc(null);
+                setReplyText('');
+                setModalVisible(true);   // 👈 re-open profile modal
+              }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Image source={closeIcon} style={styles.closeIcon} />
               </TouchableOpacity>
             </View>
           </View>
+          </TouchableWithoutFeedback>
         </View>
       )}
 
 
       {firstMessageModalVisible && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-          <View style={styles.modalOverlay} pointerEvents="box-none">
-            <View
-              style={[
-                styles.modalContent,
-                { maxHeight: Math.round(sh * 0.78), paddingBottom: 20 + insets.bottom },
-              ]}
-              pointerEvents="auto"
-            >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View style={styles.modalOverlay} pointerEvents="box-none">
+              <View
+                style={[
+                  styles.modalContent,
+                  { maxHeight: Math.round(sh * 0.78), paddingBottom: 20 + insets.bottom },
+                ]}
+                pointerEvents="auto"
+              >
               {deletionFlag && (
                 <View style={styles.deletionBanner}>
                   <Text style={styles.deletionBannerText}>
@@ -1731,44 +1939,10 @@ const rectOnBack = (
                     ]}
                     showsVerticalScrollIndicator={false}
                   >
-                    <View style={styles.photoWrap}>
-                      <Image
-                        source={{ uri: selectedProfile.photoUri }}
-                        style={styles.modalImage}
-                      />
-
-                      <TouchableOpacity
-                        style={[styles.drinkIcon, { right: "33%", bottom: "12%" }]}
-                        onPress={() => setShowDrinkSpeech(!showDrinkSpeech)}
-                      >
-                        <Image
-                          source={drinkIcon}
-                          style={{ width: "100%", height: "100%" }}
-                        />
-                        {showDrinkSpeech && (
-                          <View style={styles.drinkSpeechBubble}>
-                            <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.modalText}>
-                      <Text style={styles.modalName}>
-                        {selectedProfile.name}, {selectedProfile.age}
-                      </Text>
-                      <Text style={styles.modalLocation}>
-                        {selectedProfile.location}
-                      </Text>
-                      <Text style={styles.modalDescription}>
-                        {selectedProfile.about}
-                      </Text>
-                    </View>
-
                     <Text
                       style={[
                         styles.modalLocation,
-                        { marginTop: 12, marginBottom: 4, fontSize: 18 },
+                        { marginTop: 12, marginBottom: 4, fontSize: 18, textAlign: "center", margin: "auto" },
                       ]}
                     >
                       Your first message
@@ -1780,7 +1954,11 @@ const rectOnBack = (
                       placeholder="Say something nice…"
                       placeholderTextColor="#7A4C6E"
                       multiline
+                      blurOnSubmit
+                      returnKeyType="done"
+                      onSubmitEditing={Keyboard.dismiss}
                     />
+
                   </ScrollView>
 
                   <View
@@ -1803,6 +1981,7 @@ const rectOnBack = (
               )}
             </View>
           </View>
+          </TouchableWithoutFeedback>
         </View>
       )}
 
@@ -1866,12 +2045,14 @@ const rectOnBack = (
       )}
 
 
-      {/* 2s toast for “Message sent” */}
-      {sentToast && (
+      
+      {/* 2s toast for “Message sent / Chit Chat Sent” */}
+      {toastText && (
         <View style={styles.toast}>
-          <Text style={styles.toastText}>Message sent</Text>
+          <Text style={styles.toastText}>{toastText}</Text>
         </View>
       )}
+
 
 {profileComplete && (
   <View
@@ -2175,7 +2356,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   replyInput: {
-    width: '80%',
+    width: 300,
     height: 180,
     minHeight: 80,
     borderColor: '#40122E',
@@ -2184,7 +2365,8 @@ const styles = StyleSheet.create({
     padding: 12,
     color: '#F5E1C4',
     backgroundColor: '#6E2A48',
-    marginBottom: 20,
+    marginBottom: 0,
+    marginTop: 40,
     marginHorizontal: "auto",
     textAlignVertical: "top"
   },
@@ -2194,6 +2376,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderRightWidth: 3,
     borderBottomWidth: 3,
+    marginVertical: 10,
     borderColor: "#460b2a",
     paddingVertical: 5,
     paddingHorizontal: 25,
@@ -2320,6 +2503,14 @@ const styles = StyleSheet.create({
     fontFamily: FontNames.MontserratBold,
     textAlign: "center",
   },
+  infoLine: {
+    color: "#F5E1C4",
+    fontSize: 16,
+    fontFamily: FontNames.MontserratRegular,
+    textAlign: "center",
+    marginTop: 10,
+  },
+
 });
 
 const creepStyles = ScaledSheet.create({
