@@ -829,13 +829,15 @@ useEffect(() => {
         <ProfileNavbar
           showBack={hasSavedInSession}
           onBack={async () => {
-            // Before initial save, just behave like before (no auto-save).
+            // Before initial save, just behave like before (no auto-save),
+            // but still tell the bar we came from the bathroom.
             if (!hasSavedInSession) {
               router.replace("/bar-2");
               return;
             }
 
-            // After initial profile creation: auto-save any changes, then go back.
+            // After initial profile creation: auto-save any changes,
+            // then go back and re-arm Start Chatting.
             const ok = await saveProfileIfChanged();
             if (ok) {
               router.replace("/bar-2");
