@@ -74,7 +74,7 @@ export default function BathroomScreen() {
   const [mustAnswer, setMustAnswer] = useState(false)
 
   const [cameraVisible, setCameraVisible] = useState(false);
-  const cameraRef = useRef<Camera>(null);r
+  const cameraRef = useRef<Camera>(null);
   const device = useCameraDevice("front");
   const [noFaceVisible, setNoFaceVisible] = useState(false);
   const [validating, setValidating] = useState(false);
@@ -1012,7 +1012,7 @@ useEffect(() => {
                 {renderOnboardingContent()}
               </View>
             </Modal>
-  
+          
           <Modal visible={cameraVisible} animationType="slide" transparent={false}>
               <View style={{ flex: 1, backgroundColor: "black" }}>
                 {device ? (
