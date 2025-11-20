@@ -30,7 +30,7 @@ import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 import closeIcon from '../assets/images/x.png'
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
-import { Camera, useCameraDevice } from "react-native-vision-camera";
+//import { Camera, useCameraDevice } from "react-native-vision-camera";
 import FaceDetector from "@react-native-ml-kit/face-detection";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -74,8 +74,8 @@ export default function BathroomScreen() {
   const [mustAnswer, setMustAnswer] = useState(false)
 
   const [cameraVisible, setCameraVisible] = useState(false);
-  const cameraRef = useRef<Camera>(null);
-  const device = useCameraDevice("front");
+ // const cameraRef = useRef<Camera>(null);r
+  //const device = useCameraDevice("front");
   const [noFaceVisible, setNoFaceVisible] = useState(false);
   const [validating, setValidating] = useState(false);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
@@ -1010,7 +1010,7 @@ useEffect(() => {
                 {renderOnboardingContent()}
               </View>
             </Modal>
-  {
+  {/*
           <Modal visible={cameraVisible} animationType="slide" transparent={false}>
               <View style={{ flex: 1, backgroundColor: "black" }}>
                 {device ? (
@@ -1057,7 +1057,7 @@ useEffect(() => {
                 </View>
               </View>
             </Modal> 
-}
+*/}
             {/* No-face “Mr. Mingles” popup */}
             <Modal transparent visible={noFaceVisible} animationType="fade">
               <View style={modalStyles.modalOverlay}>

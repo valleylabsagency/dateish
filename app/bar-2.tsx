@@ -479,50 +479,33 @@ const rectOnBack = (
 
     (async () => {
       try {
-        const [startedVal, promptVal] = await Promise.all([
-          AsyncStorage.getItem("bar2Started"),      // "true" once they press Start Chatting
-          AsyncStorage.getItem("bar2ShowPrompt"),   // "true" while Start overlay is armed
-        ]);
-
+        const promptVal = await AsyncStorage.getItem("bar2ShowPrompt");
         if (!alive) return;
 
-        const hasStartedEver = startedVal === "true";
-        const promptArmed    = promptVal === "true";
+        const promptArmed = promptVal === "true";
 
-        if (hasStartedEver) {
-          // They’ve already pressed Start Chatting at least once.
-          setStarted(true);
-          setShowStartOverlay(false);
-          return;
-        }
-
+        // 🚪 1) Coming from Entrance or first-time Bathroom:
+        // Always arm the Start Chatting overlay, no matter what happened before.
         if (cameFromEntrance || fromBathroomFirst) {
-          // Either:
-          // - Came from Entrance (onboarding flow), OR
-          // - Came from Bathroom right after saving profile for the FIRST time.
-          //
-          // In both cases, if they haven't started yet, arm the Start Chatting overlay
-          // and keep them "not started" until they tap the button.
           setStarted(false);
           setShowStartOverlay(true);
           await AsyncStorage.setItem("bar2ShowPrompt", "true");
           return;
         }
 
+        // 🧷 2) Not coming from Entrance/Bathroom, but overlay was armed earlier:
+        // Keep it armed until they actually press Start Chatting.
         if (promptArmed) {
-          // We previously armed the prompt (Entrance or first-time Bathroom),
-          // so keep showing it until they actually press Start Chatting.
           setStarted(false);
           setShowStartOverlay(true);
           return;
         }
 
-        // No entrance/bathroom trigger, never started, no armed prompt:
-        // behave like old logic (assume started so they just see profiles).
+        // ✅ 3) Normal state: no prompt armed → assume they’re “in the bar”
         setStarted(true);
         setShowStartOverlay(false);
       } catch {
-        // fall back to "started" so the bar isn't stuck empty
+        // Fallback: let them see the bar normally
         setStarted(true);
         setShowStartOverlay(false);
       }
@@ -535,16 +518,17 @@ const rectOnBack = (
 
 
 
+
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
       if (!u) {
-        await AsyncStorage.multiRemove(["bar2Started", "bar2ShowPrompt"]);
+        await AsyncStorage.removeItem("bar2ShowPrompt");
         setStarted(false);
         setShowStartOverlay(false);
       }
     });
-    return unsub;
-  }, []);
+    return () => unsub();
+  }, []);  
   
 
   // welcome typing effect
@@ -1214,10 +1198,7 @@ const rectOnBack = (
                   bar: true,
                   lastActive: Date.now(),
                 }).catch(() => {});
-                await AsyncStorage.multiSet([
-                  ["bar2Started", "true"],
-                  ["bar2ShowPrompt", "false"],
-                ]);
+                await AsyncStorage.setItem("bar2ShowPrompt", "false");
               } catch {}
             }}
           >
