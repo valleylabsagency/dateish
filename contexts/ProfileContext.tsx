@@ -113,6 +113,7 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
   }, [currentUser]);
 
   // 3) Save the updated profile data to Firestore.
+  // 3) Save the updated profile data to Firestore.
   const saveProfile = async (profileData: Partial<Profile>) => {
     try {
       if (!currentUser) return;
@@ -121,12 +122,24 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
       const { moneys: _dropMoneys, isVip: _dropVip, vipSince: _dropVipSince, ...clientSafe } =
         profileData;
 
+      // 1. Merge existing profile with new changes to see the "final" state
       const newProfile = { ...(profile || {}), ...clientSafe };
-      setProfile(newProfile);
-      setProfileComplete(isProfileComplete(newProfile));
+      
+      // 2. Calculate if this new state counts as "Complete"
+      const isComplete = isProfileComplete(newProfile);
 
+      // 3. Update local state
+      setProfile(newProfile);
+      setProfileComplete(isComplete);
+
+      // 4. Save to Firestore AND include the profileComplete flag
       const ref = doc(firestore, "users", currentUser.uid);
-      await setDoc(ref, { ...clientSafe, online: true }, { merge: true });
+      await setDoc(ref, { 
+        ...clientSafe, 
+        online: true,
+        profileComplete: isComplete 
+      }, { merge: true });
+
     } catch (error) {
       console.error("Error saving profile:", error);
     }

@@ -837,7 +837,9 @@ const [toastText, setToastText] = useState<string | null>(null);
   const filtered = profiles.filter(p => {
     const theyBlockedMe = Array.isArray(p.blocked) && myUid ? p.blocked.includes(myUid) : false;
     const iBlockedThem  = blockedIds.includes(p.id);
-    return onlineStatus[p.id] && !theyBlockedMe && !iBlockedThem;
+    const isReady = p.profileComplete === true || (!!p.name && p.name.length > 0);
+
+    return onlineStatus[p.id] && !theyBlockedMe && !iBlockedThem && isReady;
   });
   const onlineProfiles = filtered;
 
@@ -1033,19 +1035,27 @@ const [toastText, setToastText] = useState<string | null>(null);
   }
 
   const goToChatFromProfile = () => {
-  if (!auth.currentUser || !selectedProfile) return;
+    if (!auth.currentUser || !selectedProfile) return;
 
-  const currentUserId = auth.currentUser.uid;
-  const partnerId = selectedProfile.id;
-  const chatId = [currentUserId, partnerId].sort().join("_");
+    const currentUserId = auth.currentUser.uid;
+    const partnerId = selectedProfile.id;
+    const chatId = [currentUserId, partnerId].sort().join("_");
 
-  // 🔺 Adjust this route to whatever your actual chat route is
-  // For example, if you have app/ChitChats.tsx and it accepts a chatId:
+    // Close any open overlays before navigation
+    setModalVisible(false);
+    setChitChatModalVisible(false);
+    setFirstMessageModalVisible(false);
+
     router.push({
       pathname: "/ChitChats",
-      params: { chatId, fromBar: "true" },
+      params: {
+        chatId,          // for versions of ChitChats that read chatId directly
+        partnerId,       // for versions that build the chatId from partnerId
+        fromBar: "true", // if you use this to tweak behavior in ChitChats
+      },
     } as any);
   };
+
 
 
   async function sendReportEmail() {
@@ -1102,56 +1112,66 @@ const [toastText, setToastText] = useState<string | null>(null);
   }
 
   const handleChatPress = async () => {
-  if (messagingBlocked) return;
+    if (messagingBlocked || !auth.currentUser || !selectedProfile) return;
 
-  try {
-    const currentUserId = auth.currentUser?.uid!;
-    const partnerId = selectedProfile.id;
-    const chatId = [currentUserId, partnerId].sort().join("_");
-    const chatDocRef = doc(firestore, "chats", chatId);
+    try {
+      const currentUserId = auth.currentUser.uid;
+      const partnerId = selectedProfile.id;
+      const chatId = [currentUserId, partnerId].sort().join("_");
+      const chatDocRef = doc(firestore, "chats", chatId);
 
-    const chatSnap = await getDoc(chatDocRef);
+      const chatSnap = await getDoc(chatDocRef);
 
-    // No chat doc at all → no messages → let them send their first one
-    if (!chatSnap.exists()) {
+      // If there is no chat doc at all, they truly haven’t talked → first message allowed
+      if (!chatSnap.exists()) {
+        openFirstMessageModal();
+        return;
+      }
+
+      const msgsRef = collection(firestore, "chats", chatId, "messages");
+      const msgsSnap = await getDocs(
+        query(msgsRef, orderBy("createdAt", "asc"), limit(50))
+      );
+
+      // No messages for some reason → treat as a fresh convo
+      if (msgsSnap.empty) {
+        openFirstMessageModal();
+        return;
+      }
+
+      let mySent = 0;
+      let theirSent = 0;
+
+      msgsSnap.forEach((d) => {
+        const m = d.data() as any;
+        // Be robust to different field names just in case
+        const senderId = m.sender || m.senderId || m.from;
+
+        if (!senderId) return;
+        if (senderId === currentUserId) mySent++;
+        else if (senderId === partnerId) theirSent++;
+      });
+
+      // 🚨 CREEP RULE:
+      // You have sent messages, they have sent none → "Don't be a creep"
+      if (mySent > 0 && theirSent === 0) {
+        setCreepVisible(true);
+        return;
+      }
+
+      // Otherwise they’ve replied or there’s some 2-way history → allow sending
       openFirstMessageModal();
-      return;
+    } catch (err) {
+      console.error("handleChatPress failed:", err);
+      Alert.alert(
+        "Error",
+        "We couldn't check your chat history right now. Try again in a moment."
+      );
+      // Note: we DON'T open the first-message modal on error anymore,
+      // so you can't bypass the creep check via a Firestore error.
     }
+  };
 
-    // Look at the *first* message (and whether there's a second)
-    const msgsRef = collection(firestore, "chats", chatId, "messages");
-    const msgsSnap = await getDocs(
-      query(msgsRef, orderBy("createdAt", "asc"), limit(2))
-    );
-
-    // Still no messages for some reason → treat as fresh
-    if (msgsSnap.empty) {
-      openFirstMessageModal();
-      return;
-    }
-
-    const docs = msgsSnap.docs;
-    const firstMsg = docs[0].data() as any;
-    const firstSender = firstMsg.sender;
-    const hasAtLeastTwoMessages = docs.length > 1;
-
-    // ✅ CREEP RULE:
-    // Only show "don't be a creep" if there is exactly ONE message
-    // and that ONE message was sent by *this* user.
-    if (!hasAtLeastTwoMessages && firstSender === currentUserId) {
-      setCreepVisible(true);
-      return;
-    }
-
-    // Otherwise (someone else sent first, or convo already going),
-    // allow them to send from the bar.
-    openFirstMessageModal();
-  } catch (err) {
-    console.error("handleChatPress failed:", err);
-    // On error, fall back to letting them try to send a first message
-    openFirstMessageModal();
-  }
-};
 
 
   const onMinglesPress = () => {
@@ -1793,7 +1813,7 @@ const [toastText, setToastText] = useState<string | null>(null);
                 </>
               )}
               {isSelectedOffline && (
-              <View style={styles.offlineOverlayInModal}>
+              <View style={styles.offlineOverlayInModal} pointerEvents="none">
                 <View style={styles.offlineBadge}>
                   <Text style={styles.offlineText}>They left the bar</Text>
                 </View>

@@ -136,20 +136,28 @@ export default function SettingsScreen() {
     return () => unsub();
   }, []);
 
-  // --- AUTH logout (as you already had) ---
   const handleLogout = async () => {
     if (isPlaying) toggleMusic();
+
     try {
+      // 1) Sign out
       await logout();
-      await AsyncStorage.removeItem("userProfile");
-      await AsyncStorage.removeItem("bar2Started");
-      setTimeout(() => {
-        router.push("/entrance");
-      }, 100);
+
+      // 2) Clear any local auth/profile state
+      await AsyncStorage.multiRemove([
+        "userProfile",
+        "bar2Started",
+        "bar2ShowPrompt", // if you're using that key in Bar2
+      ]);
     } catch (error) {
       console.error("Logout error:", error);
+      // Optional: show an alert if you want
+       Alert.alert("Error", "Could not log out. Please try again.");
+    } finally {
+      router.replace("/entrance");
     }
   };
+
 
   // --- Account actions ---
   const handleDeleteAccount = () => {
