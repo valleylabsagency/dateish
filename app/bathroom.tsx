@@ -14,7 +14,7 @@ import {
   Platform,
   Alert,
   Linking,
-  Dimensions
+  Dimensions,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -23,18 +23,17 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import ProfileNavbar from "../components/ProfileNavbar";
 import { ProfileContext } from "../contexts/ProfileContext";
 import { scale, verticalScale, moderateScale } from "react-native-size-matters";
-import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { auth, firestore } from "../firebase";
 import { FontNames } from "../constants/fonts";
 import ChitChats, { ChatType, SavedChat } from "./ChitChats";
-import closeIcon from '../assets/images/x.png'
-import LottieView from 'lottie-react-native';
-import animationData from '../assets/videos/mm-dancing.json';
-import { Camera, useCameraDevice } from "react-native-vision-camera";
-import FaceDetector from "@react-native-ml-kit/face-detection";
+import closeIcon from "../assets/images/x.png";
+import LottieView from "lottie-react-native";
+import animationData from "../assets/videos/mm-dancing.json";
+// import { Camera, useCameraDevice } from "react-native-vision-camera";
+// import FaceDetector from "@react-native-ml-kit/face-detection";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 
 // resolve the asset to get its intrinsic size
 const bathroomImg = require("../assets/images/bathroom.png");
@@ -44,21 +43,19 @@ const BG_ASPECT_RATIO = imgW / imgH;
 const withoutBg = {
   ...animationData,
   layers: animationData.layers.filter(
-    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+    (layer) => layer.ty !== 1 || layer.nm !== "Dark Blue Solid 1"
   ),
-}
+};
 
 // ===== Stage sizing helpers (fit whole image on screen) =====
 
-
 // Place children by normalized art coords (0..1)
-
-
 
 export default function BathroomScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ onboard?: string }>();
-  const { profile, saveProfile, setProfileComplete, profileComplete } = useContext(ProfileContext);
+  const { profile, saveProfile, setProfileComplete, profileComplete } =
+    useContext(ProfileContext);
 
   // form state
   const [name, setName] = useState("");
@@ -71,62 +68,67 @@ export default function BathroomScreen() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [showChitChats, setShowChitChats] = useState(false);
   const [popupFlag, setPopupFlag] = useState<string | null>(null);
-  const [mustAnswer, setMustAnswer] = useState(false)
+  const [mustAnswer, setMustAnswer] = useState(false);
 
-  const [cameraVisible, setCameraVisible] = useState(false);
-  const cameraRef = useRef<Camera>(null);
-  const device = useCameraDevice("front");
-  const [noFaceVisible, setNoFaceVisible] = useState(false);
-  const [validating, setValidating] = useState(false);
+  // const [cameraVisible, setCameraVisible] = useState(false);
+  // const cameraRef = useRef<Camera>(null);
+  // const device = useCameraDevice("front");
+  // const [noFaceVisible, setNoFaceVisible] = useState(false);
+  // const [validating, setValidating] = useState(false);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
 
-  
   const scaleCover = Math.max(stageSize.w / imgW || 0, stageSize.h / imgH || 0);
   const dispW = stageSize.w;
   const dispH = stageSize.h;
   const imgLeft = 0;
-  const imgTop  = 0;
-  
+  const imgTop = 0;
+
   // Mirror placement (TWEAK these 3 numbers to nudge as needed)
-  const mirrorX = 0.06;  // left edge of mirror, in image % (0..1)
-  const mirrorY = 0.19;  // top edge of mirror, in image % (0..1)
-  const mirrorW = .9;  // width of mirror, in image % (0..1)
+  const mirrorX = 0.06; // left edge of mirror, in image % (0..1)
+  const mirrorY = 0.19; // top edge of mirror, in image % (0..1)
+  const mirrorW = 0.9; // width of mirror, in image % (0..1)
 
   // Scale fonts based on mirror width (360 is a comfy baseline)
-  const mirrorScale = dispW > 0 ? Math.min(1.25, Math.max(0.8, (dispW * mirrorW) / 360)) : 1;
+  const mirrorScale =
+    dispW > 0 ? Math.min(1.25, Math.max(0.8, (dispW * mirrorW) / 360)) : 1;
 
-// Reusable scaled sizes (clamped)
-  const fs = (base: number) => Math.round(Math.min(24, Math.max(10, base * mirrorScale)));
+  // Reusable scaled sizes (clamped)
+  const fs = (base: number) =>
+    Math.round(Math.min(24, Math.max(10, base * mirrorScale)));
   // Mirror box actual width in pixels
   const mirrorBoxW = dispW * mirrorW;
 
-    // Photo size: ~42% of mirror width, clamped between 80–160 px
+  // Photo size: ~42% of mirror width, clamped between 80–160 px
   // helpers (put near other small utils)
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-const remap = (v: number, inMin: number, inMax: number, outMin: number, outMax: number) =>
-  outMin + ((clamp(v, inMin, inMax) - inMin) * (outMax - outMin)) / (inMax - inMin);
+  const clamp = (v: number, lo: number, hi: number) =>
+    Math.max(lo, Math.min(hi, v));
+  const remap = (
+    v: number,
+    inMin: number,
+    inMax: number,
+    outMin: number,
+    outMax: number
+  ) =>
+    outMin +
+    ((clamp(v, inMin, inMax) - inMin) * (outMax - outMin)) / (inMax - inMin);
 
-// ---- Avatar size (responsive) ----
-const shortSidePx = Math.min(dispW || 0, dispH || 0);
+  // ---- Avatar size (responsive) ----
+  const shortSidePx = Math.min(dispW || 0, dispH || 0);
 
-// Base size relative to mirror width (tweak 0.38..0.44 if needed)
-const baseAvatar = mirrorBoxW * 0.40;
+  // Base size relative to mirror width (tweak 0.38..0.44 if needed)
+  const baseAvatar = mirrorBoxW * 0.4;
 
-// Smaller screens (shortSide~340) get ~-10%, tall phones (shortSide~430) get ~+18%
-let mult = remap(shortSidePx, 340, 430, 0.90, 1.18);
+  // Smaller screens (shortSide~340) get ~-10%, tall phones (shortSide~430) get ~+18%
+  let mult = remap(shortSidePx, 340, 430, 0.9, 1.18);
 
-// Extra haircut for *very* small screens
-if (shortSidePx < 360) {
-  // 300→0.78x … 330→0.86x (keeps really tiny devices in check)
-  mult = remap(shortSidePx, 250, 230, 0.68, 0.80);
-}
+  // Extra haircut for *very* small screens
+  if (shortSidePx < 360) {
+    // 300→0.78x … 330→0.86x (keeps really tiny devices in check)
+    mult = remap(shortSidePx, 250, 230, 0.68, 0.8);
+  }
 
-// Final size with sane clamps
-const photoSize = Math.round(clamp(baseAvatar * mult, 82, 168));
-
-
-
-
+  // Final size with sane clamps
+  const photoSize = Math.round(clamp(baseAvatar * mult, 82, 168));
 
   // editing-about modal
   const [editingAbout, setEditingAbout] = useState(false);
@@ -137,14 +139,13 @@ const photoSize = Math.round(clamp(baseAvatar * mult, 82, 168));
   // Mr. Mingles warning modal (existing)
   const [modalVisible, setModalVisible] = useState(false);
   const rollAnim = useRef(new Animated.Value(500)).current;
-  const [chats, setChats] = useState<SavedChat[]>([])
+  const [chats, setChats] = useState<SavedChat[]>([]);
 
   // NEW: Onboarding flow (uses the SAME “Mr. Mingles” modal container)
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0);
 
   const [hasSavedInSession, setHasSavedInSession] = useState(!!profileComplete);
-
 
   // DOB step fields + refs for auto-advance
   const [dobDD, setDobDD] = useState("");
@@ -154,7 +155,6 @@ const photoSize = Math.round(clamp(baseAvatar * mult, 82, 168));
   const mmRef = useRef<TextInput>(null);
   const yyyyRef = useRef<TextInput>(null);
 
-
   const insets = useSafeAreaInsets();
 
   const [navH, setNavH] = useState(0);
@@ -162,93 +162,92 @@ const photoSize = Math.round(clamp(baseAvatar * mult, 82, 168));
   // If the navbar already includes its own safe-area padding (most do),
   // use its measured height only. Before we’ve measured, fall back to insets.top.
   const TOP_PADDING = navH > 0 ? navH : insets.top;
-  
-
-
-
-  
 
   // how much to bias vertical placement: 0 = top, .5 = center, 1 = bottom
-  const Y_ANCHOR = 0;                          // <- pin toward the top
-
-
+  const Y_ANCHOR = 0; // <- pin toward the top
 
   const isMounted = useRef(true);
-    useEffect(() => {
-      return () => { isMounted.current = false; };
-    }, []);
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   // determine if Next should be enabled on each step
   // replace your nextEnabled with this:
-const nextEnabled =
-  onboardingStep === 0 ? name.trim().length > 0
-  : onboardingStep === 1
-    ? dobDD.length === 2 &&
-      dobMM.length === 2 &&
-      dobYYYY.length === 4 &&
-      isValidAdult(dobDD, dobMM, dobYYYY) &&
-      isMinYearOk(dobYYYY)                 // <- block pre-1945
-    : onboardingStep === 2
+  const nextEnabled =
+    onboardingStep === 0
+      ? name.trim().length > 0
+      : onboardingStep === 1
+      ? dobDD.length === 2 &&
+        dobMM.length === 2 &&
+        dobYYYY.length === 4 &&
+        isValidAdult(dobDD, dobMM, dobYYYY) &&
+        isMinYearOk(dobYYYY) // <- block pre-1945
+      : onboardingStep === 2
       ? location.trim().length > 0
       : true;
 
-
   // show animation only on first and last step
-  const showAnimatedMM = onboardingVisible && (onboardingStep === 0 || onboardingStep === 1 || onboardingStep === 2 || onboardingStep === 3);
+  const showAnimatedMM =
+    onboardingVisible &&
+    (onboardingStep === 0 ||
+      onboardingStep === 1 ||
+      onboardingStep === 2 ||
+      onboardingStep === 3);
 
   // Firestore user ref for chit-chats
   const userDocRef = auth.currentUser
-    ? doc(firestore, 'users', auth.currentUser.uid)
-    : null
+    ? doc(firestore, "users", auth.currentUser.uid)
+    : null;
 
   function isMinYearOk(yyyy: string) {
     const y = parseInt(yyyy, 10);
     return !isNaN(y) && y >= 1945;
   }
 
-// Always pass a proper URI with scheme (file://) to ML Kit on BOTH platforms
-async function validateFace(fileUri: string) {
-  const uri = fileUri.startsWith('file://') ? fileUri : `file://${fileUri}`;
+  // Always pass a proper URI with scheme (file://) to ML Kit on BOTH platforms
+  // async function validateFace(fileUri: string) {
+  //   const uri = fileUri.startsWith('file://') ? fileUri : `file://${fileUri}`;
 
-  try {
-    const options: any = {
-      performanceMode: 'fast',
-      classificationMode: 'none',
-      contourMode: 'none',
-      minFaceSize: 0.05,
-      isTrackingEnabled: false,
-    };
+  //   try {
+  //     const options: any = {
+  //       performanceMode: 'fast',
+  //       classificationMode: 'none',
+  //       contourMode: 'none',
+  //       minFaceSize: 0.05,
+  //       isTrackingEnabled: false,
+  //     };
 
-    const mod: any = FaceDetector as any;
+  //     const mod: any = FaceDetector as any;
 
-    // Prefer detectFromFile; fall back to other method names some versions expose
-    const faces =
-      (typeof mod.detectFromFile === 'function' && await mod.detectFromFile(uri, options)) ||
-      (typeof mod.detectFromUri  === 'function' && await mod.detectFromUri(uri, options)) ||
-      (typeof mod.detect         === 'function' && await mod.detect(uri, options)) ||
-      [];
+  //     // Prefer detectFromFile; fall back to other method names some versions expose
+  //     const faces =
+  //       (typeof mod.detectFromFile === 'function' && await mod.detectFromFile(uri, options)) ||
+  //       (typeof mod.detectFromUri  === 'function' && await mod.detectFromUri(uri, options)) ||
+  //       (typeof mod.detect         === 'function' && await mod.detect(uri, options)) ||
+  //       [];
 
-    console.log('MLKit faces count =', Array.isArray(faces) ? faces.length : faces);
-    return Array.isArray(faces) && faces.length > 0;
-  } catch (e) {
-    console.warn('Face detection failed:', e, { fileUri: uri });
-    return false;
-  }
-}
-
-
-  
+  //     console.log('MLKit faces count =', Array.isArray(faces) ? faces.length : faces);
+  //     return Array.isArray(faces) && faces.length > 0;
+  //   } catch (e) {
+  //     console.warn('Face detection failed:', e, { fileUri: uri });
+  //     return false;
+  //   }
+  // }
 
   useEffect(() => {
-    if (!userDocRef) return
+    if (!userDocRef) return;
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-      if (!docSnap.exists()) return
-      const data = docSnap.data()
-      if (Array.isArray(data.chitchats)) setChats(data.chitchats as SavedChat[])
-      if (typeof data.chitchatsRequired === 'boolean') setMustAnswer(data.chitchatsRequired)
-    })
-    return () => unsubscribe()
-  }, [userDocRef])
+      if (!docSnap.exists()) return;
+      const data = docSnap.data();
+      if (Array.isArray(data.chitchats))
+        setChats(data.chitchats as SavedChat[]);
+      if (typeof data.chitchatsRequired === "boolean")
+        setMustAnswer(data.chitchatsRequired);
+    });
+    return () => unsubscribe();
+  }, [userDocRef]);
 
   async function handleSave(type: ChatType, content: string, index?: number) {
     const next = [...chats];
@@ -259,30 +258,38 @@ async function validateFace(fileUri: string) {
       // add new
       next.push({ type, content });
     }
-  
+
     setChats(next);
-  
+
     if (userDocRef) {
       try {
         await updateDoc(userDocRef, { chitchats: next });
       } catch (e) {
-        console.error('Failed to save chitchats:', e);
+        console.error("Failed to save chitchats:", e);
       }
     }
   }
 
   async function handleDelete(idx: number) {
-    const newChats = chats.filter((_, i) => i !== idx)
-    setChats(newChats)
+    const newChats = chats.filter((_, i) => i !== idx);
+    setChats(newChats);
     if (userDocRef) {
-      try { await updateDoc(userDocRef, { chitchats: newChats }) } catch (e) { console.error('Failed to delete chitchat:', e) }
+      try {
+        await updateDoc(userDocRef, { chitchats: newChats });
+      } catch (e) {
+        console.error("Failed to delete chitchat:", e);
+      }
     }
   }
 
   async function toggleRequired(val: boolean) {
-    setMustAnswer(val)
-    if (!userDocRef) return
-    try { await updateDoc(userDocRef, { chitchatsRequired: val }) } catch (e) { console.error('Failed to update chitchatsRequired:', e) }
+    setMustAnswer(val);
+    if (!userDocRef) return;
+    try {
+      await updateDoc(userDocRef, { chitchatsRequired: val });
+    } catch (e) {
+      console.error("Failed to update chitchatsRequired:", e);
+    }
   }
 
   // pre-fill from context
@@ -308,8 +315,8 @@ async function validateFace(fileUri: string) {
   // animate Mr. Mingles warning (existing)
   useEffect(() => {
     Animated.timing(rollAnim, {
-      toValue: (modalVisible || showAnimatedMM) ? 0 : 500,
-      duration: (modalVisible || showAnimatedMM) ? 1000 : 0,
+      toValue: modalVisible || showAnimatedMM ? 0 : 500,
+      duration: modalVisible || showAnimatedMM ? 1000 : 0,
       useNativeDriver: true,
     }).start();
   }, [modalVisible, showAnimatedMM]);
@@ -334,74 +341,69 @@ async function validateFace(fileUri: string) {
     // Adjust the fields to match your "complete" definition
     return Boolean(p?.name && p?.age && p?.location && p?.about && p?.photoUri);
   }
-  
 
   // OPEN ONBOARDING when routed from bar welcome (onboard=true) AND we *know* profile is incomplete
-useEffect(() => {
-  // Prefer the context flag if it’s reliable; otherwise fall back to local computed completeness
-  const effectiveComplete =
-    (typeof profileComplete === "boolean" ? profileComplete : undefined) ??
-    isProfileCompleteLocal(profile);
+  useEffect(() => {
+    // Prefer the context flag if it’s reliable; otherwise fall back to local computed completeness
+    const effectiveComplete =
+      (typeof profileComplete === "boolean" ? profileComplete : undefined) ??
+      isProfileCompleteLocal(profile);
 
-  // Do nothing until we can actually tell (avoid false “incomplete” before load)
-  if (effectiveComplete === undefined) return;
+    // Do nothing until we can actually tell (avoid false “incomplete” before load)
+    if (effectiveComplete === undefined) return;
 
-  const shouldOnboard =
-  (params.onboard === "true" || !effectiveComplete) && effectiveComplete === false;
+    const shouldOnboard =
+      (params.onboard === "true" || !effectiveComplete) &&
+      effectiveComplete === false;
 
-
-  if (shouldOnboard) {
-    setOnboardingStep(0);
-    setOnboardingVisible(true);
-  } else {
-    setOnboardingVisible(false);
-  }
-}, [params.onboard, profileComplete, profile]);
-
+    if (shouldOnboard) {
+      setOnboardingStep(0);
+      setOnboardingVisible(true);
+    } else {
+      setOnboardingVisible(false);
+    }
+  }, [params.onboard, profileComplete, profile]);
 
   // take photo
-  
-  const handleTakePhoto = async () => {
-    const status = await Camera.requestCameraPermission();
-    if (status !== "granted") {
-      Alert.alert("Camera permission needed", "Please allow camera access to take a profile photo.");
-      return;
-    }
-    setCameraVisible(true);
-  }; 
 
-  const captureAndValidate = async () => {
-    if (!cameraRef.current) return;
-    try {
-      setValidating(true);
-      const photo = await cameraRef.current.takePhoto({
-        flash: 'off',
-        enableShutterSound: true,
-        ...(Platform.OS === 'ios' ? { photoCodec: 'jpeg' } : {}),
-      });
-      
-  
-      // Normalize to file://... for both platforms
-      const uri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
+  // const handleTakePhoto = async () => {
+  //   const status = await Camera.requestCameraPermission();
+  //   if (status !== "granted") {
+  //     Alert.alert("Camera permission needed", "Please allow camera access to take a profile photo.");
+  //     return;
+  //   }
+  //   setCameraVisible(true);
+  // };
 
-      const ok = await validateFace(uri);
-  
-      if (ok) {
-        // IMPORTANT: Save the *same* uri you validated
-        setPhotoUri(uri);
-      } else {
-        setNoFaceVisible(true);
-      }
-    } catch (e) {
-      console.error(e);
-      Alert.alert("Couldn’t capture", "Please try again.");
-    } finally {
-      setValidating(false);
-      setCameraVisible(false);
-    }
-  };
-  
-  
+  // const captureAndValidate = async () => {
+  //   if (!cameraRef.current) return;
+  //   try {
+  //     setValidating(true);
+  //     const photo = await cameraRef.current.takePhoto({
+  //       flash: 'off',
+  //       enableShutterSound: true,
+  //       ...(Platform.OS === 'ios' ? { photoCodec: 'jpeg' } : {}),
+  //     });
+
+  //     // Normalize to file://... for both platforms
+  //     const uri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
+
+  //     const ok = await validateFace(uri);
+
+  //     if (ok) {
+  //       // IMPORTANT: Save the *same* uri you validated
+  //       setPhotoUri(uri);
+  //     } else {
+  //       setNoFaceVisible(true);
+  //     }
+  //   } catch (e) {
+  //     console.error(e);
+  //     Alert.alert("Couldn’t capture", "Please try again.");
+  //   } finally {
+  //     setValidating(false);
+  //     setCameraVisible(false);
+  //   }
+  // };
 
   // request location
   const handleRequestLocation = async () => {
@@ -421,9 +423,10 @@ useEffect(() => {
         );
         return;
       }
-  
+
       // 2) Permission?
-      const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
+      const { status, canAskAgain } =
+        await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
           "Permission needed",
@@ -437,23 +440,31 @@ useEffect(() => {
         );
         return;
       }
-  
+
       // 3) Get position (with timeout)
       const pos = await Promise.race([
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 12000)),
+        Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        }),
+        new Promise<never>((_, rej) =>
+          setTimeout(() => rej(new Error("timeout")), 12000)
+        ),
       ]);
-  
+
       // 4) Reverse geocode
       const geo = await Location.reverseGeocodeAsync(pos.coords);
       if (geo && geo.length > 0) {
         const { city, region, country } = geo[0];
         const cityStr = city?.trim() || region?.trim() || "";
-        const countryStr = country === "United States" ? "USA" : (country || "").trim();
+        const countryStr =
+          country === "United States" ? "USA" : (country || "").trim();
         const pretty = [cityStr, countryStr].filter(Boolean).join(", ");
         if (isMounted.current) setLocation(pretty || "");
       } else {
-        Alert.alert("Hmm…", "Couldn’t figure out your city. You can type it manually.");
+        Alert.alert(
+          "Hmm…",
+          "Couldn’t figure out your city. You can type it manually."
+        );
       }
     } catch (e: any) {
       if (e?.message === "timeout") {
@@ -466,9 +477,8 @@ useEffect(() => {
       if (isMounted.current) setLocationLoading(false);
     }
   };
-  
 
-    // submit/back handler
+  // submit/back handler
   const handleSubmit = async () => {
     if (!name || !age || !location || !about || !photoUri) {
       setModalVisible(true);
@@ -483,12 +493,11 @@ useEffect(() => {
       about === orig.about &&
       photoUri === orig.photoUri
     ) {
-      
       router.replace("/bar-2");
       return;
     }
 
-    //  snapshot BEFORE saving 
+    //  snapshot BEFORE saving
     const wasProfileComplete = !!profileComplete;
 
     setIsSaving(true);
@@ -517,42 +526,40 @@ useEffect(() => {
     }
   };
 
+  // Auto-save after first profile creation: only save if something changed
+  const saveProfileIfChanged = async () => {
+    // If we don't even have a loaded profile yet, just bail
+    if (!profile) return true;
 
-    // Auto-save after first profile creation: only save if something changed
-    const saveProfileIfChanged = async () => {
-      // If we don't even have a loaded profile yet, just bail
-      if (!profile) return true;
-  
-      const orig = profile || {};
-      const current = { name, age, location, about, photoUri };
-  
-      const changed =
-        current.name !== orig.name ||
-        current.age !== orig.age ||
-        current.location !== orig.location ||
-        current.about !== orig.about ||
-        current.photoUri !== orig.photoUri;
-  
-      if (!changed) {
-        // Nothing to do, allow navigation
-        return true;
-      }
-  
-      try {
-        setIsSaving(true);
-        await saveProfile(current);
-        // Profile is already considered "created", just keep the flag true
-        setProfileComplete(true);
-        return true;
-      } catch (e) {
-        console.error(e);
-        Alert.alert("Error", "Could not save your changes. Please try again.");
-        return false;
-      } finally {
-        setIsSaving(false);
-      }
-    };
-  
+    const orig = profile || {};
+    const current = { name, age, location, about, photoUri };
+
+    const changed =
+      current.name !== orig.name ||
+      current.age !== orig.age ||
+      current.location !== orig.location ||
+      current.about !== orig.about ||
+      current.photoUri !== orig.photoUri;
+
+    if (!changed) {
+      // Nothing to do, allow navigation
+      return true;
+    }
+
+    try {
+      setIsSaving(true);
+      await saveProfile(current);
+      // Profile is already considered "created", just keep the flag true
+      setProfileComplete(true);
+      return true;
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Could not save your changes. Please try again.");
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Helpers
   function computeAgeFromDob(dd: string, mm: string, yyyy: string) {
@@ -589,9 +596,7 @@ useEffect(() => {
         Alert.alert(
           "Sorry!",
           "Dateish is age 21 and up. Hopefully see you again when you’re older. 🙂",
-          [
-            { text: "Back", onPress: () => router.replace("/") }
-          ]
+          [{ text: "Back", onPress: () => router.replace("/") }]
         );
         return;
       }
@@ -635,7 +640,8 @@ useEffect(() => {
             {onboardingStep === 0 && "What’s your name?"}
             {onboardingStep === 1 && "What’s your Date of Birth?"}
             {onboardingStep === 2 && "Where are you from?"}
-            {onboardingStep === 3 && "Complete the rest of the stuff on your own."}
+            {onboardingStep === 3 &&
+              "Complete the rest of the stuff on your own."}
           </Text>
 
           {/* Inputs per step */}
@@ -695,54 +701,70 @@ useEffect(() => {
                 You won’t be able to change it after.
               </Text>
 
-              {dobDD && dobMM && dobYYYY && computeAgeFromDob(dobDD, dobMM, dobYYYY) < 21 && (
-                <Text style={onboardStyles.errorText}>
-                  Dateish is age 21 and up. Sorry! Hopefully see you again when you’re older. :)
-                </Text>
-              )}
+              {dobDD &&
+                dobMM &&
+                dobYYYY &&
+                computeAgeFromDob(dobDD, dobMM, dobYYYY) < 21 && (
+                  <Text style={onboardStyles.errorText}>
+                    Dateish is age 21 and up. Sorry! Hopefully see you again
+                    when you’re older. :)
+                  </Text>
+                )}
 
               {dobYYYY.length === 4 && parseInt(dobYYYY, 10) < 1945 && (
                 <Text style={onboardStyles.errorText}>
                   Are you lost? Do you need me to call your nurse?
                 </Text>
               )}
-         
             </>
           )}
 
           {onboardingStep === 2 && (
             <>
-            <TouchableOpacity
-              style={[onboardStyles.primaryButton, locationLoading && { opacity: 0.6 }]}
-              onPress={handleLocationPrompt}
-              disabled={locationLoading}
-              accessibilityLabel="Allow and fill location"
-              testID="btnFillLocation"
-            >
-              <Text style={onboardStyles.primaryButtonText}>
-                {locationLoading ? "Getting Location…" : "Allow & Fill Location"}
+              <TouchableOpacity
+                style={[
+                  onboardStyles.primaryButton,
+                  locationLoading && { opacity: 0.6 },
+                ]}
+                onPress={handleLocationPrompt}
+                disabled={locationLoading}
+                accessibilityLabel="Allow and fill location"
+                testID="btnFillLocation"
+              >
+                <Text style={onboardStyles.primaryButtonText}>
+                  {locationLoading
+                    ? "Getting Location…"
+                    : "Allow & Fill Location"}
+                </Text>
+              </TouchableOpacity>
+
+              {!!location && (
+                <View style={onboardStyles.locationPill}>
+                  <Text style={onboardStyles.locationPillText}>{location}</Text>
+                </View>
+              )}
+
+              <Text style={onboardStyles.comment}>
+                You can always change this if you move around :)
               </Text>
-            </TouchableOpacity>
-        
-            {!!location && (
-              <View style={onboardStyles.locationPill}>
-                <Text style={onboardStyles.locationPillText}>{location}</Text>
-              </View>
-            )}
-        
-            <Text style={onboardStyles.comment}>
-              You can always change this if you move around :)
-            </Text>
-          </>
+            </>
           )}
 
           {onboardingStep === 3 && (
             <>
-              <Text style={[onboardStyles.comment, { marginTop: verticalScale(8) }]}>
+              <Text
+                style={[onboardStyles.comment, { marginTop: verticalScale(8) }]}
+              >
                 I’m going out for a smoke. Come back to the bar when you finish.
               </Text>
-              <Text style={[onboardStyles.comment, { marginTop: verticalScale(8), fontStyle: "italic" }]}>
-                Tip: Tired of “Hey” and “Sup”? Check out the Chit Chats to get something worth replying to!
+              <Text
+                style={[
+                  onboardStyles.comment,
+                  { marginTop: verticalScale(8), fontStyle: "italic" },
+                ]}
+              >
+                Tip: Tired of “Hey” and “Sup”? Check out the Chit Chats to get
+                something worth replying to!
               </Text>
             </>
           )}
@@ -751,23 +773,29 @@ useEffect(() => {
         {/* Mr. Mingles image (animated only first/last) */}
         {showAnimatedMM && (
           <Animated.View
-          pointerEvents="none"
-          style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
-          // optional: accessibility clean-up so screen readers ignore the overlay:
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
-        >
-          <Image
-            source={require("../assets/images/mr-mingles.png")}
-            style={{ width: "100%", height: "100%" }}
-            resizeMode="contain"
-          />
-        </Animated.View>
+            pointerEvents="none"
+            style={[
+              modalStyles.mrMingles,
+              { transform: [{ translateX: rollAnim }] },
+            ]}
+            // optional: accessibility clean-up so screen readers ignore the overlay:
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Image
+              source={require("../assets/images/mr-mingles.png")}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="contain"
+            />
+          </Animated.View>
         )}
 
         {/* Next / OK controls */}
         <TouchableOpacity
-          style={[onboardStyles.nextButton, !nextEnabled && onboardStyles.nextButtonDisabled]}
+          style={[
+            onboardStyles.nextButton,
+            !nextEnabled && onboardStyles.nextButtonDisabled,
+          ]}
           disabled={!nextEnabled}
           onPress={handleNext}
         >
@@ -798,9 +826,11 @@ useEffect(() => {
           <TextInput
             style={editorStyles.editorInput}
             value={about}
-            onChangeText={t => {
+            onChangeText={(t) => {
               setAbout(t);
-              setDescriptionError(t.length > 50 ? "Character limit exceeded!" : "");
+              setDescriptionError(
+                t.length > 50 ? "Character limit exceeded!" : ""
+              );
             }}
             placeholder="Short and sweet... 50 characters max"
             placeholderTextColor="#999"
@@ -825,7 +855,7 @@ useEffect(() => {
 
   return (
     <View style={{ flex: 1, backgroundColor: "black" }}>
-      <View onLayout={e => setNavH(e.nativeEvent.layout.height)}>
+      <View onLayout={(e) => setNavH(e.nativeEvent.layout.height)}>
         <ProfileNavbar
           showBack={hasSavedInSession}
           onBack={async () => {
@@ -856,84 +886,86 @@ useEffect(() => {
           left: 0,
           right: 0,
           bottom: 0,
-          overflow: "hidden",         // keeps the blur neatly clipped to the stage
+          overflow: "hidden", // keeps the blur neatly clipped to the stage
           backgroundColor: "transparent",
         }}
       >
         <View style={{ flex: 1 }}>
-          
-        <Image
-          source={bathroomImg}
-          fadeDuration={0}
-          style={{
-            position: "absolute",
-            left:  imgLeft,   // 0
-            top:   imgTop,    // 0
-            width: dispW,     // stage width
-            height:dispH,     // stage height
-          }}
-          resizeMode="stretch"
-        />
+          <Image
+            source={bathroomImg}
+            fadeDuration={0}
+            style={{
+              position: "absolute",
+              left: imgLeft, // 0
+              top: imgTop, // 0
+              width: dispW, // stage width
+              height: dispH, // stage height
+            }}
+            resizeMode="stretch"
+          />
           <View
             style={[
               styles.formContainer,
               dispW > 0 && {
-                left:  imgLeft + dispW * mirrorX,
-                top:   imgTop  + dispH * mirrorY,
+                left: imgLeft + dispW * mirrorX,
+                top: imgTop + dispH * mirrorY,
                 width: dispW * mirrorW,
               },
             ]}
           >
             <TextInput
-                style={styles.input}
-                placeholder="Name"
-                placeholderTextColor="#999"
-                value={name}
-                editable={false}           
-                onChangeText={setName}
-              />
+              style={styles.input}
+              placeholder="Name"
+              placeholderTextColor="#999"
+              value={name}
+              editable={false}
+              onChangeText={setName}
+            />
 
-              <TextInput
-                style={styles.input}
-                placeholder="Age"
-                placeholderTextColor="#999"
-                value={age}
-                editable={false}           
-                onChangeText={setAge}
-                keyboardType="numeric"
-              />
+            <TextInput
+              style={styles.input}
+              placeholder="Age"
+              placeholderTextColor="#999"
+              value={age}
+              editable={false}
+              onChangeText={setAge}
+              keyboardType="numeric"
+            />
 
-              <View style={styles.locationContainer}>
-                  <View style={styles.locationInputWrap}>
-                    <TextInput
-                      style={[styles.input, locationLoading && styles.inputLoadingText]}
-                      placeholder="Location"
-                      placeholderTextColor="#999"
-                      value={location}
-                      onChangeText={setLocation}    
-                      editable={false}
-                    />
-                    {locationLoading && (
-                      <LottieView
-                        source={withoutBg}
-                        autoPlay
-                        loop
-                        style={styles.locationInlineLoader}
-                      />
-                    )}
-                  </View>
-                  <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={handleRequestLocation}
-                    disabled={locationLoading}
-                  >
-                    <Text style={styles.editButtonText}>
-                      {locationLoading ? "Getting…" : "Get Location"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+            <View style={styles.locationContainer}>
+              <View style={styles.locationInputWrap}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    locationLoading && styles.inputLoadingText,
+                  ]}
+                  placeholder="Location"
+                  placeholderTextColor="#999"
+                  value={location}
+                  onChangeText={setLocation}
+                  editable={false}
+                />
+                {locationLoading && (
+                  <LottieView
+                    source={withoutBg}
+                    autoPlay
+                    loop
+                    style={styles.locationInlineLoader}
+                  />
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={handleRequestLocation}
+                disabled={locationLoading}
+              >
+                <Text style={styles.editButtonText}>
+                  {locationLoading ? "Getting…" : "Get Location"}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-              <View style={styles.photoContainer}>
+            <View style={styles.photoContainer}>
               {photoUri ? (
                 <Image
                   source={{ uri: photoUri }}
@@ -945,75 +977,79 @@ useEffect(() => {
                   resizeMode="cover"
                 />
               ) : (
-                <MaterialIcons name="person" size={photoSize * 0.96} color="grey" />
+                <MaterialIcons
+                  name="person"
+                  size={photoSize * 0.96}
+                  color="grey"
+                />
               )}
-                <TouchableOpacity
-                  style={[styles.editButton, styles.editButtonPhoto]}
-                  onPress={handleTakePhoto}
-                >
-                  <Text style={styles.editButtonText}>Take a pic</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={[styles.editButton, styles.editButtonPhoto]}
+                onPress={handleTakePhoto}
+              >
+                <Text style={styles.editButtonText}>Take a pic</Text>
+              </TouchableOpacity>
+            </View>
 
-              <View style={styles.aboutContainer}>
-                <TouchableOpacity onPress={() => setEditingAbout(true)}>
-                  <Text style={styles.aboutText}>
-                    {about || "Write something about yourself..."}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.editButton, styles.bottomEdit]}
-                  onPress={() => setEditingAbout(true)}
-                >
-                  <Text style={styles.editButtonText}>EDIT</Text>
-                </TouchableOpacity>
-              </View>
+            <View style={styles.aboutContainer}>
+              <TouchableOpacity onPress={() => setEditingAbout(true)}>
+                <Text style={styles.aboutText}>
+                  {about || "Write something about yourself..."}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.editButton, styles.bottomEdit]}
+                onPress={() => setEditingAbout(true)}
+              >
+                <Text style={styles.editButtonText}>EDIT</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-
         </View>
-       
-          
-            
-            {/* Existing Incomplete Profile Warning Modal */}
-            <Modal transparent visible={modalVisible} animationType="slide">
-              <View style={modalStyles.modalOverlay}>
-                <TouchableOpacity
-                  style={modalStyles.closeButton}
-                  onPress={() => setModalVisible(false)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Image source={closeIcon} style={styles.closeIcon} />
-                </TouchableOpacity>
-                <View style={modalStyles.modalContainer}>
-                  <Text style={modalStyles.modalText}>{modalTypedText}</Text>
-                  <View style={modalStyles.triangleContainer}>
-                    <View style={modalStyles.outerTriangle} />
-                    <View style={modalStyles.innerTriangle} />
-                  </View>
-                  <Animated.Image
-                    source={require("../assets/images/mr-mingles.png")}
-                    style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
-                    resizeMode="contain"
-                  />
-                </View>
-              </View>
-            </Modal>
 
-            {/* NEW: Onboarding Modal (uses same visual motif) */}
-            <Modal transparent visible={onboardingVisible} animationType="fade">
-              <View style={modalStyles.modalOverlay}>
-                <TouchableOpacity
-                  style={modalStyles.closeButton}
-                  onPress={() => setOnboardingVisible(false)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Image source={closeIcon} style={styles.closeIcon} />
-                </TouchableOpacity>
-                {renderOnboardingContent()}
+        {/* Existing Incomplete Profile Warning Modal */}
+        <Modal transparent visible={modalVisible} animationType="slide">
+          <View style={modalStyles.modalOverlay}>
+            <TouchableOpacity
+              style={modalStyles.closeButton}
+              onPress={() => setModalVisible(false)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Image source={closeIcon} style={styles.closeIcon} />
+            </TouchableOpacity>
+            <View style={modalStyles.modalContainer}>
+              <Text style={modalStyles.modalText}>{modalTypedText}</Text>
+              <View style={modalStyles.triangleContainer}>
+                <View style={modalStyles.outerTriangle} />
+                <View style={modalStyles.innerTriangle} />
               </View>
-            </Modal>
-          
-          <Modal visible={cameraVisible} animationType="slide" transparent={false}>
+              <Animated.Image
+                source={require("../assets/images/mr-mingles.png")}
+                style={[
+                  modalStyles.mrMingles,
+                  { transform: [{ translateX: rollAnim }] },
+                ]}
+                resizeMode="contain"
+              />
+            </View>
+          </View>
+        </Modal>
+
+        {/* NEW: Onboarding Modal (uses same visual motif) */}
+        <Modal transparent visible={onboardingVisible} animationType="fade">
+          <View style={modalStyles.modalOverlay}>
+            <TouchableOpacity
+              style={modalStyles.closeButton}
+              onPress={() => setOnboardingVisible(false)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Image source={closeIcon} style={styles.closeIcon} />
+            </TouchableOpacity>
+            {renderOnboardingContent()}
+          </View>
+        </Modal>
+
+        {/* <Modal visible={cameraVisible} animationType="slide" transparent={false}>
               <View style={{ flex: 1, backgroundColor: "black" }}>
                 {device ? (
                   <Camera
@@ -1058,10 +1094,10 @@ useEffect(() => {
                   </TouchableOpacity>
                 </View>
               </View>
-            </Modal> 
+            </Modal>  */}
 
-            {/* No-face “Mr. Mingles” popup */}
-            <Modal transparent visible={noFaceVisible} animationType="fade">
+        {/* No-face “Mr. Mingles” popup */}
+        {/* <Modal transparent visible={noFaceVisible} animationType="fade">
               <View style={modalStyles.modalOverlay}>
                 <TouchableOpacity
                   style={modalStyles.closeButton}
@@ -1085,57 +1121,58 @@ useEffect(() => {
                   />
                 </View>
               </View>
-            </Modal>
+            </Modal> */}
 
-
-            <View style={styles.floatingHitboxes} pointerEvents="box-none">
-              {hasSavedInSession && (
-                <TouchableOpacity
-                  style={styles.hitbox}
-                  onPress={() => router.push("/settings")}
-                  pointerEvents="auto"
-                />
-              )}
-
-              <TouchableOpacity
-                style={styles.hitboxChats}
-                onPress={() => setShowChitChats(true)}
-                pointerEvents="auto"
-              />
-            </View>
-
-            <ChitChats
-              visible={showChitChats}
-              onClose={() => setShowChitChats(false)}
-              existingChats={chats}
-              onSave={handleSave}
-              onDelete={handleDelete}
-              required={mustAnswer}
-              onRequiredChange={toggleRequired}
+        <View style={styles.floatingHitboxes} pointerEvents="box-none">
+          {hasSavedInSession && (
+            <TouchableOpacity
+              style={styles.hitbox}
+              onPress={() => router.push("/settings")}
+              pointerEvents="auto"
             />
+          )}
 
-            {renderAboutEditor()}
+          <TouchableOpacity
+            style={styles.hitboxChats}
+            onPress={() => setShowChitChats(true)}
+            pointerEvents="auto"
+          />
+        </View>
 
-            {isSaving && (
-              <View style={styles.loadingOverlay}>
-                <LottieView
-                  source={withoutBg}
-                  autoPlay
-                  loop
-                  style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-                />
-              </View>
-            )}
+        <ChitChats
+          visible={showChitChats}
+          onClose={() => setShowChitChats(false)}
+          existingChats={chats}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          required={mustAnswer}
+          onRequiredChange={toggleRequired}
+        />
 
-            {!hasSavedInSession && (
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSubmit}>
-                <Text style={styles.saveBtnText}>Save Profile</Text>
-              </TouchableOpacity>
-            )}        
-  
+        {renderAboutEditor()}
+
+        {isSaving && (
+          <View style={styles.loadingOverlay}>
+            <LottieView
+              source={withoutBg}
+              autoPlay
+              loop
+              style={{
+                width: 600,
+                height: 600,
+                backgroundColor: "transparent",
+              }}
+            />
+          </View>
+        )}
+
+        {!hasSavedInSession && (
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSubmit}>
+            <Text style={styles.saveBtnText}>Save Profile</Text>
+          </TouchableOpacity>
+        )}
       </View>
-        
-      </View>
+    </View>
   );
 }
 
@@ -1148,13 +1185,13 @@ const styles = StyleSheet.create({
   formContainer: {
     position: "absolute",
     width: "90%",
-    overflow: "hidden",              
+    overflow: "hidden",
     paddingHorizontal: scale(6),
   },
   closeIcon: {
     width: 24,
     height: 24,
-    tintColor: '#F5E1C4',
+    tintColor: "#F5E1C4",
   },
   input: {
     width: "100%",
@@ -1169,7 +1206,7 @@ const styles = StyleSheet.create({
   },
   locationContainer: {
     alignItems: "center",
-    paddingBottom: verticalScale(1)
+    paddingBottom: verticalScale(1),
   },
   locationInputWrap: {
     width: "100%",
@@ -1222,25 +1259,25 @@ const styles = StyleSheet.create({
     fontFamily: FontNames.MontSerratSemiBold,
     maxWidth: "100%",
     flexShrink: 1,
-    paddingHorizontal: 8
+    paddingHorizontal: 8,
   },
   bottomEdit: {
     marginTop: verticalScale(5),
   },
   hitbox: {
-    position: 'absolute',
+    position: "absolute",
     top: "70%",
     left: "10%",
     width: 120,
     height: 120,
   },
   hitboxChats: {
-    position: 'absolute',
+    position: "absolute",
     top: "71%",
     right: "10%",
     width: 120,
     height: 80,
-   //backgroundColor: "rgba(0,255,0,0.2)"   --DEBUG COLOR
+    //backgroundColor: "rgba(0,255,0,0.2)"   --DEBUG COLOR
   },
   bottomNavbarContainer: {
     position: "absolute",
@@ -1254,7 +1291,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   inputLocked: {
-    color: "#6f6d8a",        // dimmed look
+    color: "#6f6d8a", // dimmed look
     opacity: 0.8,
   },
   saveBtn: {
@@ -1286,10 +1323,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 300,            // make sure it's above everything else
+    zIndex: 300, // make sure it's above everything else
   },
-
-  
 });
 
 const editorStyles = StyleSheet.create({
@@ -1356,7 +1391,7 @@ const modalStyles = StyleSheet.create({
     top: verticalScale(40),
     right: scale(20),
     zIndex: 100,
-    width: scale(40),          
+    width: scale(40),
     height: scale(40),
     justifyContent: "center",
     alignItems: "center",
@@ -1377,8 +1412,8 @@ const modalStyles = StyleSheet.create({
     padding: verticalScale(20),
     alignItems: "center",
     position: "relative",
-    overflow: "visible",      // <- allow MM to hang out of the box
-    marginBottom: "55%"
+    overflow: "visible", // <- allow MM to hang out of the box
+    marginBottom: "55%",
   },
   modalText: {
     color: "#eceded",
@@ -1421,7 +1456,7 @@ const modalStyles = StyleSheet.create({
     borderTopColor: "#020621",
   },
   mrMingles: {
-    width: scale(380),        
+    width: scale(380),
     height: scale(460),
     position: "absolute",
     bottom: -verticalScale(350),
