@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "dateish-4edf2"
-  }
+    "default": "dateish-4edf2",
+    "dateish": "dateish-4edf2"
+  },
+  "targets": {},
+  "etags": {}
 }

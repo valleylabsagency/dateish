@@ -67,15 +67,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     currentChatIdRef.current = currentChatId;
   }, [currentChatId]);
 
-  useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
-      const data = resp.notification.request.content.data as any;
-      // e.g., if you send { chatId, partnerId } in data:
-      // router.push(`/chat?partner=${data.partnerId}`);
-    });
-    return () => sub.remove();
-  }, []);
-
   // 1️⃣ Register for push and save token
   useEffect(() => {
     (async () => {

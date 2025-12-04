@@ -321,8 +321,8 @@ useEffect(() => {
                           <ProfileProvider>
                             <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
                               <View style={styles.container}>
-                                <NotificationDisplay />
                                 <OfflineNotice />
+                                <PushNavBridge />
                                 {!hideNavbar && <Navbar />}
                                 <Stack
                                   detachInactiveScreens={false}
@@ -338,6 +338,7 @@ useEffect(() => {
                                     gestureEnabled: true,
                                   }}
                                 />
+                                 <NotificationDisplay />
                                 <StatusBar hidden />
                               </View>
                             </NavbarContext.Provider>
