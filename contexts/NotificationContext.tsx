@@ -68,27 +68,38 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [currentChatId]);
 
   // 1️⃣ Register for push and save token
-  useEffect(() => {
-    (async () => {
+useEffect(() => {
+  let unsubAuth: (() => void) | null = null;
+
+  (async () => {
+    try {
+      console.log("[Push] registration effect start. isDevice =", Constants.isDevice);
+
+      // You can keep this check if you want, but log it
       if (!Constants.isDevice) {
-        console.warn("Must use physical device for push notifications");
+        console.warn("[Push] Not a physical device – token registration skipped");
         return;
       }
-  
-      // Ask permissions
+
+      // Ask / check permissions
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      console.log("[Push] existing permission status =", existingStatus);
+
       let finalStatus = existingStatus;
       if (existingStatus !== "granted") {
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
+        console.log("[Push] requestPermissionsAsync returned =", status);
       }
+
       if (finalStatus !== "granted") {
-        console.warn("Push notification permission not granted!");
+        console.warn("[Push] Push notification permission not granted!");
         return;
       }
-  
-      // Android channel (ties to your bundled wav)
+
+      // Android channel
       if (Platform.OS === "android") {
+        console.log("[Push] setting Android notification channel");
         await Notifications.setNotificationChannelAsync("default", {
           name: "default",
           importance: Notifications.AndroidImportance.MAX,
@@ -97,31 +108,42 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         });
       }
-  
-      // The critical bit: pass a stable projectId
-      const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync({
-        projectId: PROJECT_ID,
-      });
-      console.log("Expo push token:", expoPushToken);
-  
-      // You may get here before login; store and write once user exists
+
+      // Get Expo token
+      console.log("[Push] calling getExpoPushTokenAsync with projectId =", PROJECT_ID);
+      const tokenResponse = await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID });
+      const expoPushToken = tokenResponse.data;
+      console.log("[Push] got Expo push token:", expoPushToken);
+
+      // Write for current user if already logged in
       if (auth.currentUser) {
+        console.log("[Push] writing token for currentUser uid =", auth.currentUser.uid);
         await setDoc(
           doc(firestore, "users", auth.currentUser.uid),
           { expoPushToken },
           { merge: true }
         );
+        console.log("[Push] token written for currentUser");
       }
-  
+
       // Also update token when auth state changes
-      const unsub = auth.onAuthStateChanged(async (u) => {
+      unsubAuth = auth.onAuthStateChanged(async (u) => {
         if (u) {
+          console.log("[Push] auth state changed – writing token for uid =", u.uid);
           await setDoc(doc(firestore, "users", u.uid), { expoPushToken }, { merge: true });
+          console.log("[Push] token written after auth state change");
         }
       });
-      return () => unsub();
-    })();
-  }, []);
+    } catch (err) {
+      console.error("[Push] Error during registration:", err);
+    }
+  })();
+
+  return () => {
+    if (unsubAuth) unsubAuth();
+  };
+}, []);
+
 
   // keep refs for filtering
   const uidRef = useRef<string | null>(null);

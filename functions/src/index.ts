@@ -117,6 +117,7 @@ async function sendPush(
     title,
     body,
     data,
+    channelId: "default",
   }));
   for (let i = 0; i < messages.length; i += 100) {
     const chunk = messages.slice(i, i + 100);
@@ -213,6 +214,7 @@ export const pushOnNewMessage = onDocumentCreated(
         senderName: msg.senderName || "",
       },
       priority: "high",
+      channelId: "default",
     }));
 
     const res = await fetch("https://exp.host/--/api/v2/push/send", {
