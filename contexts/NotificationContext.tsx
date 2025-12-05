@@ -66,20 +66,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     currentChatIdRef.current = currentChatId;
   }, [currentChatId]);
+  
 
-  // 1️⃣ Register for push and save token
+// 1️⃣ Register for push and save token
 useEffect(() => {
   let unsubAuth: (() => void) | null = null;
 
   (async () => {
     try {
-      console.log("[Push] registration effect start. isDevice =", Constants.isDevice);
-
-      // You can keep this check if you want, but log it
-      if (!Constants.isDevice) {
-        console.warn("[Push] Not a physical device – token registration skipped");
-        return;
-      }
+      console.log("[Push] registration effect start");
 
       // Ask / check permissions
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -145,6 +140,7 @@ useEffect(() => {
 }, []);
 
 
+
   // keep refs for filtering
   const uidRef = useRef<string | null>(null);
   const startTimeRef = useRef<number>(Date.now());
@@ -156,12 +152,14 @@ useEffect(() => {
   };
 
   const showNotification = (msg: string, pid: string, name: string) => {
-    setVisible(false);
-    setMessage(msg);
-    setPartnerId(pid);
-    setSenderName(name);
-    setTimeout(() => setVisible(true), 50);
-  };
+  console.log("[Notif] showNotification called with:", { msg, pid, name });
+  setVisible(false);
+  setMessage(msg);
+  setPartnerId(pid);
+  setSenderName(name);
+  setTimeout(() => setVisible(true), 50);
+};
+
 
   // 2️⃣ Listen for incoming push responses (foreground behavior)
   useEffect(() => {
@@ -173,70 +171,129 @@ useEffect(() => {
     return () => receivedSub.remove();
   }, []);
 
-  // 3️⃣ Existing Firestore message‐watching logic triggers local in‐app banners
-  useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged(user => {
-      if (!user) return;
-      uidRef.current = user.uid;
-      startTimeRef.current = Date.now();
+ // 3️⃣ Existing Firestore message‐watching logic triggers local in‐app banners
+// 3️⃣ Firestore message‐watching logic triggers local in‐app banners
+useEffect(() => {
+ 
+  const unsubscribeAuth = auth.onAuthStateChanged(user => {
+    
+    if (!user) return;
 
-      const chatsQ = query(
-        collection(firestore, 'chats'),
-        where('users', 'array-contains', user.uid),
-        where('visibleFor', 'array-contains', user.uid), 
-        orderBy('updatedAt', 'desc')                     
-      );
+    uidRef.current = user.uid;
+    startTimeRef.current = Date.now();
 
-      const unsubChats = onSnapshot(chatsQ, snapshot => {
+    const chatsQ = query(
+      collection(firestore, "chats"),
+      where("users", "array-contains", user.uid),
+      orderBy("updatedAt", "desc")
+    );
+
+   
+
+    const unsubChats = onSnapshot(
+      chatsQ,
+      snapshot => {
+       
+
+        // clear old message listeners
         msgUnsubs.current.forEach(unsub => unsub());
         msgUnsubs.current = [];
 
         snapshot.forEach(chatDoc => {
-          const chat = chatDoc.data() as any;
-          if (!Array.isArray(chat.visibleFor) || !chat.visibleFor.includes(user.uid)) return; // extra safety
           const chatId = chatDoc.id;
+          const chat = chatDoc.data() as any;
+         
+
+          if (!Array.isArray(chat.visibleFor) || !chat.visibleFor.includes(user.uid)) {
+            console.log("[Notif] skipping chat", chatId, "not visibleFor user");
+            return;
+          }
+
           const msgsQ = query(
-            collection(firestore, 'chats', chatId, 'messages'),
-            orderBy('createdAt', 'desc'),
+            collection(firestore, "chats", chatId, "messages"),
+            orderBy("createdAt", "desc"),
             limit(1)
           );
 
-          const unsubMsg = onSnapshot(msgsQ, msgSnap => {
-            if (msgSnap.empty) return;
-            const doc0 = msgSnap.docs[0];
-            const data0 = doc0.data() as any;
-            if (!data0.createdAt || !data0.sender) return;
-            const ts =
-              typeof data0.createdAt.toMillis === 'function'
-                ? data0.createdAt.toMillis()
-                : data0.createdAt.seconds * 1000;
+          console.log("[Notif] subscribing to latest message in chat", chatId);
 
-            if (
-              ts > startTimeRef.current &&
-              data0.sender !== uidRef.current &&
-              currentChatIdRef.current !== chatId &&
-              lastNotifiedRef.current[chatId] !== doc0.id
-            ) {
-              getDoc(doc(firestore, 'users', data0.sender)).then(u => {
-                const realName = u.exists() ? (u.data() as any).name : 'Unknown';
-                showNotification(data0.text, data0.sender, realName);
-                lastNotifiedRef.current[chatId] = doc0.id;
-              });
+          const unsubMsg = onSnapshot(
+            msgsQ,
+            msgSnap => {
+              console.log(
+                "[Notif] messages snapshot for chat",
+                chatId,
+                "size =",
+                msgSnap.size
+              );
+              if (msgSnap.empty) return;
+
+              const doc0 = msgSnap.docs[0];
+              const data0 = doc0.data() as any;
+              console.log("[Notif] latest message in chat", chatId, data0);
+
+              if (!data0.createdAt || !data0.sender) {
+                console.log("[Notif] message missing createdAt or sender, skipping");
+                return;
+              }
+
+              const ts =
+                typeof data0.createdAt.toMillis === "function"
+                  ? data0.createdAt.toMillis()
+                  : data0.createdAt.seconds * 1000;
+
+              if (
+                ts > startTimeRef.current &&
+                data0.sender !== uidRef.current &&
+                currentChatIdRef.current !== chatId &&
+                lastNotifiedRef.current[chatId] !== doc0.id
+              ) {
+                console.log("[Notif] conditions met, fetching sender name for", data0.sender);
+                getDoc(doc(firestore, "users", data0.sender)).then(u => {
+                  const realName = u.exists() ? (u.data() as any).name : "Unknown";
+                  console.log("[Notif] triggering showNotification for chat", chatId, "from", realName);
+                  showNotification(data0.text, data0.sender, realName);
+                  lastNotifiedRef.current[chatId] = doc0.id;
+                });
+              } else {
+                console.log("[Notif] conditions NOT met for notification in chat", chatId, {
+                  ts,
+                  startTime: startTimeRef.current,
+                  sender: data0.sender,
+                  currentUser: uidRef.current,
+                  currentChatId: currentChatIdRef.current,
+                  lastNotified: lastNotifiedRef.current[chatId],
+                  docId: doc0.id,
+                });
+              }
+            },
+            err => {
+              console.error("[Notif] msgs onSnapshot error for chat", chatId, err);
             }
-          });
+          );
 
           msgUnsubs.current.push(unsubMsg);
         });
-      });
+      },
+      err => {
+        console.error("[Notif] chats onSnapshot error:", err);
+      }
+    );
 
-      return () => {
-        unsubChats();
-        msgUnsubs.current.forEach(unsub => unsub());
-      };
-    });
+    return () => {
+      console.log("[Notif] cleaning up chats listener");
+      unsubChats();
+      msgUnsubs.current.forEach(unsub => unsub());
+    };
+  });
 
-    return () => unsubscribeAuth();
-  }, []);
+  return () => {
+    console.log("[Notif] cleaning up auth listener");
+    unsubscribeAuth();
+  };
+}, []);
+
+
 
   return (
     <NotificationContext.Provider
