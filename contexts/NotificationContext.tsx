@@ -68,6 +68,116 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [currentChatId]);
   
 
+  // 1️⃣ Register for push and save token
+useEffect(() => {
+  let unsubAuth: (() => void) | null = null;
+
+  (async () => {
+    try {
+      console.log("[Push] registration effect start. isDevice =", Constants.isDevice);
+
+      // You can keep this check if you want, but log it
+      if (!Constants.isDevice) {
+        console.warn("[Push] Not a physical device – token registration skipped");
+        return;
+      }
+
+      // Ask / check permissions
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      console.log("[Push] existing permission status =", existingStatus);
+
+      let finalStatus = existingStatus;
+      if (existingStatus !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+        console.log("[Push] requestPermissionsAsync returned =", status);
+      }
+
+      if (finalStatus !== "granted") {
+        console.warn("[Push] Push notification permission not granted!");
+        return;
+      }
+
+      // Android channel
+      if (Platform.OS === "android") {
+        console.log("[Push] setting Android notification channel");
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "default",
+          importance: Notifications.AndroidImportance.MAX,
+          sound: "push_notif.wav",
+          vibrationPattern: [0, 250, 250, 250],
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        });
+      }
+
+      // Get Expo token
+      console.log("[Push] calling getExpoPushTokenAsync with projectId =", PROJECT_ID);
+      const tokenResponse = await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID });
+      const expoPushToken = tokenResponse.data;
+      console.log("[Push] got Expo push token:", expoPushToken);
+
+      // Write for current user if already logged in
+      if (auth.currentUser) {
+        console.log("[Push] writing token for currentUser uid =", auth.currentUser.uid);
+        await setDoc(
+          doc(firestore, "users", auth.currentUser.uid),
+          { expoPushToken },
+          { merge: true }
+        );
+        console.log("[Push] token written for currentUser");
+      }
+
+      // Also update token when auth state changes
+      unsubAuth = auth.onAuthStateChanged(async (u) => {
+        if (u) {
+          console.log("[Push] auth state changed – writing token for uid =", u.uid);
+          await setDoc(doc(firestore, "users", u.uid), { expoPushToken }, { merge: true });
+          console.log("[Push] token written after auth state change");
+        }
+      });
+    } catch (err) {
+      console.error("[Push] Error during registration:", err);
+    }
+  })();
+
+  return () => {
+    if (unsubAuth) unsubAuth();
+  };
+}, []);
+
+
+  // keep refs for filtering
+  const uidRef = useRef<string | null>(null);
+  const startTimeRef = useRef<number>(Date.now());
+  const lastNotifiedRef = useRef<{ [chat: string]: string }>({});
+  const msgUnsubs = useRef<(() => void)[]>([]);
+
+  const hideNotification = () => {
+    setVisible(false);
+  };
+
+  const showNotification = (msg: string, pid: string, name: string) => {
+  console.log("[Notif] showNotification called with:", { msg, pid, name });
+  setVisible(false);
+  setMessage(msg);
+  setPartnerId(pid);
+  setSenderName(name);
+  setTimeout(() => setVisible(true), 50);
+};
+
+
+  // 2️⃣ Listen for incoming push responses (foreground behavior)
+  useEffect(() => {
+    const receivedSub = Notifications.addNotificationReceivedListener(notification => {
+      // You could also inspect notification.request.content.data here
+      const { body, data } = notification.request.content;
+      showNotification(body || '', data.partnerId || '', data.senderName || '');
+    });
+    return () => receivedSub.remove();
+  }, []);
+
+ // 3️⃣ Existing Firestore message‐watching logic triggers local in‐app banners
+// 3️⃣ Firestore message‐watching logic triggers local in‐app banners
 // 1️⃣ Register for push and save token
 useEffect(() => {
   let unsubAuth: (() => void) | null = null;
@@ -140,158 +250,6 @@ useEffect(() => {
 }, []);
 
 
-
-  // keep refs for filtering
-  const uidRef = useRef<string | null>(null);
-  const startTimeRef = useRef<number>(Date.now());
-  const lastNotifiedRef = useRef<{ [chat: string]: string }>({});
-  const msgUnsubs = useRef<(() => void)[]>([]);
-
-  const hideNotification = () => {
-    setVisible(false);
-  };
-
-  const showNotification = (msg: string, pid: string, name: string) => {
-  console.log("[Notif] showNotification called with:", { msg, pid, name });
-  setVisible(false);
-  setMessage(msg);
-  setPartnerId(pid);
-  setSenderName(name);
-  setTimeout(() => setVisible(true), 50);
-};
-
-
-  // 2️⃣ Listen for incoming push responses (foreground behavior)
-  useEffect(() => {
-    const receivedSub = Notifications.addNotificationReceivedListener(notification => {
-      // You could also inspect notification.request.content.data here
-      const { body, data } = notification.request.content;
-      showNotification(body || '', data.partnerId || '', data.senderName || '');
-    });
-    return () => receivedSub.remove();
-  }, []);
-
- // 3️⃣ Existing Firestore message‐watching logic triggers local in‐app banners
-// 3️⃣ Firestore message‐watching logic triggers local in‐app banners
-useEffect(() => {
- 
-  const unsubscribeAuth = auth.onAuthStateChanged(user => {
-    
-    if (!user) return;
-
-    uidRef.current = user.uid;
-    startTimeRef.current = Date.now();
-
-    const chatsQ = query(
-      collection(firestore, "chats"),
-      where("users", "array-contains", user.uid),
-      orderBy("updatedAt", "desc")
-    );
-
-   
-
-    const unsubChats = onSnapshot(
-      chatsQ,
-      snapshot => {
-       
-
-        // clear old message listeners
-        msgUnsubs.current.forEach(unsub => unsub());
-        msgUnsubs.current = [];
-
-        snapshot.forEach(chatDoc => {
-          const chatId = chatDoc.id;
-          const chat = chatDoc.data() as any;
-         
-
-          if (!Array.isArray(chat.visibleFor) || !chat.visibleFor.includes(user.uid)) {
-            console.log("[Notif] skipping chat", chatId, "not visibleFor user");
-            return;
-          }
-
-          const msgsQ = query(
-            collection(firestore, "chats", chatId, "messages"),
-            orderBy("createdAt", "desc"),
-            limit(1)
-          );
-
-          console.log("[Notif] subscribing to latest message in chat", chatId);
-
-          const unsubMsg = onSnapshot(
-            msgsQ,
-            msgSnap => {
-              console.log(
-                "[Notif] messages snapshot for chat",
-                chatId,
-                "size =",
-                msgSnap.size
-              );
-              if (msgSnap.empty) return;
-
-              const doc0 = msgSnap.docs[0];
-              const data0 = doc0.data() as any;
-              console.log("[Notif] latest message in chat", chatId, data0);
-
-              if (!data0.createdAt || !data0.sender) {
-                console.log("[Notif] message missing createdAt or sender, skipping");
-                return;
-              }
-
-              const ts =
-                typeof data0.createdAt.toMillis === "function"
-                  ? data0.createdAt.toMillis()
-                  : data0.createdAt.seconds * 1000;
-
-              if (
-                ts > startTimeRef.current &&
-                data0.sender !== uidRef.current &&
-                currentChatIdRef.current !== chatId &&
-                lastNotifiedRef.current[chatId] !== doc0.id
-              ) {
-                console.log("[Notif] conditions met, fetching sender name for", data0.sender);
-                getDoc(doc(firestore, "users", data0.sender)).then(u => {
-                  const realName = u.exists() ? (u.data() as any).name : "Unknown";
-                  console.log("[Notif] triggering showNotification for chat", chatId, "from", realName);
-                  showNotification(data0.text, data0.sender, realName);
-                  lastNotifiedRef.current[chatId] = doc0.id;
-                });
-              } else {
-                console.log("[Notif] conditions NOT met for notification in chat", chatId, {
-                  ts,
-                  startTime: startTimeRef.current,
-                  sender: data0.sender,
-                  currentUser: uidRef.current,
-                  currentChatId: currentChatIdRef.current,
-                  lastNotified: lastNotifiedRef.current[chatId],
-                  docId: doc0.id,
-                });
-              }
-            },
-            err => {
-              console.error("[Notif] msgs onSnapshot error for chat", chatId, err);
-            }
-          );
-
-          msgUnsubs.current.push(unsubMsg);
-        });
-      },
-      err => {
-        console.error("[Notif] chats onSnapshot error:", err);
-      }
-    );
-
-    return () => {
-      console.log("[Notif] cleaning up chats listener");
-      unsubChats();
-      msgUnsubs.current.forEach(unsub => unsub());
-    };
-  });
-
-  return () => {
-    console.log("[Notif] cleaning up auth listener");
-    unsubscribeAuth();
-  };
-}, []);
 
 
 
