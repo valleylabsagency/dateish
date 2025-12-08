@@ -53,12 +53,15 @@ import {
 
 import BoardStage from "./BoardStage";
 import BossFX from "./BossFX";
+import DebugOverlay from "./DebugOverlay";
 
 const CUTSCENE = require("./assets/DartsVid.mp4");
 const HAND_L3 = require("./assets/alienHand.png");
 const HAND_L3_TOP = require("./assets/alienHandTop.png");
 
 const L3_HAND_OFFSET = { x: -20, y: -60 }; // tweak freely
+
+const SHOW_DEBUG = true; // ← Change to true to show debug overlay
 
 /* ================================ SHARED ================================ */
 type DartRef = {
@@ -1037,6 +1040,44 @@ function GameSession({
             <Text style={styles.skipBossText}>Skip to Boss</Text>
           </Pressable>
         )} */}
+
+        {SHOW_DEBUG && (
+          <DebugOverlay
+            showGrid={true}
+            showCellCenters={true}
+            showLastCell={true}
+            showLabels={true}
+            showRings={true}
+            showSpokes={true}
+            highlightSector={true}
+            showImpact={true}
+            GRID_W={T.GRID_W}
+            GRID_H={T.GRID_H}
+            getTargetRect={() => ({
+              left: BOARD_CENTER.x - BOARD_RADIUS,
+              top: BOARD_CENTER.y - BOARD_RADIUS,
+              right: BOARD_CENTER.x + BOARD_RADIUS,
+              bottom: BOARD_CENTER.y + BOARD_RADIUS,
+              width: BOARD_RADIUS * 2,
+              height: BOARD_RADIUS * 2,
+            })}
+            lastCell={lastCell.current}
+            getScoringCenter={() => BOARD_CENTER}
+            BOARD_RADIUS={BOARD_RADIUS}
+            ringRadii={{
+              innerBull: 0.05,
+              outerBull: 0.1,
+              tripleInner: 0.5,
+              tripleOuter: 0.55,
+              doubleInner: 0.9,
+              doubleOuter: 0.95,
+            }}
+            lastInfo={lastInfo.current}
+            lastScore={lastScore}
+            lastRing={lastRing}
+            lastSector={lastSector}
+          />
+        )}
 
         <Animated.View
           pointerEvents="none"

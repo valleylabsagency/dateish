@@ -64,15 +64,18 @@ const mirrorRow = (left: string) => {
   return n + n.split("").reverse().join("");
 };
 
+const DESIGN_WIDTH = 360; // S24 logical width you logged
+const DESIGN_HEIGHT = 703; // S24 logical height you logged
+
 const UI_CONFIG = { MAZE_Y_OFFSET: -68 };
 
 /* ==== global background size/position controls ==== */
-const BG_SCALE = 1.19; // 1 = fit; >1 bigger
+const BG_SCALE = 1.28; // 1 = fit; >1 bigger
 const BG_SHIFT_X = 0; // px
-const BG_SHIFT_Y = 40; // px
+const BG_SHIFT_Y = 48; // px
 
 /* ==== global game size/position controls ==== */
-const GAME_SCALE = 0.9; // 1 = fit screen; <1 smaller; >1 larger (may crop)
+const GAME_SCALE = 0.85; // 1 = fit screen; <1 smaller; >1 larger (may crop)
 const GAME_SHIFT_X = 0; // px shift after centering
 const GAME_SHIFT_Y = 30; // px shift after centering
 
@@ -144,7 +147,14 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   const FULL = useMemo(() => LEFT_HALF_ROWS_RAW.map(mirrorRow), []);
   const rows = FULL.length;
   const cols = FULL.reduce((m, r) => Math.max(m, r.length), 0);
-  const { width, height } = Dimensions.get("window");
+
+  // We still know the real device, but we don't use it for layout,
+  // only for the outer background / centering if you ever want it.
+  const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+
+  // === use the fixed S24 design size for all layout numbers ===
+  const width = DESIGN_WIDTH;
+  const height = DESIGN_HEIGHT;
 
   const BASE_MARGIN = 16;
   const BASE_CELL = Math.max(
@@ -155,7 +165,6 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
     )
   );
 
-  // === scaled game sizing ===
   const CELL_BASE = Math.min(width / cols, height / rows);
   const CELL = CELL_BASE * GAME_SCALE; // scale the whole game
   const STAGE_W = cols * CELL;
@@ -164,7 +173,7 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   const PADY = (height - STAGE_H) / 2 + GAME_SHIFT_Y;
 
   // Inventory thumbs
-  const INV_ITEM_SIZE = Math.max(24, CELL * 0.9) * 1.7;
+  const INV_ITEM_SIZE = Math.max(24, CELL * 0.9) * 1.5;
   const INV_GAP = Math.max(4, CELL * 0.15) - 10;
   const INV_X0 = PADX + 8;
   const INV_Y_BASE = Math.max(
@@ -345,9 +354,7 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   const LYD_COLLISION_R = LYD_SIZE * 0.35;
   const WALK_FPS = 7,
     WALK_PERIOD = 1 / WALK_FPS;
-  const lydStand = useImage(
-    require("./lyd/LITTLE_YELLOW_GUY_STAND.png")
-  );
+  const lydStand = useImage(require("./lyd/LITTLE_YELLOW_GUY_STAND.png"));
   const lydWalk = useImage(require("./lyd/LITTLE_YELLOW_GUY_WALK.png"));
   const curFrameRef = useRef<"stand" | "walk">("stand");
   const walkAccRef = useRef(0);
@@ -994,7 +1001,7 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   /* ===================== RENDER ===================== */
   return (
     <View style={styles.screen}>
-      {/* Scalable background */}
+      {/* Full-screen background stays device-sized */}
       <View style={styles.bgWrap} pointerEvents="none">
         <Image
           source={require("./lyd/BACKGROUND.png")}
@@ -1014,292 +1021,301 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
 
       <StatusBar hidden />
 
-      {/* Big centered timer */}
-      <View style={styles.timerHud}>
-        <Text style={styles.timerText}> {formatTime(elapsed)}</Text>
-      </View>
-
-      {/* Intro overlay: Ready? / Go! */}
-      {(phase === "ready" || phase === "go") && (
-        <View style={styles.introWrap}>
-          <Text style={phase === "ready" ? styles.readyText : styles.goText}>
-            {phase === "ready" ? "Ready?" : "Go!"}
-          </Text>
+      {/* This is your virtual S24 screen.
+         On S24: fits perfectly.
+         On smaller screens: cropped.
+         On larger screens: same size box in the middle (because of screen style). */}
+      <View style={{ width: DESIGN_WIDTH, height: DESIGN_HEIGHT }}>
+        {/* Big centered timer */}
+        <View style={styles.timerHud}>
+          <Text style={styles.timerText}> {formatTime(elapsed)}</Text>
         </View>
-      )}
 
-      {/* Canvas */}
-      <Canvas style={{ width, height }}>
-        {/* Inventory */}
-        {Array.from({ length: collectedCount }).map((_, i) => {
-          const img = itemImages[i];
-          if (!img) return null;
-          const x = INV_X0 + i * (INV_ITEM_SIZE + INV_GAP);
-          return (
-            <SkiaImage
-              key={`inv-${i}`}
-              image={img}
-              x={x}
-              y={INV_Y_BASE}
-              width={INV_ITEM_SIZE}
-              height={INV_ITEM_SIZE}
-            />
-          );
-        })}
+        {/* Intro overlay: Ready? / Go! */}
+        {(phase === "ready" || phase === "go") && (
+          <View style={styles.introWrap}>
+            <Text style={phase === "ready" ? styles.readyText : styles.goText}>
+              {phase === "ready" ? "Ready?" : "Go!"}
+            </Text>
+          </View>
+        )}
 
-        {/* Stage */}
-        <Group
-          transform={[
-            { translateX: PADX },
-            { translateY: PADY + UI_CONFIG.MAZE_Y_OFFSET },
-          ]}
-        >
-          <Rect x={0} y={0} width={STAGE_W} height={STAGE_H} color="#000" />
-
-          {/* Walls */}
-          <Group>
-            {wallPaths.map((p, i) => (
-              <Path
-                key={`fill-${i}-${tick}`}
-                path={p}
-                style="fill"
-                color={WALL_FILL}
+        {/* Canvas locked to design size */}
+        <Canvas style={{ width, height }}>
+          {/* Inventory */}
+          {Array.from({ length: collectedCount }).map((_, i) => {
+            const img = itemImages[i];
+            if (!img) return null;
+            const x = INV_X0 + i * (INV_ITEM_SIZE + INV_GAP);
+            return (
+              <SkiaImage
+                key={`inv-${i}`}
+                image={img}
+                x={x}
+                y={INV_Y_BASE}
+                width={INV_ITEM_SIZE}
+                height={INV_ITEM_SIZE}
               />
-            ))}
-          </Group>
-          <Group>
-            <BlurMask blur={OUTER_BLUR} style="outer" />
-            {wallPaths.map((p, i) => (
-              <Path
-                key={`o-${i}-${tick}`}
-                path={p}
-                color={OUTER_COLOR}
-                style="stroke"
-                strokeWidth={OUTER_W}
-                strokeJoin="round"
-                strokeCap="round"
-              >
-                <CornerPathEffect r={CORNER_R} />
-              </Path>
-            ))}
-          </Group>
-          <Group>
-            <BlurMask blur={MID_BLUR} style="outer" />
-            {wallPaths.map((p, i) => (
-              <Path
-                key={`m-${i}-${tick}`}
-                path={p}
-                color={MID_COLOR}
-                style="stroke"
-                strokeWidth={MID_W}
-                strokeJoin="round"
-                strokeCap="round"
-              >
-                <CornerPathEffect r={CORNER_R} />
-              </Path>
-            ))}
-          </Group>
-          <Group>
-            {wallPaths.map((p, i) => (
-              <Path
-                key={`c-${i}-${tick}`}
-                path={p}
-                color={CORE_COLOR}
-                style="stroke"
-                strokeWidth={Math.max(0.5, CELL * 0.04)}
-                strokeJoin="round"
-                strokeCap="round"
-              >
-                <CornerPathEffect r={CORNER_R} />
-              </Path>
-            ))}
-          </Group>
+            );
+          })}
 
-          {/* Portals */}
-          <Group>
-            {PORTALS.map((pair, idx) => (
-              <React.Fragment key={`portalpair-${idx}`}>
-                {[pair.a, pair.b].map((e, ei) => (
-                  <Circle
-                    key={`portal-${idx}-${ei}`}
-                    cx={e.c * CELL + CELL / 2}
-                    cy={e.r * CELL + CELL / 2}
-                    r={CELL * 0.3}
-                    color={e.color}
-                  />
-                ))}
-              </React.Fragment>
-            ))}
-          </Group>
+          {/* Stage */}
+          <Group
+            transform={[
+              { translateX: PADX },
+              { translateY: PADY + UI_CONFIG.MAZE_Y_OFFSET },
+            ]}
+          >
+            {/* ... everything inside the stage exactly as you had it ... */}
+            {/* Rect, walls, portals, items, enemies, LYD, knife, etc */}
 
-          {/* Quest item */}
-          {itemPos && currentItemImage && (
-            <SkiaImage
-              image={currentItemImage}
-              x={itemPos.c * CELL + CELL / 2 - itemPixelSize(curItem) / 2}
-              y={itemPos.r * CELL + CELL / 2 - itemPixelSize(curItem) / 2}
-              width={itemPixelSize(curItem)}
-              height={itemPixelSize(curItem)}
-            />
-          )}
+            <Rect x={0} y={0} width={STAGE_W} height={STAGE_H} color="#000" />
 
-          {/* Knife pickups */}
-          {KNIFE_IMG &&
-            KNIFE_SPAWNS.map((k, idx) =>
-              knifePickups[idx] ? (
-                <SkiaImage
-                  key={`knife-pickup-${idx}`}
-                  image={KNIFE_IMG}
-                  x={k.c * CELL + CELL / 2 - KNIFE_SIZE / 2}
-                  y={k.r * CELL + CELL / 2 - KNIFE_SIZE / 2}
-                  width={KNIFE_SIZE}
-                  height={KNIFE_SIZE}
+            {/* Walls */}
+            <Group>
+              {wallPaths.map((p, i) => (
+                <Path
+                  key={`fill-${i}-${tick}`}
+                  path={p}
+                  style="fill"
+                  color={WALL_FILL}
                 />
-              ) : null
+              ))}
+            </Group>
+            <Group>
+              <BlurMask blur={OUTER_BLUR} style="outer" />
+              {wallPaths.map((p, i) => (
+                <Path
+                  key={`o-${i}-${tick}`}
+                  path={p}
+                  color={OUTER_COLOR}
+                  style="stroke"
+                  strokeWidth={OUTER_W}
+                  strokeJoin="round"
+                  strokeCap="round"
+                >
+                  <CornerPathEffect r={CORNER_R} />
+                </Path>
+              ))}
+            </Group>
+            <Group>
+              <BlurMask blur={MID_BLUR} style="outer" />
+              {wallPaths.map((p, i) => (
+                <Path
+                  key={`m-${i}-${tick}`}
+                  path={p}
+                  color={MID_COLOR}
+                  style="stroke"
+                  strokeWidth={MID_W}
+                  strokeJoin="round"
+                  strokeCap="round"
+                >
+                  <CornerPathEffect r={CORNER_R} />
+                </Path>
+              ))}
+            </Group>
+            <Group>
+              {wallPaths.map((p, i) => (
+                <Path
+                  key={`c-${i}-${tick}`}
+                  path={p}
+                  color={CORE_COLOR}
+                  style="stroke"
+                  strokeWidth={Math.max(0.5, CELL * 0.04)}
+                  strokeJoin="round"
+                  strokeCap="round"
+                >
+                  <CornerPathEffect r={CORNER_R} />
+                </Path>
+              ))}
+            </Group>
+
+            {/* Portals */}
+            <Group>
+              {PORTALS.map((pair, idx) => (
+                <React.Fragment key={`portalpair-${idx}`}>
+                  {[pair.a, pair.b].map((e, ei) => (
+                    <Circle
+                      key={`portal-${idx}-${ei}`}
+                      cx={e.c * CELL + CELL / 2}
+                      cy={e.r * CELL + CELL / 2}
+                      r={CELL * 0.3}
+                      color={e.color}
+                    />
+                  ))}
+                </React.Fragment>
+              ))}
+            </Group>
+
+            {/* Quest item */}
+            {itemPos && currentItemImage && (
+              <SkiaImage
+                image={currentItemImage}
+                x={itemPos.c * CELL + CELL / 2 - itemPixelSize(curItem) / 2}
+                y={itemPos.r * CELL + CELL / 2 - itemPixelSize(curItem) / 2}
+                width={itemPixelSize(curItem)}
+                height={itemPixelSize(curItem)}
+              />
             )}
 
-          {/* Enemies */}
-          <Group>
-            {activeEnemiesRef.current.map((en, i) => {
-              const def = ENEMIES[en.idx],
-                img = enemyImages[en.idx];
-              if (!img) return null;
-              const sz = enemyPixelSize(def);
-              return (
-                <SkiaImage
-                  key={`enemy-${i}-${def.id}`}
-                  image={img}
-                  x={en.x - sz / 2}
-                  y={en.y - sz / 2}
-                  width={sz}
-                  height={sz}
-                />
-              );
-            })}
-          </Group>
-
-          {/* LYD */}
-          {currentLYDImage && (
-            <Group
-              transform={[
-                { translateX: posRef.current.x },
-                { translateY: posRef.current.y },
-                { rotate: rot },
-                { scaleX },
-              ]}
-            >
-              <SkiaImage
-                image={currentLYDImage}
-                x={-LYD_SIZE / 2}
-                y={-LYD_SIZE / 2}
-                width={LYD_SIZE}
-                height={LYD_SIZE}
-              />
-            </Group>
-          )}
-
-          {/* Active knife (attached; flashing near end) */}
-          {KNIFE_IMG &&
-            activeKnifeRef.current &&
-            (() => {
-              const t0 = activeKnifeRef.current!.startMs;
-              const aliveEnd = t0 + KNIFE_ALIVE_MS;
-              const flashing = performance.now() >= aliveEnd;
-              const visible =
-                !flashing ||
-                Math.floor(
-                  (performance.now() - aliveEnd) / KNIFE_FLASH_PERIOD_MS
-                ) %
-                  2 ===
-                  0;
-              if (!visible) return null;
-              const baseAngle = angleFor(dirRef.current);
-              const offsetAngle = baseAngle;
-              const renderAngle = baseAngle + deg2rad(KNIFE_ORIENT_DEGREES);
-              const cx =
-                posRef.current.x + Math.cos(offsetAngle) * KNIFE_OFFSET;
-              const cy =
-                posRef.current.y + Math.sin(offsetAngle) * KNIFE_OFFSET;
-              return (
-                <Group
-                  transform={[
-                    { translateX: cx },
-                    { translateY: cy },
-                    { rotate: renderAngle },
-                  ]}
-                >
+            {/* Knife pickups */}
+            {KNIFE_IMG &&
+              KNIFE_SPAWNS.map((k, idx) =>
+                knifePickups[idx] ? (
                   <SkiaImage
+                    key={`knife-pickup-${idx}`}
                     image={KNIFE_IMG}
-                    x={-KNIFE_SIZE / 2}
-                    y={-KNIFE_SIZE / 2}
+                    x={k.c * CELL + CELL / 2 - KNIFE_SIZE / 2}
+                    y={k.r * CELL + CELL / 2 - KNIFE_SIZE / 2}
                     width={KNIFE_SIZE}
                     height={KNIFE_SIZE}
                   />
-                </Group>
-              );
-            })()}
-        </Group>
-      </Canvas>
+                ) : null
+              )}
 
-      {/* Win overlay with time */}
-      {won && (
-        <View style={styles.overlayWrap}>
-          <Text style={styles.winText}>
-            Congrats! You Got Married!{" "}
-            <Text style={styles.winTime}>{formatTime(elapsed)}</Text>
-          </Text>
-          <View style={styles.restartBtn}>
-            <Text style={styles.restartTxt} onPress={restartGame}>
-              Restart
+            {/* Enemies */}
+            <Group>
+              {activeEnemiesRef.current.map((en, i) => {
+                const def = ENEMIES[en.idx],
+                  img = enemyImages[en.idx];
+                if (!img) return null;
+                const sz = enemyPixelSize(def);
+                return (
+                  <SkiaImage
+                    key={`enemy-${i}-${def.id}`}
+                    image={img}
+                    x={en.x - sz / 2}
+                    y={en.y - sz / 2}
+                    width={sz}
+                    height={sz}
+                  />
+                );
+              })}
+            </Group>
+
+            {/* LYD */}
+            {currentLYDImage && (
+              <Group
+                transform={[
+                  { translateX: posRef.current.x },
+                  { translateY: posRef.current.y },
+                  { rotate: rot },
+                  { scaleX },
+                ]}
+              >
+                <SkiaImage
+                  image={currentLYDImage}
+                  x={-LYD_SIZE / 2}
+                  y={-LYD_SIZE / 2}
+                  width={LYD_SIZE}
+                  height={LYD_SIZE}
+                />
+              </Group>
+            )}
+
+            {/* Active knife (attached; flashing near end) */}
+            {KNIFE_IMG &&
+              activeKnifeRef.current &&
+              (() => {
+                const t0 = activeKnifeRef.current!.startMs;
+                const aliveEnd = t0 + KNIFE_ALIVE_MS;
+                const flashing = performance.now() >= aliveEnd;
+                const visible =
+                  !flashing ||
+                  Math.floor(
+                    (performance.now() - aliveEnd) / KNIFE_FLASH_PERIOD_MS
+                  ) %
+                    2 ===
+                    0;
+                if (!visible) return null;
+                const baseAngle = angleFor(dirRef.current);
+                const offsetAngle = baseAngle;
+                const renderAngle = baseAngle + deg2rad(KNIFE_ORIENT_DEGREES);
+                const cx =
+                  posRef.current.x + Math.cos(offsetAngle) * KNIFE_OFFSET;
+                const cy =
+                  posRef.current.y + Math.sin(offsetAngle) * KNIFE_OFFSET;
+                return (
+                  <Group
+                    transform={[
+                      { translateX: cx },
+                      { translateY: cy },
+                      { rotate: renderAngle },
+                    ]}
+                  >
+                    <SkiaImage
+                      image={KNIFE_IMG}
+                      x={-KNIFE_SIZE / 2}
+                      y={-KNIFE_SIZE / 2}
+                      width={KNIFE_SIZE}
+                      height={KNIFE_SIZE}
+                    />
+                  </Group>
+                );
+              })()}
+          </Group>
+        </Canvas>
+
+        {/* Win overlay with time */}
+        {won && (
+          <View style={styles.overlayWrap}>
+            <Text style={styles.winText}>
+              Congrats! You Got Married!{" "}
+              <Text style={styles.winTime}>{formatTime(elapsed)}</Text>
             </Text>
+            <View style={styles.restartBtn}>
+              <Text style={styles.restartTxt} onPress={restartGame}>
+                Restart
+              </Text>
+            </View>
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Game Over */}
-      {gameOver && (
-        <View style={styles.overlayWrap}>
-          <Text style={styles.gameOverText}>GAME OVER</Text>
-          <View style={styles.restartBtn}>
-            <Text style={styles.restartTxt} onPress={restartGame}>
-              Restart
-            </Text>
+        {/* Game Over */}
+        {gameOver && (
+          <View style={styles.overlayWrap}>
+            <Text style={styles.gameOverText}>GAME OVER</Text>
+            <View style={styles.restartBtn}>
+              <Text style={styles.restartTxt} onPress={restartGame}>
+                Restart
+              </Text>
+            </View>
           </View>
-        </View>
-      )}
+        )}
 
-      {/* === D-PAD === */}
-      <View style={styles.pad}>
-        <View style={styles.padRow}>
-          <Pad
-            label="▲"
-            onPress={() =>
-              phase === "play" && !gameOver && !won && setDesired(DIRS.Up)
-            }
-          />
-        </View>
-        <View style={styles.padRow}>
-          <Pad
-            label="◀"
-            onPress={() =>
-              phase === "play" && !gameOver && !won && setDesired(DIRS.Left)
-            }
-          />
-          <View style={{ width: 40 }} />
-          <Pad
-            label="▶"
-            onPress={() =>
-              phase === "play" && !gameOver && !won && setDesired(DIRS.Right)
-            }
-          />
-        </View>
-        <View style={styles.padRow}>
-          <Pad
-            label="▼"
-            onPress={() =>
-              phase === "play" && !gameOver && !won && setDesired(DIRS.Down)
-            }
-          />
+        {/* === D-PAD === */}
+        <View style={styles.pad}>
+          <View style={styles.padRow}>
+            <Pad
+              label="▲"
+              onPress={() =>
+                phase === "play" && !gameOver && !won && setDesired(DIRS.Up)
+              }
+            />
+          </View>
+          <View style={styles.padRow}>
+            <Pad
+              label="◀"
+              onPress={() =>
+                phase === "play" && !gameOver && !won && setDesired(DIRS.Left)
+              }
+            />
+            <View style={{ width: 40 }} />
+            <Pad
+              label="▶"
+              onPress={() =>
+                phase === "play" && !gameOver && !won && setDesired(DIRS.Right)
+              }
+            />
+          </View>
+          <View style={styles.padRow}>
+            <Pad
+              label="▼"
+              onPress={() =>
+                phase === "play" && !gameOver && !won && setDesired(DIRS.Down)
+              }
+            />
+          </View>
         </View>
       </View>
     </View>
@@ -1372,9 +1388,8 @@ const styles = StyleSheet.create({
   // Big centered timer
   timerHud: {
     position: "absolute",
-    top: 145,
-    left: 200,
-    right: 0,
+    top: 120,
+    right: 25,
     alignItems: "center",
     zIndex: 20,
   },
@@ -1464,21 +1479,21 @@ const styles = StyleSheet.create({
   // D-pad (with your tighter gaps)
   pad: {
     position: "absolute",
-    bottom: 75,
+    bottom: 50,
     alignSelf: "center",
     alignItems: "center",
     gap: 0,
   },
   padRow: {
     flexDirection: "row",
-    gap: 20,
+    gap: 10,
     alignItems: "center",
     justifyContent: "center",
   },
 
   padBtn: {
-    width: 54,
-    height: 54,
+    width: 50,
+    height: 50,
     borderRadius: 33,
     backgroundColor: "#FACC15", // yellow face
     borderWidth: 2,

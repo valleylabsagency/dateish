@@ -1,13 +1,22 @@
 import React, { useEffect } from "react";
-import { View, TouchableOpacity, ImageBackground, Image, StyleSheet, Button, Dimensions } from "react-native";
+import {
+  View,
+  TouchableOpacity,
+  ImageBackground,
+  Image,
+  StyleSheet,
+  Button,
+  Dimensions,
+} from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   withTiming,
   withSequence,
+  withDelay,
   Easing,
-  runOnJS
+  runOnJS,
 } from "react-native-reanimated";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -37,49 +46,59 @@ const MMAnimated: React.FC<MMAnimatedProps> = ({
   const rotate = useSharedValue(0);
   const tapRotate = useSharedValue(0);
   const pivotOffsetY = -150; // rotate around chest-ish
+  const DELAY = 300;
 
   const slideInMM = (onEnd?: () => void) => {
     translateX.value = SCREEN_WIDTH;
-    rotate.value = 0;
+    rotate.value = 30;
     tapRotate.value = 0;
 
-    rotate.value = withTiming(-10, { duration: 800 });
-    translateX.value = withSpring(0, { damping: 35, stiffness: 451 });
+    // slide in after 500ms
+    translateX.value = withDelay(
+      DELAY,
+      withSpring(0, { damping: 50, stiffness: 451 })
+    );
 
-    // final rotate spring → call onEnd
-    rotate.value = withTiming(-30, { duration: 300 }, () => {
-      rotate.value = withSpring(
-        0,
-        { damping: 20, stiffness: 409 },
-        (finished) => {
-          if (finished && onEnd) runOnJS(onEnd)();
-        }
-      );
-    });
+    // tilt-in wiggle after 500ms
+    rotate.value = withDelay(
+      DELAY,
+      withSequence(
+        withTiming(-10, { duration: 150 }),
+        withTiming(-28, { duration: 220 }),
+        withSpring(0, { damping: 20, stiffness: 600 }, (finished) => {
+          if (finished && onEnd) {
+            runOnJS(onEnd)();
+          }
+        })
+      )
+    );
   };
 
   useEffect(() => {
     if (enterOnMount) {
-      slideInMM(onEnterComplete);  
+      slideInMM(onEnterComplete);
     } else {
-      translateX.value = 0;  // show immediately, no animation
+      translateX.value = 0; // show immediately, no animation
       rotate.value = 0;
       tapRotate.value = 0;
     }
-  }, []);
+  }, [enterOnMount]);
 
   const slideOutMM = (onEnd?: () => void) => {
     rotate.value = withTiming(-10, { duration: 150 });
 
-    translateX.value = withTiming(SCREEN_WIDTH * 1.5, {
-      duration: 600,
-      easing: Easing.in(Easing.cubic),
-    },
-    (finished) => {
-      if (finished && onEnd) {
-        runOnJS(onEnd)();
+    translateX.value = withTiming(
+      SCREEN_WIDTH * 1.5,
+      {
+        duration: 600,
+        easing: Easing.in(Easing.cubic),
+      },
+      (finished) => {
+        if (finished && onEnd) {
+          runOnJS(onEnd)();
+        }
       }
-    });
+    );
 
     rotate.value = withTiming(-10, { duration: 300 }, () => {
       rotate.value = withSpring(0, {
@@ -117,7 +136,7 @@ const MMAnimated: React.FC<MMAnimatedProps> = ({
     if (leaving) {
       slideOutMM(onLeaveComplete);
     }
-  }, [leaving])
+  }, [leaving]);
 
   useEffect(() => {
     if (enterOnMount) {
@@ -157,8 +176,6 @@ const MMAnimated: React.FC<MMAnimatedProps> = ({
           pointerEvents="none"
         />
       )}
-
-      
     </View>
   );
 
@@ -198,7 +215,7 @@ const styles = StyleSheet.create({
     height: 500,
     marginBottom: "50%",
     marginLeft: 100,
-    zIndex: 8
+    zIndex: 8,
   },
   barFront: {
     position: "absolute",
