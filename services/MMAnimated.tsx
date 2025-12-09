@@ -5,7 +5,6 @@ import {
   ImageBackground,
   Image,
   StyleSheet,
-  Button,
   Dimensions,
 } from "react-native";
 import Animated, {
@@ -29,6 +28,7 @@ type MMAnimatedProps = {
   leaving?: boolean;
   onEnterComplete?: () => void;
   onLeaveComplete?: () => void;
+  onPress?: () => void;
   enterOnMount?: boolean;
 };
 
@@ -39,13 +39,14 @@ const MMAnimated: React.FC<MMAnimatedProps> = ({
   leaving = false,
   onEnterComplete,
   onLeaveComplete,
+  onPress,
   enterOnMount = true,
   style,
 }) => {
   const translateX = useSharedValue(SCREEN_WIDTH);
   const rotate = useSharedValue(0);
   const tapRotate = useSharedValue(0);
-  const pivotOffsetY = -150; // rotate around chest-ish
+  const pivotOffsetY = -150;
   const DELAY = 300;
 
   const slideInMM = (onEnd?: () => void) => {
@@ -53,13 +54,11 @@ const MMAnimated: React.FC<MMAnimatedProps> = ({
     rotate.value = 30;
     tapRotate.value = 0;
 
-    // slide in after 500ms
     translateX.value = withDelay(
       DELAY,
       withSpring(0, { damping: 50, stiffness: 451 })
     );
 
-    // tilt-in wiggle after 500ms
     rotate.value = withDelay(
       DELAY,
       withSequence(
@@ -73,16 +72,6 @@ const MMAnimated: React.FC<MMAnimatedProps> = ({
       )
     );
   };
-
-  useEffect(() => {
-    if (enterOnMount) {
-      slideInMM(onEnterComplete);
-    } else {
-      translateX.value = 0; // show immediately, no animation
-      rotate.value = 0;
-      tapRotate.value = 0;
-    }
-  }, [enterOnMount]);
 
   const slideOutMM = (onEnd?: () => void) => {
     rotate.value = withTiming(-10, { duration: 150 });
@@ -129,25 +118,20 @@ const MMAnimated: React.FC<MMAnimatedProps> = ({
   };
 
   useEffect(() => {
-    slideInMM();
-  }, []);
+    if (enterOnMount) {
+      slideInMM(onEnterComplete);
+    } else {
+      translateX.value = 0;
+      rotate.value = 0;
+      tapRotate.value = 0;
+    }
+  }, [enterOnMount, onEnterComplete]);
 
   useEffect(() => {
     if (leaving) {
       slideOutMM(onLeaveComplete);
     }
-  }, [leaving]);
-
-  useEffect(() => {
-    if (enterOnMount) {
-      slideInMM();
-    } else {
-      // start already visible with no animation
-      translateX.value = 0;
-      rotate.value = 0;
-      tapRotate.value = 0;
-    }
-  }, []);
+  }, [leaving, onLeaveComplete]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -158,9 +142,19 @@ const MMAnimated: React.FC<MMAnimatedProps> = ({
     ],
   }));
 
+  const handleImagePress = () => {
+    console.log("MMAnimated: image pressed"); // 🔴 should see this
+    onImagePress();
+    if (onPress) onPress();
+  };
+
   const Inner = () => (
     <View style={styles.inner}>
-      <TouchableOpacity activeOpacity={0.8} onPress={onImagePress}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={handleImagePress}
+        hitSlop={{ top: 40, bottom: 40, left: 40, right: 40 }} // bigger tap area
+      >
         <Animated.Image
           source={require("../assets/images/mr-mingles.png")}
           style={[styles.mingles, animatedStyle]}
@@ -179,7 +173,6 @@ const MMAnimated: React.FC<MMAnimatedProps> = ({
     </View>
   );
 
-  // When showBackground is true, draw the bar as the component background
   return showBackground ? (
     <ImageBackground
       source={require("../assets/images/bar-back.png")}
@@ -196,7 +189,6 @@ const MMAnimated: React.FC<MMAnimatedProps> = ({
 };
 
 const styles = StyleSheet.create({
-  // This view sizes the scene. Default keeps the same aspect as your bar image.
   bg: {
     width: "100%",
     aspectRatio: 1125 / 2436,
@@ -222,11 +214,6 @@ const styles = StyleSheet.create({
     bottom: "-5%",
     width: "100%",
     height: 830,
-  },
-  controls: {
-    position: "absolute",
-    bottom: 60,
-    alignItems: "center",
   },
 });
 
