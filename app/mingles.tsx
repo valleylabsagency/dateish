@@ -10,32 +10,36 @@ import {
   Image,
   Modal,
   ScrollView,
-  Animated
+  Animated as RNAnimated,
+  Linking,
+  Platform,
+  useWindowDimensions,
+  Pressable,
 } from "react-native";
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSequence,
+} from "react-native-reanimated";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
 import { MaterialIcons } from "@expo/vector-icons";
 import { ProfileContext } from "../contexts/ProfileContext";
-import { NavbarContext } from '../contexts/NavbarContext';
+import { NavbarContext } from "../contexts/NavbarContext";
 import PopUp from "../components/PopUp";
 import { verticalScale } from "react-native-size-matters";
-import LottieView from 'lottie-react-native';
-import animationData from '../assets/videos/mm-dancing.json';
-//import { spendMoneys } from '../services/moneys';
-//import { MoneysContext } from "../contexts/MoneysContext";
+import LottieView from "lottie-react-native";
+import animationData from "../assets/videos/mm-dancing.json";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { auth, firestore } from "../firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as StoreReview from "expo-store-review";
-import { Linking, Platform, useWindowDimensions, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-//import { showInterstitial } from "@/services/ads";
 import { useIsFocused } from "@react-navigation/native";
 import * as NavigationBar from "expo-navigation-bar";
-
-
 
 const BG_IMG = require("../assets/images/mm-back.png");
 const FRONT_IMG = require("../assets/images/mm-front.png");
@@ -43,8 +47,6 @@ const MINGLES_IMG = require("../assets/images/mr-mingles.png");
 
 // Get the art’s intrinsic aspect ratio (so overlays line up exactly)
 const { width: BGW, height: BGH } = Image.resolveAssetSource(BG_IMG);
-const STAGE_AR = BGW / BGH; // aspect ratio of your scene artwork
-
 
 const { width, height } = Dimensions.get("window");
 const BUBBLE_HEIGHT = height * 0.18;
@@ -52,19 +54,15 @@ const BUBBLE_HEIGHT = height * 0.18;
 const withoutBg = {
   ...animationData,
   layers: animationData.layers.filter(
-    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+    (layer) => layer.ty !== 1 || layer.nm !== "Dark Blue Solid 1"
   ),
-}
-
-// Pick a lower Y on smaller phones so the drink sits farther down on the bar
-
-
+};
 
 export default function MinglesScreen() {
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
   });
-  
+
   const { profile, saveProfile } = useContext(ProfileContext);
   const { setShowWcButton } = useContext(NavbarContext);
 
@@ -76,9 +74,39 @@ export default function MinglesScreen() {
 
   const isFocused = useIsFocused();
   const hasMeasuredStage = useRef(false);
-  const screenOpacity = React.useRef(new Animated.Value(0)).current;
+  const screenOpacity = React.useRef(new RNAnimated.Value(0)).current;
   const insets = useSafeAreaInsets();
 
+  // 🔸 Reanimated wiggle for Mr. Mingles (same logic as MMAnimated)
+  const tapRotate = useSharedValue(0);
+  const MINGLES_PIVOT_FROM_CENTER = 140; // closer to the bottom = bigger number
+
+  const triggerMinglesWiggle = () => {
+    const randomAngle = () => Math.floor(Math.random() * 6 + 1); // 1–6°
+    const randomDuration = () => Math.floor(Math.random() * 80 + 60); // 60–140ms
+
+    tapRotate.value = 0;
+    tapRotate.value = withSequence(
+      withTiming(-randomAngle(), { duration: randomDuration() }),
+      withTiming(randomAngle(), { duration: randomDuration() }),
+      withTiming(-randomAngle(), { duration: randomDuration() }),
+      withTiming(randomAngle(), { duration: randomDuration() }),
+      withTiming(-randomAngle(), { duration: randomDuration() }),
+      withTiming(randomAngle(), { duration: randomDuration() }),
+      withTiming(-randomAngle(), { duration: randomDuration() }),
+      withTiming(randomAngle(), { duration: randomDuration() }),
+      withTiming(-randomAngle(), { duration: randomDuration() }),
+      withTiming(0, { duration: 80 })
+    );
+  };
+
+  const minglesAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: MINGLES_PIVOT_FROM_CENTER },
+      { rotate: `${tapRotate.value}deg` },
+      { translateY: -MINGLES_PIVOT_FROM_CENTER },
+    ],
+  }));
 
   useEffect(() => {
     if (isFocused) {
@@ -86,7 +114,7 @@ export default function MinglesScreen() {
       screenOpacity.setValue(0);
 
       const timeout = setTimeout(() => {
-        Animated.timing(screenOpacity, {
+        RNAnimated.timing(screenOpacity, {
           toValue: 1,
           duration: 250,
           useNativeDriver: true,
@@ -98,7 +126,7 @@ export default function MinglesScreen() {
       };
     } else {
       screenOpacity.stopAnimation();
-      Animated.timing(screenOpacity, {
+      RNAnimated.timing(screenOpacity, {
         toValue: 0,
         duration: 400,
         useNativeDriver: true,
@@ -108,41 +136,44 @@ export default function MinglesScreen() {
 
   useEffect(() => {
     if (Platform.OS !== "android") return;
-  
+
     NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => {});
     NavigationBar.setBackgroundColorAsync("#592540").catch(() => {});
     NavigationBar.setButtonStyleAsync("light").catch(() => {});
   }, []);
-  
 
   // Turn on to SEE the touchable overlays (auto-on in dev if you want)
-const SHOW_HITBOXES = true; // or __DEV__
-const SHOW_HITBOX = false; // flip to true when debugging tap areas
+  const SHOW_HITBOXES = true; // or __DEV__
+  const SHOW_HITBOX = false; // flip to true when debugging tap areas
 
-const hotspotBase = {
-  position: "absolute" as const,
-  zIndex: 9999,
-  ...Platform.select({ android: { elevation: 9999 } }),
-};
+  const hotspotBase = {
+    position: "absolute" as const,
+    zIndex: 9999,
+    ...Platform.select({ android: { elevation: 9999 } }),
+  };
 
-const debugOutline = SHOW_HITBOX
-  ? { borderWidth: 1, borderColor: "rgba(0,255,255,0.6)", borderStyle: "dashed", backgroundColor: "transparent" }
-  : null;
-
-const hit = (color = "lime") =>
-  SHOW_HITBOXES
+  const debugOutline = SHOW_HITBOX
     ? {
-        backgroundColor: "rgba(0,255,0,0.15)",
-        borderColor: color,
         borderWidth: 1,
-        zIndex: 99,      // above front art
-        elevation: 99,   // Android
+        borderColor: "rgba(0,255,255,0.6)",
+        borderStyle: "dashed",
+        backgroundColor: "transparent",
       }
     : null;
 
+  const hit = (color = "lime") =>
+    SHOW_HITBOXES
+      ? {
+          backgroundColor: "rgba(0,255,0,0.15)",
+          borderColor: color,
+          borderWidth: 1,
+          zIndex: 99,
+          elevation: 99,
+        }
+      : null;
+
   const router = useRouter();
   const params = useLocalSearchParams<{ open?: string }>();
-  
 
   const [showVipPopup, setShowVipPopup] = useState(false);
 
@@ -152,12 +183,8 @@ const hit = (color = "lime") =>
   const [showRatePrompt, setShowRatePrompt] = useState(false);
   const [showNoThanks, setShowNoThanks] = useState(false);
 
-
-
   // toggles the drink‐speech bubble
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
-
-  //const { triggerSpend } = useContext(MoneysContext);
 
   useEffect(() => {
     if (params.open === "shop") {
@@ -165,8 +192,6 @@ const hit = (color = "lime") =>
       setShowPopupShop(true);
     }
   }, [params.open]);
-  
-
 
   useEffect(() => {
     setShowWcButton(true);
@@ -177,7 +202,7 @@ const hit = (color = "lime") =>
       const raw = await AsyncStorage.getItem("barVisitCount");
       const n = (raw ? parseInt(raw, 10) : 0) + 1;
       await AsyncStorage.setItem("barVisitCount", String(n));
-  
+
       const prompted = await AsyncStorage.getItem("ratingPrompted");
       if (n === 2 && !prompted) {
         setShowRatePrompt(true);
@@ -185,37 +210,34 @@ const hit = (color = "lime") =>
     })();
   }, []);
 
-  const ANDROID_PKG = "com.yourapp";           // TODO: your package
-const IOS_APP_ID  = "id0000000000";          // TODO: your App Store ID
+  const ANDROID_PKG = "com.yourapp"; // TODO: your package
+  const IOS_APP_ID = "id0000000000"; // TODO: your App Store ID
 
-async function handleRateYes() {
-  setShowRatePrompt(false);
-  await AsyncStorage.setItem("ratingPrompted", "1");
+  async function handleRateYes() {
+    setShowRatePrompt(false);
+    await AsyncStorage.setItem("ratingPrompted", "1");
 
-  // Prefer native in-app review if available
-  if (await StoreReview.isAvailableAsync()) {
-    StoreReview.requestReview();
-    return;
+    if (await StoreReview.isAvailableAsync()) {
+      StoreReview.requestReview();
+      return;
+    }
+
+    const url = Platform.select({
+      ios: `itms-apps://itunes.apple.com/app/${IOS_APP_ID}?action=write-review`,
+      android: `market://details?id=${ANDROID_PKG}`,
+    });
+    if (url) Linking.openURL(url);
   }
 
-  const url = Platform.select({
-    ios: `itms-apps://itunes.apple.com/app/${IOS_APP_ID}?action=write-review`,
-    android: `market://details?id=${ANDROID_PKG}`,
-  });
-  if (url) Linking.openURL(url);
-}
-
-async function handleRateNo() {
-  setShowRatePrompt(false);
-  setShowNoThanks(true);
-  await AsyncStorage.setItem("ratingPrompted", "1");
-  setTimeout(async () => {
-    setShowNoThanks(false);
-   // await showInterstitial();
-  }, 3000);
-}
-
-  
+  async function handleRateNo() {
+    setShowRatePrompt(false);
+    setShowNoThanks(true);
+    await AsyncStorage.setItem("ratingPrompted", "1");
+    setTimeout(async () => {
+      setShowNoThanks(false);
+      // await showInterstitial();
+    }, 3000);
+  }
 
   // ─── Bubble messages ─────────────────────────
   const messages = [
@@ -224,9 +246,8 @@ async function handleRateNo() {
     "Go talk to some humans!",
   ];
   const [idx, setIdx] = useState(0);
-  const back = () => setIdx(i => (i - 1 + messages.length) % messages.length);
-  // cycles forward, wrapping to zero
-  const cycle = () => setIdx(i => (i + 1) % messages.length);
+  const back = () => setIdx((i) => (i - 1 + messages.length) % messages.length);
+  const cycle = () => setIdx((i) => (i + 1) % messages.length);
 
   // ─── Drink menu modal ────────────────────────
   const [showDrinkMenu, setShowDrinkMenu] = useState(false);
@@ -254,21 +275,13 @@ async function handleRateNo() {
   };
 
   const handleTipJar = async () => {
-    
     /*
     try {
-      // Spend exactly 1 for the tip jar
       const result = await spendMoneys({ amount: 1, reason: "tip-jar" });
       triggerSpend(1);
-  
-      // (Optional) You can show a quick “thanks” animation here if you want
-      // then show the Tips popup:
       setPopupFlag("tips");
-     //setShowPopupTips(true);
     } catch (e: any) {
       console.error("Tip jar failed:", e.code, e.message);
-      // If e.code === 'functions/not-found', the URL retry in the helper should have caught it;
-      // If it still fails, check project/region and any App Check enforcement.
     }*/
   };
 
@@ -276,7 +289,6 @@ async function handleRateNo() {
   const userDrink = (profile?.drink || "water").toLowerCase();
   const drinkIcon = drinkMapping[userDrink];
   const isSmall = ["vodka", "tequila"].includes(userDrink);
-  const drinkSize = isSmall ? width * 0.10 : width * 0.25;
   const drinkTextMapping: Record<string, string> = {
     wine: "Where's the romance at?",
     beer: "Chill night... Sup?",
@@ -291,124 +303,116 @@ async function handleRateNo() {
 
   if (!fontsLoaded) return null;
 
- // state to hold the *exact* visible height
-const [stageH, setStageH] = React.useState<number | null>(null);
+  // state to hold the *exact* visible height
+  const [stageH, setStageH] = React.useState<number | null>(null);
 
-// ====== Stage sizing (COVER, no side bars, no bottom gap) ======
-const { width: sw, height: sh } = useWindowDimensions();
+  // ====== Stage sizing (COVER, no side bars, no bottom gap) ======
+  const { width: sw, height: sh } = useWindowDimensions();
 
-// Use measured stage height if we have it; otherwise fall back to full height minus our initial navbar guess
-const containerW = sw;
-const visibleH = stageH ?? (sh - 72); 
+  const containerW = sw;
+  const visibleH = stageH ?? sh - 72;
 
+  const scale = Math.max(containerW / BGW, visibleH / BGH);
+  const dispW = BGW * scale;
+  const dispH = BGH * scale;
 
+  const offsetX = (containerW - dispW) / 2;
+  const offsetY = (visibleH - dispH) / 2;
 
-// Compute cover scale in the *visible* area only
-const scale = Math.max(containerW / BGW, visibleH / BGH);
-const dispW = BGW * scale;
-const dispH = BGH * scale;
+  const FRONT_HEIGHT_FRAC = 0.64;
 
-const offsetX = (containerW - dispW) / 2;
-const offsetY = (visibleH - dispH) / 2;
+  const FRONT = { x: 0, w: 1 };
 
-const FRONT_HEIGHT_FRAC = 0.64; // was 0.8 → shorter
+  const frontLeft = offsetX + FRONT.x * dispW;
+  const frontHeightPx = FRONT_HEIGHT_FRAC * dispH;
+  const frontTop = Math.round(visibleH - frontHeightPx);
 
-const FRONT = { x: 0, w: 1 };
+  // Generic rect helper in art space (uses visibleH offsets)
+  const rect = React.useCallback(
+    (x: number, y: number, w: number, h: number) => ({
+      position: "absolute" as const,
+      left: offsetX + x * dispW,
+      top: offsetY + y * dispH,
+      width: w * dispW,
+      height: h * dispH,
+    }),
+    [offsetX, offsetY, dispW, dispH]
+  );
 
-const frontLeft = offsetX + FRONT.x * dispW;
-const frontHeightPx = FRONT_HEIGHT_FRAC * dispH;
-const frontTop = Math.round(visibleH - frontHeightPx);
-
-// Generic rect helper in art space (uses visibleH offsets)
-const rect = React.useCallback(
-  (x: number, y: number, w: number, h: number) => ({
+  // Hotspots tied to FRONT box
+  const rectInFront = (x: number, y: number, w: number, h: number) => ({
     position: "absolute" as const,
-    left: offsetX + x * dispW,
-    top:  offsetY + y * dispH,
-    width:  w * dispW,
-    height: h * dispH,
-  }),
-  [offsetX, offsetY, dispW, dispH]
-);
+    left: frontLeft + x * dispW,
+    top: frontTop + y * frontHeightPx,
+    width: w * dispW,
+    height: h * frontHeightPx,
+  });
 
-// Hotspots tied to FRONT box
-const rectInFront = (x: number, y: number, w: number, h: number) => ({
-  position: "absolute" as const,
-  left:  frontLeft + x * dispW,
-  top:   frontTop  + y * frontHeightPx,
-  width: w * dispW,
-  height: h * frontHeightPx,
-});
+  const MINGLES = { x: 0.02, y: 0.06, w: 0.8, h: 0.8 };
+  const minglesBox = rect(MINGLES.x, MINGLES.y, MINGLES.w, MINGLES.h);
+  const HIT_INSET = {
+    left: 0.3,
+    right: 0.3,
+    top: 0.25,
+    bottom: 0.24,
+  };
+  const minglesHit = rect(
+    MINGLES.x + MINGLES.w * HIT_INSET.left,
+    MINGLES.y + MINGLES.h * HIT_INSET.top,
+    MINGLES.w * (1 - HIT_INSET.left - HIT_INSET.right),
+    MINGLES.h * (1 - HIT_INSET.top - HIT_INSET.bottom)
+  );
 
-const MINGLES = { x: 0.02, y: 0.06, w: 0.8, h: 0.8 };
-const minglesBox = rect(MINGLES.x, MINGLES.y, MINGLES.w, MINGLES.h);
-const HIT_INSET = { left: 0.3, right: 0.3, top: 0.25, bottom: 0.24 }; // 10–12% inset
-const minglesHit = rect(
-  MINGLES.x + MINGLES.w * HIT_INSET.left,
-  MINGLES.y + MINGLES.h * HIT_INSET.top,
-  MINGLES.w * (1 - HIT_INSET.left - HIT_INSET.right),
-  MINGLES.h * (1 - HIT_INSET.top - HIT_INSET.bottom)
-);
+  const bubbleH = Math.min(Math.round(dispH * 0.18), 140);
 
-
-// Keep the bubble height consistent with bar-2
-const bubbleH = Math.min(Math.round(dispH * 0.18), 140);
-
-
-// A little extra spacing for the TAP button (positive pushes it down)
-const tapExtraGap = 0.02 * dispH;
-
-const shortSide = Math.min(sw, sh);
-
-// Stick the drink to the TOP of the FRONT image.
-// Small positive y keeps it just below the glass edge across devices.
-const DRINK_TOP_FRAC = shortSide < 400 ? 0.30 : 0.33; // tweak to taste (0 = exactly at top)
-const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
-
-
-
-
+  const shortSide = Math.min(sw, sh);
+  const DRINK_TOP_FRAC = shortSide < 400 ? 0.3 : 0.33;
+  const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
 
   return (
     <>
-      <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
+      <RNAnimated.View style={[styles.container, { opacity: screenOpacity }]}>
         <View
           style={{
             flex: 1,
             alignItems: "center",
             justifyContent: "flex-start",
-            backgroundColor: "black", // letterbox bars if needed
+            backgroundColor: "black",
           }}
         >
           {/* ==== STAGE (locked to bg aspect) ==== */}
-          <View style={{ width: containerW, height: visibleH, overflow: "hidden" }}>
-
+          <View
+            style={{ width: containerW, height: visibleH, overflow: "hidden" }}
+          >
             {/* Back layer */}
             <Image
               source={BG_IMG}
-              style={{ position: "absolute", left: offsetX, top: offsetY, width: dispW, height: dispH }}
+              style={{
+                position: "absolute",
+                left: offsetX,
+                top: offsetY,
+                width: dispW,
+                height: dispH,
+              }}
               resizeMode="stretch"
             />
 
-
-            {/* Mr. Mingles (click to cycle) */}
-            
-            <Image
+            {/* Mr. Mingles (Reanimated wiggle) */}
+            <Reanimated.Image
               source={MINGLES_IMG}
-              style={[minglesBox]}
+              style={[minglesBox, minglesAnimatedStyle]}
               resizeMode="contain"
               pointerEvents="none"
             />
-           
 
             {/* Speech bubble — same placement as bar-2 */}
             <View
               style={{
                 position: "absolute",
-                left:  offsetX + dispW * 0.05,
-                top:   2,                  // 2px under the stage top
-                width: dispW * 0.90,
-                height: bubbleH,           // capped height like bar-2
+                left: offsetX + dispW * 0.05,
+                top: 2,
+                width: dispW * 0.9,
+                height: bubbleH,
                 zIndex: 30,
                 ...Platform.select({ android: { elevation: 30 } }),
               }}
@@ -423,9 +427,14 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
                   onPress={back}
                   style={{
                     position: "absolute",
-                    left: 0, top: 0, bottom: 20, width: 40,
-                    alignItems: "center", justifyContent: "center",
-                    zIndex: 2, ...Platform.select({ android: { elevation: 2 } }),
+                    left: 0,
+                    top: 0,
+                    bottom: 20,
+                    width: 40,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 2,
+                    ...Platform.select({ android: { elevation: 2 } }),
                   }}
                 >
                   <MaterialIcons name="chevron-left" size={32} color="#fff" />
@@ -436,9 +445,14 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
                   onPress={cycle}
                   style={{
                     position: "absolute",
-                    right: 0, top: 0, bottom: 20, width: 40,
-                    alignItems: "center", justifyContent: "center",
-                    zIndex: 2, ...Platform.select({ android: { elevation: 2 } }),
+                    right: 0,
+                    top: 0,
+                    bottom: 20,
+                    width: 40,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 2,
+                    ...Platform.select({ android: { elevation: 2 } }),
                   }}
                 >
                   <MaterialIcons name="chevron-right" size={32} color="#fff" />
@@ -458,10 +472,7 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
                   }}
                 >
                   <Text
-                    style={[
-                      styles.bubbleText,
-                      { includeFontPadding: false },
-                    ]}
+                    style={[styles.bubbleText, { includeFontPadding: false }]}
                   >
                     {messages[idx]}
                   </Text>
@@ -469,7 +480,12 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
                   {idx === 0 && (
                     <TouchableOpacity
                       onPress={() => setShowDrinkMenu(true)}
-                      style={{ paddingHorizontal: 24, paddingVertical: 8, borderRadius: 8, marginTop: 8 }}
+                      style={{
+                        paddingHorizontal: 24,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        marginTop: 8,
+                      }}
                     >
                       <Text style={styles.tapText}>- TAP -</Text>
                     </TouchableOpacity>
@@ -478,10 +494,13 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
               </ImageBackground>
             </View>
 
-
-
             {/* ==== DRINK MENU MODAL ==== */}
-            <Modal visible={showDrinkMenu} transparent animationType="fade" onRequestClose={() => setShowDrinkMenu(false)}>
+            <Modal
+              visible={showDrinkMenu}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setShowDrinkMenu(false)}
+            >
               <View style={drinkModalStyles.modalOverlay}>
                 <View style={drinkModalStyles.modalContainer}>
                   <ImageBackground
@@ -499,7 +518,7 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
                     {Object.entries(drinkMapping).map(([name]) => (
                       <TouchableOpacity
                         key={name}
-                        style={drinkModalStyles[name]}   // wine/beer/… positions you already defined
+                        style={drinkModalStyles[name]}
                         onPress={() => handleDrinkSelect(name)}
                         activeOpacity={0.8}
                       >
@@ -517,7 +536,11 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
                           source={withoutBg}
                           autoPlay
                           loop
-                          style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+                          style={{
+                            width: 600,
+                            height: 600,
+                            backgroundColor: "transparent",
+                          }}
                         />
                       </View>
                     )}
@@ -526,11 +549,13 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
               </View>
             </Modal>
 
-
             {/* Hotspots – all normalized; tweak once and they’re stable everywhere */}
             <Pressable
-              style={[hotspotBase, minglesHit]} // hit() only for debugging
-              onPress={cycle}
+              style={[hotspotBase, minglesHit, debugOutline]}
+              onPress={() => {
+                triggerMinglesWiggle();
+                cycle();
+              }}
               android_ripple={{ color: "rgba(255,255,255,0.08)" }}
             />
 
@@ -540,25 +565,22 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
             />
             <Pressable
               style={[hotspotBase, rectInFront(0.57, 0.76, 0.13, 0.03)]}
-              onPress={() => { setPopupFlag("shop"); setShowPopupShop(true); }}
+              onPress={() => {
+                setPopupFlag("shop");
+                setShowPopupShop(true);
+              }}
             />
             <Pressable
               style={[hotspotBase, rectInFront(0.54, 0.84, 0.16, 0.03)]}
-              onPress={() => { setPopupFlag("rules"); setShowPopupRules(true); }}
+              onPress={() => {
+                setPopupFlag("rules");
+                setShowPopupRules(true);
+              }}
             />
             <Pressable
               style={[hotspotBase, rectInFront(0.05, 0.3, 0.18, 0.19)]}
               onPress={handleTipJar}
             />
-            {/*
-            <Pressable
-              style={rect(0.38, 0.79, 0.28, 0.06)} // "Don’t Press Here"
-              onPress={async () => { if (!dontPressPressed) { setDontPressPressed(true); } }}
-            > 
-              <Text style={[styles.dontPressText, dontPressPressed && styles.dontPressDisabled]}>
-                {dontPressPressed ? "Told you not to press…" : "Don’t Press Here"}
-              </Text>
-            </Pressable>*/}
 
             {/* Front layer (glass, bar, etc.) – perfectly aligned */}
             <Image
@@ -573,13 +595,16 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
               resizeMode="stretch"
               pointerEvents="none"
             />
+
             {/* --- User's drink, positioned relative to the FRONT image --- */}
             {drinkIcon && (
               <View
-                // pick a spot on the bar: tweak these fractions to move it
                 style={[
                   DRINK_BOX,
-                  { zIndex: 20, alignItems: "center", justifyContent: "center",
+                  {
+                    zIndex: 20,
+                    alignItems: "center",
+                    justifyContent: "center",
                     ...Platform.select({ android: { elevation: 20 } }),
                   },
                 ]}
@@ -592,7 +617,6 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
                 >
                   <Image
                     source={drinkIcon}
-                    // fill the front-relative box; use contain so art keeps aspect
                     style={{ width: "100%", height: "100%" }}
                     resizeMode="contain"
                   />
@@ -602,7 +626,7 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
                   <View
                     style={{
                       position: "absolute",
-                      bottom: "105%",             // bubble sits just above the drink
+                      bottom: "105%",
                       left: "50%",
                       transform: [{ translateX: -70 }],
                       backgroundColor: "rgba(0,0,0,0.8)",
@@ -613,36 +637,37 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
                     }}
                     pointerEvents="none"
                   >
-                    <Text style={{ color: "#fff", textAlign: "center", fontFamily: FontNames.MontserratRegular }}>
+                    <Text
+                      style={{
+                        color: "#fff",
+                        textAlign: "center",
+                        fontFamily: FontNames.MontserratRegular,
+                      }}
+                    >
                       {drinkText}
                     </Text>
                   </View>
                 )}
               </View>
             )}
-
-
-
           </View>
         </View>
 
         {/* Bottom nav can remain full-width below */}
         <View
-          style={[styles.navbarContainer, { paddingBottom: insets.bottom }]}   // 👈 safe-area padding
+          style={[styles.navbarContainer, { paddingBottom: insets.bottom }]}
           onLayout={(e) => {
             const y = e.nativeEvent.layout.y;
             if (!hasMeasuredStage.current || isFocused) {
               hasMeasuredStage.current = true;
-              setStageH(y);                     // y = height available above navbar
+              setStageH(y);
             }
           }}
           pointerEvents="box-none"
         >
           <BottomNavbar selectedTab="Mr. Mingles" />
         </View>
-
-      </Animated.View>
-
+      </RNAnimated.View>
 
       <PopUp
         visible={showPopupShop}
@@ -659,16 +684,19 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
         >
           <View style={shopStyles.container}>
             {[
-              { amount: 30,  price: "$1"  },
-              { amount: 100, price: "$3"  },
-              { amount: 300, price: "$5"  },
-              { amount: 1000,price: "$10" },
+              { amount: 30, price: "$1" },
+              { amount: 100, price: "$3" },
+              { amount: 300, price: "$5" },
+              { amount: 1000, price: "$10" },
             ].map((p) => (
               <View key={p.amount} style={shopStyles.row}>
                 <Text style={shopStyles.amount}>{p.amount} moneys</Text>
                 <View style={shopStyles.right}>
                   <Text style={shopStyles.price}>{p.price}</Text>
-                  <TouchableOpacity style={shopStyles.buyBtn} onPress={() => {}}>
+                  <TouchableOpacity
+                    style={shopStyles.buyBtn}
+                    onPress={() => {}}
+                  >
                     <Text style={shopStyles.buyText}>Buy</Text>
                   </TouchableOpacity>
                 </View>
@@ -696,8 +724,6 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
               </TouchableOpacity>
             )}
 
-
-            {/* spacer so last item isn’t tight to bottom edge */}
             <View style={{ height: 8 }} />
           </View>
         </ScrollView>
@@ -712,7 +738,7 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
           style={shopStyles.vipScroll}
           contentContainerStyle={shopStyles.vipScrollContent}
           showsVerticalScrollIndicator
-          persistentScrollbar   
+          persistentScrollbar
         >
           <View style={shopStyles.vipContainer}>
             <Text style={shopStyles.vipLine}>$5 a month</Text>
@@ -720,7 +746,10 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
             <Text style={shopStyles.vipLine}>300 moneys a day</Text>
 
             <TouchableOpacity
-              style={[shopStyles.buyBtn, { marginTop: 14, opacity: vipLoading ? 0.6 : 1 }]}
+              style={[
+                shopStyles.buyBtn,
+                { marginTop: 14, opacity: vipLoading ? 0.6 : 1 },
+              ]}
               disabled={vipLoading}
               onPress={async () => {
                 try {
@@ -731,11 +760,12 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
                     isVip: true,
                     vipSince: serverTimestamp(),
                   });
-                  // keep ProfileContext in sync immediately
                   await saveProfile({ isVip: true });
                   setShowVipPopup(false);
                   setShowPopupShop(false);
-                  alert("Congrats! You’re a VIP of Dateish! You’re way cooler now.");
+                  alert(
+                    "Congrats! You’re a VIP of Dateish! You’re way cooler now."
+                  );
                 } catch (e) {
                   console.error(e);
                 } finally {
@@ -743,21 +773,20 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
                 }
               }}
             >
-              <Text style={shopStyles.buyText}>{vipLoading ? "Subscribing…" : "Subscribe"}</Text>
+              <Text style={shopStyles.buyText}>
+                {vipLoading ? "Subscribing…" : "Subscribe"}
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       </PopUp>
 
-
-
-
       <PopUp
-          visible={showPopupRules}
-          flag={popupFlag || undefined}
-          title="Bar Rules"
-          onClose={() => setShowPopupRules(false)}
-        >
+        visible={showPopupRules}
+        flag={popupFlag || undefined}
+        title="Bar Rules"
+        onClose={() => setShowPopupRules(false)}
+      >
         <ScrollView style={shopStyles.vipScroll}>
           <View style={styles.hoursContainer}>
             <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
@@ -767,19 +796,21 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
           <View style={styles.hoursContainer}>
             <Text style={styles.hoursText}>Happy Hour:{"\n"}</Text>
             <Text style={styles.hours}>17:00–21:00</Text>
-          </View> 
+          </View>
 
           <View style={styles.hoursContainer}>
             <View style={styles.vipContainer}>
-            <Text style={styles.vipText}>VIP</Text>
-            <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
+              <Text style={styles.vipText}>VIP</Text>
+              <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
             </View>
-          
+
             <Text style={styles.hours}>All Day Erry Day</Text>
           </View>
 
           <Text style={styles.ruleText}>No Nude Pics</Text>
-          <Text style={[styles.hoursText, {marginBottom: 20}]}>No Links Allowed</Text>
+          <Text style={[styles.hoursText, { marginBottom: 20 }]}>
+            No Links Allowed
+          </Text>
           <Text style={styles.ruleText}>Age 21 and Up</Text>
         </ScrollView>
       </PopUp>
@@ -790,13 +821,21 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
         title="Tips"
         onClose={() => setShowPopupTips(false)}
       />
+
       <PopUp
         visible={showRatePrompt}
         title="Mr. Mingles"
         onClose={() => setShowRatePrompt(false)}
       >
         <View style={{ alignItems: "center" }}>
-          <Text style={{ color: "#ffe3d0", fontSize: 18, textAlign: "center", marginBottom: 12 }}>
+          <Text
+            style={{
+              color: "#ffe3d0",
+              fontSize: 18,
+              textAlign: "center",
+              marginBottom: 12,
+            }}
+          >
             If you’re a nice awesome person, rate us in the app store!
           </Text>
           <View style={{ flexDirection: "row", gap: 10 }}>
@@ -804,7 +843,10 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
               <Text style={shopStyles.buyText}>Yeah I’m the best</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[shopStyles.buyBtn, { backgroundColor: "rgba(255,255,255,0.06)" }]}
+              style={[
+                shopStyles.buyBtn,
+                { backgroundColor: "rgba(255,255,255,0.06)" },
+              ]}
               onPress={handleRateNo}
             >
               <Text style={{ color: "#ffe3d0" }}>No I don’t wanna</Text>
@@ -822,7 +864,6 @@ const DRINK_BOX = rectInFront(0.53, DRINK_TOP_FRAC, 0.13, 0.22);
           Ok no worries… Oh btw completely unrelated, here’s an ad :)
         </Text>
       </PopUp>
-
     </>
   );
 }
@@ -849,7 +890,7 @@ const styles = StyleSheet.create({
     width: "70%",
     alignItems: "center",
     justifyContent: "center",
-    height: "38%"
+    height: "38%",
   },
   minglesImage: {
     width: width * 0.8,
@@ -861,7 +902,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "80%",
     alignItems: "center",
-    // pointerEvents none above
   },
   bubbleContainer: {
     position: "absolute",
@@ -869,13 +909,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
   },
   mmfront: {
     width: "100%",
     height: "80%",
     position: "absolute",
-    bottom: 0
+    bottom: 0,
   },
   bubble: {
     width: width * 0.9,
@@ -883,17 +923,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingHorizontal: 10,
     alignItems: "center",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
   },
-  arrow: { width: 40, alignItems: "center", justifyContent: "center", position: "relative", bottom: 15 },
+  arrow: {
+    width: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    bottom: 15,
+  },
   bubbleContent: {
     position: "absolute",
-    top: 0, 
+    top: 0,
     bottom: 25,
     left: 40,
     right: 40,
     justifyContent: "center",
-    alignItems: "center"
+    alignItems: "center",
   },
   bubbleText: {
     fontFamily: FontNames.MontserratRegular,
@@ -927,7 +973,7 @@ const styles = StyleSheet.create({
     right: "27%",
     width: 70,
     height: 30,
-    zIndex: 550
+    zIndex: 550,
   },
   overlayTouchableRules: {
     position: "absolute",
@@ -935,7 +981,7 @@ const styles = StyleSheet.create({
     right: "30%",
     width: 70,
     height: 30,
-    zIndex: 550
+    zIndex: 550,
   },
   overlayTouchableTips: {
     position: "absolute",
@@ -984,14 +1030,14 @@ const styles = StyleSheet.create({
     color: "#d8bfd8",
     fontFamily: FontNames.MontserratRegular,
     textAlign: "center",
-    marginBottom: -35
+    marginBottom: -35,
   },
   hours: {
     fontSize: 26,
     color: "#ffe3d0",
     fontFamily: FontNames.MontserratExtraLightItalic,
     textAlign: "center",
-    marginBottom: 20
+    marginBottom: 20,
   },
   vipContainer: {
     display: "flex",
@@ -1000,21 +1046,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   vipText: {
-    color: "red",          // highlight VIP in red
+    color: "red",
     fontSize: 26,
     fontFamily: FontNames.MontserratBold,
     marginRight: 6,
-    marginBottom: 5
+    marginBottom: 5,
   },
   ruleText: {
     fontSize: 26,
     color: "#e78bbb",
     textAlign: "center",
-    marginBottom: 10
+    marginBottom: 10,
   },
   dontPressHotspot: {
     position: "absolute",
-    bottom: "20.5%",   // tweak to sit “on the bar next to the chalkboard”
+    bottom: "20.5%",
     right: "44%",
     width: 160,
     height: 32,
@@ -1028,6 +1074,7 @@ const styles = StyleSheet.create({
   },
   dontPressDisabled: { opacity: 0.6 },
 });
+
 const drinkModalStyles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
@@ -1035,18 +1082,28 @@ const drinkModalStyles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  modalContainer: { width: "90%", height: "80%", backgroundColor: "transparent" },
+  modalContainer: {
+    width: "90%",
+    height: "80%",
+    backgroundColor: "transparent",
+  },
   menuBackground: { width: "100%", height: "100%" },
-  closeHotspot: { position: "absolute", top: 40, right: 0, width: 80, height: 80 },
+  closeHotspot: {
+    position: "absolute",
+    top: 40,
+    right: 0,
+    width: 80,
+    height: 80,
+  },
   labelImage: { width: 55, height: 55 },
-  wine:    { position: "absolute", top: "42%", left: "28%" },
-  beer:    { position: "absolute", top: "55%", left: "28%" },
+  wine: { position: "absolute", top: "42%", left: "28%" },
+  beer: { position: "absolute", top: "55%", left: "28%" },
   whiskey: { position: "absolute", top: "67%", left: "28%" },
   martini: { position: "absolute", top: "82%", left: "28%" },
-  vodka:   { position: "absolute", top: "42%", left: "75%" },
+  vodka: { position: "absolute", top: "42%", left: "75%" },
   tequila: { position: "absolute", top: "55%", left: "75%" },
-  absinthe:{ position: "absolute", top: "67%", left: "75%" },
-  water:   { position: "absolute", top: "82%", left: "75%" },
+  absinthe: { position: "absolute", top: "67%", left: "75%" },
+  water: { position: "absolute", top: "82%", left: "75%" },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
@@ -1127,10 +1184,14 @@ const shopStyles = StyleSheet.create({
     fontSize: 22,
     fontFamily: FontNames.MontserratBold,
   },
-  
+
   vipScroll: { maxHeight: height * 0.5, width: "100%" },
-  vipScrollContent: { alignItems: "center", paddingHorizontal: 12, paddingBottom: 12 },
-  
+  vipScrollContent: {
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
+
   vipContainer: {
     alignItems: "center",
     paddingVertical: 6,
@@ -1144,8 +1205,7 @@ const shopStyles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 8,
   },
-  
+
   scroll: { maxHeight: height * 0.6, width: "100%" },
   scrollContent: { paddingHorizontal: 8, paddingBottom: 12 },
 });
-
