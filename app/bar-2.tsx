@@ -719,12 +719,12 @@ export default function Bar2Screen() {
 
   useEffect(() => {
     if (!videoRef.current) return;
-    if (started && tvOn) {
-      videoRef.current.playAsync().catch(() => {});
-    } else {
-      videoRef.current.pauseAsync().catch(() => {});
-    }
-  }, [tvOn, started]);
+    // if (started && tvOn) {
+    videoRef.current.playAsync().catch(() => {});
+    // } else {
+    //   videoRef.current.pauseAsync().catch(() => {});
+    // }
+  }, []);
 
   const toggleTV = () => setTvOn((prev) => !prev);
 
@@ -1380,6 +1380,39 @@ export default function Bar2Screen() {
           }}
           resizeMode="stretch"
         />
+
+        {profileComplete && (showStartOverlay || leaving) && (
+          <View
+            style={rectInFront(
+              MINGLES_F.x,
+              MINGLES_F.y,
+              MINGLES_F.w,
+              MINGLES_F.h,
+              { zIndex: 29 }
+            )}
+            onLayout={(e) => setMinglesBox(e.nativeEvent.layout)}
+          >
+            <MMAnimated
+              showBackground={false}
+              showBarFront={false}
+              showControls={false}
+              enterOnMount
+              leaving={leaving}
+              minglesOffsetY={0}
+              onLeaveComplete={() => {
+                setLeaving(false);
+                setShowStartOverlay(false); // ✅ Hide overlay after animation
+
+                setStarted(true);
+              }}
+              onPress={() => {
+                console.log("MM pressed");
+              }}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
+        )}
+
         {profileComplete && showStartOverlay && (
           <>
             {/* Bubble overlay */}
@@ -1399,7 +1432,7 @@ export default function Bar2Screen() {
                 visible={bubbleVisible}
                 width={dispW * 0.9}
                 height={dispW * 0.45}
-                delayTime={1000}
+                delayTime={800}
                 anchor={{ x: 0.5, y: 0 }}
                 onHidden={() => {
                   setShowStartOverlay(false);
@@ -1414,7 +1447,7 @@ export default function Bar2Screen() {
                 {
                   position: "absolute",
                   left: btnLeft,
-                  top: btnTop - 50,
+                  top: btnTop - 20,
                   width: btnW,
                   height: btnH,
                   zIndex: 40,
@@ -1460,7 +1493,6 @@ export default function Bar2Screen() {
           <>
             {/* Mr. Mingles (FRONT-anchored) */}
             <View
-              pointerEvents="none"
               style={rectInFront(
                 MINGLES_F.x,
                 MINGLES_F.y,
@@ -1475,14 +1507,17 @@ export default function Bar2Screen() {
                 showBarFront={false}
                 showControls={false}
                 enterOnMount
-                leaving={leaving}
-                onLeaveComplete={() => {
-                  setLeaving(false);
-                  setStarted(true);
-                }}
-                style={StyleSheet.absoluteFill}
+                style={StyleSheet.absoluteFillObject}
+                minglesOffsetY={8}
                 onPress={() => {
-                  console.log("MM pressed – go somewhere");
+                  // 👈 this runs AFTER the internal wiggle is triggered
+                  if (welcomeTyping) {
+                    setWelcomeDisplayed(WELCOME_MESSAGES[welcomeIndex]);
+                    setWelcomeTyping(false);
+                  } else {
+                    setPointerTarget(null);
+                    handleWelcomeAdvance();
+                  }
                 }}
               />
             </View>
@@ -1499,10 +1534,18 @@ export default function Bar2Screen() {
                 zIndex: 30,
               }}
             >
-              <ImageBackground
+              {/* <ImageBackground
                 source={require("../assets/images/speech-bubble.png")}
                 style={{ flex: 1 }}
                 resizeMode="stretch"
+              > */}
+              <SpeechBubblePop
+                source={require("../assets/images/speech-bubble.png")}
+                visible={true}
+                width={dispW * 0.9}
+                height={dispW * 0.45}
+                delayTime={800}
+                anchor={{ x: 0.5, y: 0 }}
               >
                 <View
                   style={{
@@ -1514,7 +1557,8 @@ export default function Bar2Screen() {
                 >
                   <Text style={styles.bubbleText}>{welcomeDisplayed}</Text>
                 </View>
-              </ImageBackground>
+              </SpeechBubblePop>
+              {/* </ImageBackground> */}
             </View>
           </>
         )}
@@ -1527,7 +1571,7 @@ export default function Bar2Screen() {
                 position: "absolute",
                 // near face/hand inside the tap box
                 left: toPxLeft(MINGLES_TAP.x + MINGLES_TAP.w * 0.78) - 150,
-                top: toPxTop(MINGLES_TAP.y + MINGLES_TAP.h * 0.22) + 28,
+                top: toPxTop(MINGLES_TAP.y + MINGLES_TAP.h * 0.22) - 30,
                 zIndex: 2000,
                 transform: [{ scale: pointerScale }, { rotate: "85deg" }],
               }}
@@ -1555,11 +1599,11 @@ export default function Bar2Screen() {
           )}
 
         {/* TV */}
-        {profileComplete && started && (
+        {profileComplete && (
           <Pressable
             onPress={toggleTV}
             style={[
-              { zIndex: 1000 },
+              { zIndex: 28 }, // behind speech
               rectOnBack(TV.x, TV.y, TV.w, TV.h, {
                 top: offsetY - 48 + TV.y * dispH,
               }),
@@ -1570,7 +1614,7 @@ export default function Bar2Screen() {
             <Video
               ref={videoRef}
               source={steamboat}
-              style={StyleSheet.absoluteFill}
+              style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
               resizeMode="cover"
               isLooping
               shouldPlay={started && tvOn}
@@ -1581,19 +1625,20 @@ export default function Bar2Screen() {
               <View
                 style={{
                   ...StyleSheet.absoluteFillObject,
-                  backgroundColor: "black",
+                  backgroundColor: "rgba(16, 16, 16, 1)",
                   justifyContent: "center",
                   alignItems: "center",
+                  borderRadius: 12,
                 }}
               >
-                <Text
+                {/* <Text
                   style={{
                     color: "#ffe3d0",
                     fontFamily: FontNames.MontserratRegular,
                   }}
                 >
                   —
-                </Text>
+                </Text> */}
               </View>
             )}
           </Pressable>
@@ -1660,37 +1705,6 @@ export default function Bar2Screen() {
           </Animated.View>
         )}
 
-        {profileComplete && (showStartOverlay || leaving) && (
-          <Pressable
-            style={rectInFront(
-              MINGLES_F.x,
-              MINGLES_F.y,
-              MINGLES_F.w,
-              MINGLES_F.h,
-              { zIndex: 5 }
-            )}
-            onLayout={(e) => setMinglesBox(e.nativeEvent.layout)}
-            onPress={() => {
-              console.log("WRAPPER: Mingles area pressed"); // 🔴 you MUST see this
-            }}
-          >
-            <MMAnimated
-              showBackground={false}
-              showBarFront={false}
-              showControls={false}
-              enterOnMount
-              leaving={leaving}
-              onLeaveComplete={() => {
-                setLeaving(false);
-                setShowStartOverlay(false); // ✅ Hide overlay after animation
-
-                setStarted(true);
-              }}
-              style={StyleSheet.absoluteFill}
-            />
-          </Pressable>
-        )}
-
         {/* Front layer (glass/bar) — fully visible on all devices */}
         <View
           pointerEvents="none"
@@ -1700,18 +1714,22 @@ export default function Bar2Screen() {
             top: frontTop,
             width: frontWidth,
             height: frontHeight + 15,
-            zIndex: 10,
+            zIndex: 30,
           }}
         >
           <Image
             source={FRONT_IMG}
-            style={{ width: "100%", height: "100%" }}
+            style={
+              profileComplete
+                ? { width: "100%", height: "100%", bottom: "5%" }
+                : { width: "100%", height: "100%", bottom: "12%" }
+            }
             resizeMode="contain" // show the whole asset without distortion
           />
         </View>
 
         {/* FRONT-anchored tap area for Mingles (debug color shown) */}
-        {!profileComplete && (
+        {/* {!profileComplete && (
           <Pressable
             onPress={() => {
               if (welcomeTyping) {
@@ -1734,7 +1752,7 @@ export default function Bar2Screen() {
             // Optional: keep layout for future diagnostics
             onLayout={(e) => setMinglesBox(e.nativeEvent.layout)}
           />
-        )}
+        )} */}
       </View>
 
       {/* Skip (always above stage so it can't be covered) */}

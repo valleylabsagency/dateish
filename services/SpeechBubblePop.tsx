@@ -1,6 +1,12 @@
 // SpeechBubblePop.tsx
-import React, { useEffect } from "react";
-import { Image, ImageSourcePropType, StyleProp, ViewStyle } from "react-native";
+import React, { useEffect, ReactNode } from "react";
+import {
+  Image,
+  ImageSourcePropType,
+  StyleProp,
+  ViewStyle,
+  View,
+} from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -33,17 +39,21 @@ type Props = {
 
   /** Called after the HIDE animation finishes. */
   onHidden?: () => void;
+
+  /** Optional content rendered on top of the bubble image. */
+  children?: ReactNode;
 };
 
 const SpeechBubblePop: React.FC<Props> = ({
   source,
   width,
   height,
-  anchor = { x: 0.5, y: 1 }, // bottom-center feels right for a speech bubble
+  anchor = { x: 0.5, y: 1 }, // bottom-center
   visible,
   style,
   delayTime = 0,
   onHidden,
+  children,
 }) => {
   const scale = useSharedValue(0);
   const opacity = useSharedValue(0);
@@ -57,9 +67,9 @@ const SpeechBubblePop: React.FC<Props> = ({
       scale.value = withDelay(
         delayTime,
         withSequence(
-          withTiming(1.1, { duration: 130 }), // overshoot
+          withTiming(1.1, { duration: 130 }),
           withTiming(0.9, { duration: 90 }),
-          withTiming(1, { duration: 80 }) // settle
+          withTiming(1, { duration: 80 })
         )
       );
 
@@ -76,14 +86,12 @@ const SpeechBubblePop: React.FC<Props> = ({
   }, [visible, delayTime, onHidden, scale, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => {
-    // pivot at anchor instead of the center
     const ax = anchor.x ?? 0.5;
     const ay = anchor.y ?? 1;
 
     const sx = scale.value;
     const sy = scale.value;
 
-    // shift so the anchor stays put while scaling
     const tx = (0.5 - ax) * width * (1 - sx);
     const ty = (0.5 - ay) * height * (1 - sy);
 
@@ -97,8 +105,6 @@ const SpeechBubblePop: React.FC<Props> = ({
     };
   });
 
-  // Important: we *always* render this, even when hidden,
-  // so the hide animation has something to run on.
   return (
     <Animated.View style={[{ width, height }, animatedStyle, style]}>
       <Image
@@ -106,6 +112,24 @@ const SpeechBubblePop: React.FC<Props> = ({
         style={{ width: "100%", height: "100%" }}
         resizeMode="stretch"
       />
+
+      {children && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: 20,
+          }}
+        >
+          {children}
+        </View>
+      )}
     </Animated.View>
   );
 };

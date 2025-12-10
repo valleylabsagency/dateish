@@ -30,6 +30,8 @@ import ChitChats, { ChatType, SavedChat } from "./ChitChats";
 import closeIcon from "../assets/images/x.png";
 import LottieView from "lottie-react-native";
 import animationData from "../assets/videos/mm-dancing.json";
+import * as ImagePicker from "expo-image-picker";
+
 // import { Camera, useCameraDevice } from "react-native-vision-camera";
 // import FaceDetector from "@react-native-ml-kit/face-detection";
 
@@ -363,6 +365,36 @@ export default function BathroomScreen() {
       setOnboardingVisible(false);
     }
   }, [params.onboard, profileComplete, profile]);
+
+  // temporary camera for expo
+  const handleTakePhoto = async () => {
+    // ask for camera permission
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Camera permission needed",
+        "Please allow camera access to take a profile photo."
+      );
+      return;
+    }
+
+    // open native camera
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1], // square crop for your circle avatar
+      quality: 0.8,
+      cameraType: ImagePicker.CameraType.front, // selfie cam
+    });
+
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+    if (!asset?.uri) return;
+
+    // just save the uri, same as before
+    setPhotoUri(asset.uri);
+  };
 
   // take photo
 
