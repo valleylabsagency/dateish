@@ -415,6 +415,9 @@ export default function Bar2Screen() {
     ...(extra || {}),
   });
 
+  const skipOpacity = useRef(new Animated.Value(0)).current;
+  const pointerOpacity = useRef(new Animated.Value(0)).current;
+
   // toast for “message sent / Chit Chat Sent”
   const [toastText, setToastText] = useState<string | null>(null);
 
@@ -636,6 +639,30 @@ export default function Bar2Screen() {
     setWelcomeDisplayed(finalMsg);
     setPointerTarget("bathroom");
   };
+
+  // skip button fade-in
+  useEffect(() => {
+    if (!profileComplete && cameFromEntrance) {
+      Animated.timing(skipOpacity, {
+        toValue: 1,
+        duration: 600, // fade-in duration
+        delay: 2000, // wait 2 seconds
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [profileComplete, cameFromEntrance]);
+
+  // skip button fade-in
+  useEffect(() => {
+    if (!profileComplete && cameFromEntrance) {
+      Animated.timing(pointerOpacity, {
+        toValue: 1,
+        duration: 600, // fade-in duration
+        delay: 1200, // wait 2 seconds
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [profileComplete, cameFromEntrance]);
 
   // Existing chat bar state
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -1574,6 +1601,7 @@ export default function Bar2Screen() {
                 top: toPxTop(MINGLES_TAP.y + MINGLES_TAP.h * 0.22) - 30,
                 zIndex: 2000,
                 transform: [{ scale: pointerScale }, { rotate: "85deg" }],
+                opacity: pointerOpacity,
               }}
             >
               <MaterialIcons name="pan-tool-alt" size={56} color="#ffe3d0" />
@@ -1757,26 +1785,31 @@ export default function Bar2Screen() {
 
       {/* Skip (always above stage so it can't be covered) */}
       {!profileComplete && cameFromEntrance && (
-        <TouchableOpacity
-          onPress={skipWelcome}
+        <Animated.View
           style={{
+            opacity: skipOpacity,
             position: "absolute",
-            // align to the same visual spot: ~22% down from navbar, ~6% from right edge
             top: topNavH + sh * 0.22,
             right: sw * 0.4,
-            backgroundColor: "#6e1944",
-            borderWidth: 4,
-            borderColor: "#460b2a",
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderRadius: 12,
             zIndex: 3000,
             elevation: 3000,
-            width: 70,
           }}
         >
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={skipWelcome}
+            style={{
+              backgroundColor: "#6e1944",
+              borderWidth: 4,
+              borderColor: "#460b2a",
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 12,
+              width: 70,
+            }}
+          >
+            <Text style={styles.skipText}>Skip</Text>
+          </TouchableOpacity>
+        </Animated.View>
       )}
 
       {/* ─── PROFILE DETAIL OVERLAY (non-blocking) ──────────────────── */}
