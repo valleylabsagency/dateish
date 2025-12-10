@@ -1,19 +1,11 @@
 // SpeechBubblePop.tsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Image,
-  ImageSourcePropType,
-  LayoutChangeEvent,
-  View,
-  ViewStyle,
-  StyleProp,
-} from "react-native";
+import React, { useEffect } from "react";
+import { Image, ImageSourcePropType, StyleProp, ViewStyle } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSequence,
   withTiming,
-  withSpring,
   withDelay,
   runOnJS,
 } from "react-native-reanimated";
@@ -22,107 +14,100 @@ type Anchor = { x: number; y: number }; // each in [0..1]
 
 type Props = {
   source: ImageSourcePropType;
+
+  /** Explicit width/height in px (we'll always pass them from parent). */
+  width: number;
+  height: number;
+
+  /** Where the bubble grows from, normalized (0..1). Default bottom center. */
   anchor?: Anchor;
+
+  /** Show/hide the bubble (with animation). */
   visible: boolean;
+
+  /** Extra wrapper style (positioning, margins, etc.). */
   style?: StyleProp<ViewStyle>;
-  popDurationMs?: number;
-  overshootScale?: number;
+
+  /** Delay before popping IN (ms). */
   delayTime?: number;
-  onShown?: () => void;
+
+  /** Called after the HIDE animation finishes. */
   onHidden?: () => void;
 };
 
-const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
-
-export default function SpeechBubblePop({
+const SpeechBubblePop: React.FC<Props> = ({
   source,
-  anchor = { x: 0.5, y: 0.5 },
+  width,
+  height,
+  anchor = { x: 0.5, y: 1 }, // bottom-center feels right for a speech bubble
   visible,
   style,
-  popDurationMs = 110,
-  overshootScale = 1.08,
-  delayTime = 1500,
-  onShown,
+  delayTime = 0,
   onHidden,
-}: Props) {
-  const [measured, setMeasured] = useState({ w: 0, h: 0 });
+}) => {
   const scale = useSharedValue(0);
-
-  const ax = useMemo(() => clamp01(anchor.x), [anchor.x]);
-  const ay = useMemo(() => clamp01(anchor.y), [anchor.y]);
-
-  const onLayout = useCallback(
-    (e: LayoutChangeEvent) => {
-      const { width: w, height: h } = e.nativeEvent.layout;
-      if (w !== measured.w || h !== measured.h) {
-        setMeasured({ w, h });
-      }
-    },
-    [measured.w, measured.h]
-  );
+  const opacity = useSharedValue(0);
 
   useEffect(() => {
     if (visible) {
+      // POP IN
+      scale.value = 0.2;
+      opacity.value = 0;
+
       scale.value = withDelay(
         delayTime,
         withSequence(
-          withTiming(overshootScale, { duration: popDurationMs }),
-          withSpring(
-            1,
-            {
-              damping: 6,
-              stiffness: 140,
-              mass: 0.6,
-              overshootClamping: false,
-              restDisplacementThreshold: 0.001,
-              restSpeedThreshold: 0.001,
-            },
-            (finished) => {
-              "worklet";
-              if (finished && onShown) runOnJS(onShown)();
-            }
-          )
+          withTiming(1.1, { duration: 130 }), // overshoot
+          withTiming(0.9, { duration: 90 }),
+          withTiming(1, { duration: 80 }) // settle
         )
       );
+
+      opacity.value = withDelay(delayTime, withTiming(1, { duration: 120 }));
     } else {
-      scale.value = withTiming(0, { duration: 120 }, (finished) => {
-        "worklet";
-        if (finished && onHidden) runOnJS(onHidden)();
+      // POP OUT
+      scale.value = withTiming(0.8, { duration: 120 }, (finished) => {
+        if (finished && onHidden) {
+          runOnJS(onHidden)();
+        }
       });
+      opacity.value = withTiming(0, { duration: 120 });
     }
-  }, [visible, overshootScale, popDurationMs, delayTime, onShown, onHidden]);
+  }, [visible, delayTime, onHidden, scale, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => {
-    const w = measured.w || 0;
-    const h = measured.h || 0;
+    // pivot at anchor instead of the center
+    const ax = anchor.x ?? 0.5;
+    const ay = anchor.y ?? 1;
 
-    const tx = -ax * w;
-    const ty = -ay * h;
+    const sx = scale.value;
+    const sy = scale.value;
+
+    // shift so the anchor stays put while scaling
+    const tx = (0.5 - ax) * width * (1 - sx);
+    const ty = (0.5 - ay) * height * (1 - sy);
 
     return {
+      opacity: opacity.value,
       transform: [
         { translateX: tx },
         { translateY: ty },
         { scale: scale.value },
-        { translateX: -tx },
-        { translateY: -ty },
       ],
-      opacity: scale.value === 0 ? 0 : 1,
     };
-  }, [measured.w, measured.h, ax, ay]);
+  });
 
+  // Important: we *always* render this, even when hidden,
+  // so the hide animation has something to run on.
   return (
-    <View style={style} pointerEvents="none">
-      <Animated.View
-        onLayout={onLayout}
-        style={[{ flex: 1 }, animatedStyle]} // ⬅️ this is the key
-      >
-        <Image
-          source={source}
-          style={{ width: "100%", height: "100%" }} // fill parent
-          resizeMode="stretch"
-        />
-      </Animated.View>
-    </View>
+    <Animated.View style={[{ width, height }, animatedStyle, style]}>
+      <Image
+        source={source}
+        style={{ width: "100%", height: "100%" }}
+        resizeMode="stretch"
+      />
+    </Animated.View>
   );
-}
+};
+
+export default SpeechBubblePop;

@@ -320,7 +320,7 @@ export default function Bar2Screen() {
   });
 
   // pre-start bubble (blank) visibility
-  const [bubbleVisible, setBubbleVisible] = useState(false);
+  const [bubbleVisible, setBubbleVisible] = useState(true);
 
   // slide-in for the avatars row
   const avatarsX = useRef(new Animated.Value(width)).current; // start off-screen right
@@ -1382,33 +1382,32 @@ export default function Bar2Screen() {
         />
         {profileComplete && showStartOverlay && (
           <>
-            {/* Blank bubble above the stage (same position as onboarding bubble) */}
-            {bubbleVisible && (
-              <View
-                style={{
-                  position: "absolute",
-                  left: offsetX + dispW * 0.05,
-                  top: 50, // 2px under stage top (= under Navbar)
-                  width: dispW * 0.9,
-                  height: bubbleH, // ✅ capped height
-                  zIndex: 30,
+            {/* Bubble overlay */}
+            <View
+              style={{
+                position: "absolute",
+                left: offsetX + dispW * 0.05,
+                top: 50,
+                width: dispW * 0.9,
+                height: dispW * 0.45, // ⬅️ FIX: give it a real fixed height
+                zIndex: 30,
+                // backgroundColor: "rgba(0,255,0,0.3)", // 👈 TEMP: debug
+              }}
+            >
+              <SpeechBubblePop
+                source={require("../assets/images/speech-bubble.png")}
+                visible={bubbleVisible}
+                width={dispW * 0.9}
+                height={dispW * 0.45}
+                delayTime={1000}
+                anchor={{ x: 0.5, y: 0 }}
+                onHidden={() => {
+                  setShowStartOverlay(false);
                 }}
-              >
-                {/* <ImageBackground
-                  source={require("../assets/images/speech-bubble.png")}
-                  style={{ flex: 1 }}
-                  resizeMode="stretch"
-                /> */}
-                <SpeechBubblePop
-                  source={require("../assets/images/speech-bubble.png")}
-                  visible={true}
-                  anchor={{ x: 0.2, y: -0.5 }}
-                  style={{ flex: 1 }}
-                  delayTime={1000}
-                />
-              </View>
-            )}
-            {/* Start Chatting button pinned ~20px above navbar */}
+              />
+            </View>
+
+            {/* Start Chatting button */}
             <TouchableOpacity
               style={[
                 styles.startButton,
@@ -1422,10 +1421,12 @@ export default function Bar2Screen() {
                 },
               ]}
               onPress={async () => {
+                // 👇 this is where you trigger the pop-out
                 setBubbleVisible(false);
+
                 setLeaving(true);
-                setShowStartOverlay(false);
-                setTimeout(() => setStarted(true), 1100);
+                // setShowStartOverlay(false); // ⬅ if you want to SEE the exit animation,
+                // move this into onHidden instead.
                 try {
                   const db = getDatabase();
                   const statusRef = rtdbRef(
@@ -1445,8 +1446,8 @@ export default function Bar2Screen() {
                 style={styles.startButtonText}
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.6} // shrink instead of truncating
-                ellipsizeMode="clip" // just in case, don’t show "…"
+                minimumFontScale={0.6}
+                ellipsizeMode="clip"
               >
                 Start Chatting
               </Text>
@@ -1659,14 +1660,14 @@ export default function Bar2Screen() {
           </Animated.View>
         )}
 
-        {profileComplete && showStartOverlay && (
+        {profileComplete && (showStartOverlay || leaving) && (
           <Pressable
             style={rectInFront(
               MINGLES_F.x,
               MINGLES_F.y,
               MINGLES_F.w,
               MINGLES_F.h,
-              { zIndex: 5 } // a bit above bar-front (10), below bubble/button if needed
+              { zIndex: 5 }
             )}
             onLayout={(e) => setMinglesBox(e.nativeEvent.layout)}
             onPress={() => {
@@ -1681,6 +1682,8 @@ export default function Bar2Screen() {
               leaving={leaving}
               onLeaveComplete={() => {
                 setLeaving(false);
+                setShowStartOverlay(false); // ✅ Hide overlay after animation
+
                 setStarted(true);
               }}
               style={StyleSheet.absoluteFill}
@@ -1688,7 +1691,6 @@ export default function Bar2Screen() {
           </Pressable>
         )}
 
-        {/* Front layer (glass/bar) — fully visible on all devices */}
         {/* Front layer (glass/bar) — fully visible on all devices */}
         <View
           pointerEvents="none"
