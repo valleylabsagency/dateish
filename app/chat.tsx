@@ -100,6 +100,8 @@ export default function ChatScreen() {
   const [mingDisplayedText, setMingDisplayedText] = useState("");
   const [hasSentInitial, setHasSentInitial] = useState(false);
   const fullMingText = "Wait for them to answer. Don't be a creep!";
+  const [partnerDeletedChat, setPartnerDeletedChat] = useState(false);
+
 
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput | null>(null);
@@ -278,22 +280,42 @@ useEffect(() => {
   }, [mingModalVisible]);
 
   
-useEffect(() => {
-  if (!chatId) return;
-  const chatRef = doc(firestore, "chats", chatId);
-  const unsubscribe = onSnapshot(chatRef, (snap) => {
-    const data = snap.data();
-    // If the partner removed *you* from visibleFor:
-    if (data?.visibleFor && !data.visibleFor.includes(currentUserId)) {
-      Alert.alert(
-        `${partnerProfile?.name || "They"} deleted this conversation.`,
-        "Time to move on!",
-        [{ text: "OK", onPress: () => router.replace("/inbox") }]
-      );
-    }
-  });
-  return () => unsubscribe();
-}, [chatId, currentUserId, partnerProfile]);
+  useEffect(() => {
+    if (!chatId || !currentUserId || !partnerId) return;
+
+    const chatRef = doc(firestore, "chats", chatId);
+    const unsubscribe = onSnapshot(chatRef, (snap) => {
+      const data: any = snap.data() || {};
+      const visibleFor: string[] = Array.isArray(data.visibleFor)
+        ? data.visibleFor
+        : [];
+
+      const youVisible   = visibleFor.includes(currentUserId);
+      const themVisible  = visibleFor.includes(partnerId);
+
+      // 👉 You deleted it on your side
+      if (!youVisible && themVisible) {
+        setPartnerDeletedChat(false);
+        setCurrentChatId(null);
+        // Optionally kick back to inbox since this chat is hidden for you
+        router.replace("/inbox");
+        return;
+      }
+
+      // 👉 They deleted it on their side
+      if (youVisible && !themVisible) {
+        setPartnerDeletedChat(true);   // this drives the "They deleted this convo" overlay
+        setCurrentChatId(null);
+        return;
+      }
+
+      // No deletion / both visible
+      setPartnerDeletedChat(false);
+    });
+
+    return () => unsubscribe();
+  }, [chatId, currentUserId, partnerId, setCurrentChatId]);
+
 
 // 2a) initialize the RTDB ref once you know chatId:
 useEffect(() => {
@@ -359,6 +381,7 @@ useEffect(() => {
 
 
   const sendMessage = async () => {
+    if (partnerDeletedChat) return; // don't allow sending to a deleted convo
     if (inputMessage.trim() === "" || !chatId) return;
     //setTypingModalVisible(false);
     Keyboard.dismiss();
@@ -757,6 +780,15 @@ useEffect(() => {
           </View>
         </View>
       </Modal>
+      {partnerDeletedChat && (
+        <View style={styles.deletedOverlay}>
+          <View style={styles.deletedBox}>
+            <Text style={styles.deletedText}>
+              {(partnerProfile?.name || "They")} deleted this convo
+            </Text>
+          </View>
+        </View>
+      )}
 
       <View style={styles.bottomNavbarContainer}>
         <BottomNavbar selectedTab="Chats" />
@@ -1142,6 +1174,33 @@ const styles = ScaledSheet.create({
     bottom: "-95%",
     right: "-20%",
   },
+    deletedOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 50,
+  },
+  deletedBox: {
+    backgroundColor: "#020621",
+    paddingVertical: "20@ms",
+    paddingHorizontal: "32@ms",
+    borderRadius: "16@ms",
+    borderWidth: "3@ms",
+    borderColor: "#fff",
+    maxWidth: "80%",
+  },
+  deletedText: {
+    color: "#fff",
+    fontSize: "22@ms",
+    textAlign: "center",
+    fontFamily: FontNames.MontserratRegular,
+  },
+
 });
 
 export { ChatScreen };

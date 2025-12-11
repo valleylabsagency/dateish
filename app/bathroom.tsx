@@ -144,6 +144,7 @@ const photoSize = Math.round(clamp(baseAvatar * mult, 82, 168));
   const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0);
 
   const [hasSavedInSession, setHasSavedInSession] = useState(!!profileComplete);
+  const [dismissedOnboarding, setDismissedOnboarding] = useState(false);
 
 
   // DOB step fields + refs for auto-advance
@@ -336,27 +337,31 @@ async function validateFace(fileUri: string) {
   }
   
 
-  // OPEN ONBOARDING when routed from bar welcome (onboard=true) AND we *know* profile is incomplete
-useEffect(() => {
-  // Prefer the context flag if it’s reliable; otherwise fall back to local computed completeness
-  const effectiveComplete =
-    (typeof profileComplete === "boolean" ? profileComplete : undefined) ??
-    isProfileCompleteLocal(profile);
+  // OPEN ONBOARDING only when routed from bar (?onboard=true) AND profile is incomplete
+  useEffect(() => {
+    const effectiveComplete =
+      (typeof profileComplete === "boolean" ? profileComplete : undefined) ??
+      isProfileCompleteLocal(profile);
 
-  // Do nothing until we can actually tell (avoid false “incomplete” before load)
-  if (effectiveComplete === undefined) return;
+    // Do nothing until we actually know
+    if (effectiveComplete === undefined) return;
 
-  const shouldOnboard =
-  (params.onboard === "true" || !effectiveComplete) && effectiveComplete === false;
+    const comingFromBar = params.onboard === "true";
 
+    const shouldOnboard =
+      comingFromBar &&
+      !effectiveComplete &&
+      !hasSavedInSession &&
+      !dismissedOnboarding;
 
-  if (shouldOnboard) {
-    setOnboardingStep(0);
-    setOnboardingVisible(true);
-  } else {
-    setOnboardingVisible(false);
-  }
-}, [params.onboard, profileComplete, profile]);
+    if (shouldOnboard) {
+      setOnboardingStep(0);
+      setOnboardingVisible(true);
+    } else if (!comingFromBar || effectiveComplete || dismissedOnboarding) {
+      setOnboardingVisible(false);
+    }
+  }, [params.onboard, profileComplete, profile, hasSavedInSession, dismissedOnboarding]);
+
 
 
   // take photo
@@ -601,7 +606,8 @@ useEffect(() => {
       setOnboardingStep(3);
     } else if (onboardingStep === 3) {
       setOnboardingVisible(false);
-      // user can complete remaining fields now
+      setDismissedOnboarding(true);
+     
     }
   };
 
@@ -832,7 +838,7 @@ useEffect(() => {
             // Before initial save, just behave like before (no auto-save),
             // but still tell the bar we came from the bathroom.
             if (!hasSavedInSession) {
-              router.replace("/bar-2");
+              router.back();
               return;
             }
 
@@ -1004,9 +1010,13 @@ useEffect(() => {
               <View style={modalStyles.modalOverlay}>
                 <TouchableOpacity
                   style={modalStyles.closeButton}
-                  onPress={() => setOnboardingVisible(false)}
+                  onPress={() => {
+                    setOnboardingVisible(false);
+                    setDismissedOnboarding(true);
+                  }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
+
                   <Image source={closeIcon} style={styles.closeIcon} />
                 </TouchableOpacity>
                 {renderOnboardingContent()}

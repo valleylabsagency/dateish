@@ -158,14 +158,15 @@ export default function InboxScreen() {
             const partnerUid = conv.users.find((u: string) => u !== currentUserId)!;
             const online = partnerStatus[partnerUid];
             const partnerRemoved = !(conv.visibleFor || []).includes(partnerUid); // partner deleted on their side
+
+            const containerStyle = online
+              ? listStyles.conversationContainer
+              : listStyles.disabledConversation;
+
             return (
               <TouchableOpacity
                 key={conv.id}
-                style={
-                  online
-                    ? listStyles.conversationContainer
-                    : listStyles.disabledConversation
-                }
+                style={containerStyle}
                 onPress={() => router.push(`/inbox?partner=${partnerUid}`)}
               >
                 <ConversationPreview
@@ -173,11 +174,14 @@ export default function InboxScreen() {
                   online={online}
                   currentUserId={currentUserId}
                 />
-                {partnerRemoved && (
+
+                {/* Offline banner overlay */}
+                {!online && (
                   <View style={listStyles.banner}>
-                    <Text style={listStyles.bannerText}>They deleted this chat</Text>
+                    <Text style={listStyles.bannerText}>User is offline</Text>
                   </View>
                 )}
+
                 <TouchableOpacity
                   style={online ? listStyles.trashOnline : listStyles.trashOffline}
                   onPress={() => handleTrashPress(conv.id)}
@@ -187,6 +191,7 @@ export default function InboxScreen() {
               </TouchableOpacity>
             );
           })}
+
         </ScrollView>
       )}
 
@@ -261,17 +266,23 @@ const listStyles = StyleSheet.create({
   },
   banner: {
     position: "absolute",
-    top: 6,
+    top: 20,
     left: 10,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    paddingVertical: 6,
     borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+    width: "90%"
   },
   bannerText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: 14,
+    fontFamily: FontNames.MontserratRegular,
   },
+
     
 });
 
