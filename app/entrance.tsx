@@ -43,6 +43,8 @@ import { AntDesign } from "@expo/vector-icons"; // Google
 import { FontAwesome } from "@expo/vector-icons"; // Meta (Facebook)
 import { Ionicons } from "@expo/vector-icons";
 import { useNeonFlicker } from "../Hooks/useNeonFlicker";
+import MusicToggleButton from "@/components/MusicToggleButton";
+import { MusicContext } from "../contexts/MusicContext";
 
 const { width, height } = Dimensions.get("window");
 const MESSAGE = "Happy Hour daily! ";
@@ -147,6 +149,7 @@ function isBarOpenNow(d = new Date()) {
 export default function EntranceScreen() {
   const router = useRouter();
   const { firstTime, setFirstTime } = useContext(FirstTimeContext);
+  const { beginEntranceTransition } = useContext(MusicContext);
 
   const [showAuth, setShowAuth] = useState(false);
   const [playAnimation, setPlayAnimation] = useState(false);
@@ -206,6 +209,18 @@ export default function EntranceScreen() {
   // small helpers
   const IDENT = authMethod === "email" ? emailAddr.trim() : userHandle.trim(); // what we sign in/up with
   const termsUrl = "https://dateishoffice.wixsite.com/dateish";
+
+  const navOnceRef = useRef(false);
+
+  const goToEntranceAnim = () => {
+    if (navOnceRef.current) return;
+    navOnceRef.current = true;
+
+    beginEntranceTransition();
+
+    // optional tiny headstart (keeps UX instant but makes fade actually begin)
+    setTimeout(() => router.replace("/entranceAnimation"), 80);
+  };
 
   function resetClipboard() {
     setAuthStep(1);
@@ -288,7 +303,7 @@ export default function EntranceScreen() {
       if (enteredCode.trim() === sentCode) {
         // Approved → Entrance Animation
         setShowAuth(false);
-        router.replace("/entranceAnimation");
+        goToEntranceAnim();
       } else {
         Alert.alert(
           "Authentication couldn’t finish successfully.",
@@ -442,8 +457,7 @@ export default function EntranceScreen() {
         setNotVipVisible(true);
         return;
       }
-
-      router.replace("/entranceAnimation");
+      goToEntranceAnim();
     } catch (err: any) {
       console.error("Auth error:", err?.code, err?.message || err);
       const { title, message, code } = mapFirebaseAuthError(err);
@@ -489,7 +503,7 @@ export default function EntranceScreen() {
         setNotVipVisible(true);
         return;
       }
-      router.replace("/entranceAnimation");
+      goToEntranceAnim();
     } catch (err: any) {
       const { title, message } = mapFirebaseAuthError(err);
       setAuthError(true);
@@ -537,7 +551,7 @@ export default function EntranceScreen() {
         setNotVipVisible(true);
         return;
       }
-      router.replace("/entranceAnimation"); //entrance anim
+      goToEntranceAnim();
     } catch (err: any) {
       const { title, message } = mapFirebaseAuthError(err);
       setAuthError(true);
@@ -604,14 +618,15 @@ export default function EntranceScreen() {
   const closeCongratsAndEnter = () => {
     setShowVipCongrats(false);
     setShowConfetti(false);
-    router.replace("/entranceAnimation");
+    goToEntranceAnim();
   };
 
   const handleEntrancePress = () => {
     const user = auth.currentUser;
     if (isBarOpen) {
       if (user) {
-        router.replace("/entranceAnimation"); //entrance anim
+        goToEntranceAnim();
+        //entrance anim
       } else {
         setShowAuth(true);
       }
@@ -625,7 +640,7 @@ export default function EntranceScreen() {
       hasStartedRef.current = true;
     }
     if (hasStartedRef.current && status.didJustFinish) {
-      router.replace("/entranceAnimation");
+      goToEntranceAnim();
     }
   };
 
@@ -654,6 +669,9 @@ export default function EntranceScreen() {
         style={styles.background}
         resizeMode="stretch"
       >
+        <View style={{ position: "absolute", top: 50, right: 20, zIndex: 999 }}>
+          <MusicToggleButton />
+        </View>
         <Animated.Image
           source={require("../assets/images/entrance-sign.png")}
           style={[styles.entranceSign, neonFlicker]}
@@ -1305,7 +1323,7 @@ export default function EntranceScreen() {
               onPress={() => {
                 setShowVipCongrats(false);
                 setShowConfetti(false);
-                router.replace("/entranceAnimation");
+                goToEntranceAnim();
               }}
             >
               <Text style={mmStyles.vipBtnText}>Enter</Text>

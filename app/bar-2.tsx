@@ -1,5 +1,11 @@
 // bar-2.tsx
-import React, { useState, useEffect, useRef, useContext } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useContext,
+  useCallback,
+} from "react";
 
 import {
   View,
@@ -28,7 +34,7 @@ import {
   onValue,
   update as rtdbUpdate,
 } from "firebase/database";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { scale, ScaledSheet } from "react-native-size-matters";
 import { ChatType, SavedChat } from "./ChitChats";
@@ -62,6 +68,7 @@ import PopUp from "../components/PopUp";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 // top of file
 import * as NavigationBar from "expo-navigation-bar";
+import { MusicContext } from "../contexts/MusicContext";
 
 // NEW
 import * as MailComposer from "expo-mail-composer";
@@ -138,6 +145,16 @@ const WELCOME_MESSAGES = [
 const LAST_WELCOME_INDEX = WELCOME_MESSAGES.length - 1;
 
 export default function Bar2Screen() {
+  // Inside music starts after entrance animation ends
+  const { setBar2Visible } = useContext(MusicContext);
+
+  useFocusEffect(
+    useCallback(() => {
+      setBar2Visible(true);
+      return () => setBar2Visible(false);
+    }, [setBar2Visible])
+  );
+
   const router = useRouter();
   const params = useLocalSearchParams<{
     cameFromEntrance?: string;

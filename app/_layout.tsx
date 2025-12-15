@@ -187,7 +187,7 @@ function AnimatedSplashScreen({ children }: { children?: React.ReactNode }) {
   useEffect(() => {
     const t = setTimeout(() => {
       if (!isSplashVideoComplete) setVideoComplete(true);
-    }, 4000);
+    }, 6000);
     return () => clearTimeout(t);
   }, [isSplashVideoComplete]);
 
