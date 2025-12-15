@@ -1,4 +1,5 @@
-import React, { createContext, useState, useEffect } from "react";
+// contexts/MusicContext.tsx
+import React, { createContext, useEffect, useRef, useState } from "react";
 import { Audio } from "expo-av";
 import { usePathname } from "expo-router";
 
@@ -14,82 +15,111 @@ export const MusicContext = createContext<MusicContextValue>({
   toggleMusic: () => {},
 });
 
+const FADE_IN_DURATION_MS = 5000;
+const FADE_STEPS = 25;
+
 export function MusicProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  // Consider both "/" and "/welcome" as routes where we should NOT play music.
-  const shouldPlayMusic = !(pathname === "/entrance" || pathname === "/");
 
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(shouldPlayMusic);
+  const shouldPlayMusic = !(pathname === "/" || pathname === "/welcome");
+  const isEntrance = pathname === "/entrance";
+
+  const MUSIC_SOURCE = isEntrance
+    ? require("../assets/videos/outside sound fx.wav")
+    : require("../assets/videos/music.mp3");
+
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  const [isPlaying, setIsPlaying] = useState(true);
   const [soundLoading, setSoundLoading] = useState(false);
 
-  // Set the audio mode if we intend to play music.
+  // Set audio mode once
   useEffect(() => {
-    if (shouldPlayMusic) {
-      Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
-        shouldDuckAndroid: true,
-        interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
-        playThroughEarpieceAndroid: false,
-      });
-    }
-  }, [shouldPlayMusic]);
+    Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
+      shouldDuckAndroid: true,
+      interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+      playThroughEarpieceAndroid: false,
+    });
+  }, []);
 
-  // Single effect to manage sound creation and unloading based on isPlaying.
+  // Main sound lifecycle
   useEffect(() => {
-    if (!shouldPlayMusic) return;
+    let cancelled = false;
+
+    const fadeIn = async (sound: Audio.Sound) => {
+      const stepTime = FADE_IN_DURATION_MS / FADE_STEPS;
+
+      for (let i = 1; i <= FADE_STEPS; i++) {
+        if (cancelled) return;
+        const vol = i / FADE_STEPS;
+        try {
+          await sound.setVolumeAsync(vol);
+        } catch {}
+        await new Promise((r) => setTimeout(r, stepTime));
+      }
+    };
 
     (async () => {
-      if (isPlaying && !sound) {
-        // Create and start playing the sound.
-        setSoundLoading(true);
-        try {
-          const { sound: newSound } = await Audio.Sound.createAsync(
-            require("../assets/videos/music.mp3"),
-            { shouldPlay: true, isLooping: true }
-          );
-          setSound(newSound);
-        } catch (err) {
-          console.error("Audio creation error:", err);
-        } finally {
-          setSoundLoading(false);
+      if (!shouldPlayMusic) {
+        if (soundRef.current) {
+          try {
+            await soundRef.current.stopAsync();
+            await soundRef.current.unloadAsync();
+          } catch {}
+          soundRef.current = null;
         }
-      } else if (!isPlaying && sound) {
-        // Pause and unload sound when turning off.
+        return;
+      }
+
+      // Always unload when switching route / source
+      if (soundRef.current) {
         try {
-          await sound.pauseAsync();
+          await soundRef.current.stopAsync();
+          await soundRef.current.unloadAsync();
+        } catch {}
+        soundRef.current = null;
+      }
+
+      if (!isPlaying) return;
+
+      setSoundLoading(true);
+      try {
+        const { sound } = await Audio.Sound.createAsync(MUSIC_SOURCE, {
+          shouldPlay: true,
+          isLooping: true,
+          volume: isEntrance ? 0 : 1, // 👈 key line
+        });
+
+        if (cancelled) {
           await sound.unloadAsync();
-        } catch (err) {
-          console.error("Audio unload error:", err);
-        } finally {
-          setSound(null);
+          return;
         }
+
+        soundRef.current = sound;
+
+        // 👇 Fade in ONLY for outside ambience
+        if (isEntrance) {
+          fadeIn(sound);
+        }
+      } catch (err) {
+        console.error("Audio creation error:", err);
+      } finally {
+        if (!cancelled) setSoundLoading(false);
       }
     })();
-  }, [isPlaying, shouldPlayMusic]);
 
-  useEffect(() => {
-    if (!shouldPlayMusic && sound) {
-      (async () => {
-        try {
-          await sound.pauseAsync();
-          await sound.unloadAsync();
-        } catch (err) {
-          console.error("Audio unload error on route change:", err);
-        } finally {
-          setSound(null);
-          setIsPlaying(false);
-        }
-      })();
-    }
-  }, [shouldPlayMusic, sound]);
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldPlayMusic, isPlaying, MUSIC_SOURCE, isEntrance]);
 
-  // The toggle function simply flips the isPlaying state.
+  // Toggle
   const toggleMusic = () => {
     if (!shouldPlayMusic || soundLoading) return;
-    setIsPlaying((prev) => !prev);
+    setIsPlaying((p) => !p);
   };
 
   return (

@@ -1,5 +1,13 @@
-import 'react-native-reanimated';
-import React, { useState, createContext, useEffect, useContext, useCallback, useMemo, useRef } from "react";
+import "react-native-reanimated";
+import React, {
+  useState,
+  createContext,
+  useEffect,
+  useContext,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   View,
   Text,
@@ -12,14 +20,21 @@ import {
   Animated,
   useWindowDimensions,
 } from "react-native";
-import { usePathname, useLocalSearchParams, withLayoutContext } from "expo-router"
+import {
+  usePathname,
+  useLocalSearchParams,
+  withLayoutContext,
+} from "expo-router";
 import Navbar from "../components/Navbar";
-import { NavbarContext } from '../contexts/NavbarContext';
+import { NavbarContext } from "../contexts/NavbarContext";
 import { MoneysProvider } from "../contexts/MoneysContext";
 import { ProfileProvider } from "../contexts/ProfileContext";
 import { FirstTimeProvider } from "../contexts/FirstTimeContext";
 import { MusicProvider, MusicContext } from "@/contexts/MusicContext";
-import { NotificationProvider, NotificationContext } from "@/contexts/NotificationContext";
+import {
+  NotificationProvider,
+  NotificationContext,
+} from "@/contexts/NotificationContext";
 import InactivityHandler from "../components/InactivityHandler";
 import PresenceWrapper from "@/contexts/PresenceContext";
 import { AuthProvider } from "../contexts/AuthContext";
@@ -32,23 +47,31 @@ import { StatusBar } from "expo-status-bar";
 import * as NavigationBar from "expo-navigation-bar";
 import InAppNotification from "../components/InAppNotification";
 import OfflineNotice from "../components/OfflineNotice";
-import LottieView from 'lottie-react-native';
-import animationData from '../assets/videos/mm-dancing.json';
+import LottieView from "lottie-react-native";
+import animationData from "../assets/videos/mm-dancing.json";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import PushNavBridge from './PushNavBridge';
-import * as SystemUI from 'expo-system-ui';
+import PushNavBridge from "./PushNavBridge";
+import * as SystemUI from "expo-system-ui";
 
-import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
+import {
+  createStackNavigator,
+  CardStyleInterpolators,
+} from "@react-navigation/stack";
 
 const BaseStack = createStackNavigator();
 const Stack = withLayoutContext(BaseStack.Navigator);
 
 //import { initAds } from "@/services/ads";
 
-
 // Firebase imports for global notifications
 import { auth, firestore } from "../firebase";
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  orderBy,
+} from "firebase/firestore";
 
 // Prevent native splash from auto-hiding
 //SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -56,9 +79,9 @@ import { collection, query, where, onSnapshot, orderBy } from "firebase/firestor
 const withoutBg = {
   ...animationData,
   layers: animationData.layers.filter(
-    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+    (layer) => layer.ty !== 1 || layer.nm !== "Dark Blue Solid 1"
   ),
-}
+};
 
 function useDisableBackButton() {
   useEffect(() => {
@@ -75,7 +98,13 @@ function useDisableBackButton() {
  * Renders the splash video and calls onLoaded/onFinish events
  */
 
-function SplashVideo({ onLoaded, onFinish }: { onLoaded: () => void; onFinish: () => void; }) {
+function SplashVideo({
+  onLoaded,
+  onFinish,
+}: {
+  onLoaded: () => void;
+  onFinish: () => void;
+}) {
   const videoRef = useRef<any>(null);
   const [lastStatus, setLastStatus] = useState<AVPlaybackStatus | null>(null);
 
@@ -84,12 +113,21 @@ function SplashVideo({ onLoaded, onFinish }: { onLoaded: () => void; onFinish: (
       ref={videoRef}
       source={require("../assets/images/splash-screen.mp4")}
       style={StyleSheet.absoluteFill}
-      shouldPlay={!(lastStatus && "isLoaded" in lastStatus && lastStatus.isLoaded && "didJustFinish" in lastStatus && lastStatus.didJustFinish)}
+      shouldPlay={
+        !(
+          lastStatus &&
+          "isLoaded" in lastStatus &&
+          lastStatus.isLoaded &&
+          "didJustFinish" in lastStatus &&
+          lastStatus.didJustFinish
+        )
+      }
       isLooping={false}
       resizeMode={ResizeMode.COVER}
       onPlaybackStatusUpdate={(status) => {
         if ("isLoaded" in status && status.isLoaded) {
-          if (!(lastStatus && "isLoaded" in lastStatus && lastStatus.isLoaded)) onLoaded();
+          if (!(lastStatus && "isLoaded" in lastStatus && lastStatus.isLoaded))
+            onLoaded();
           if (status.didJustFinish) onFinish();
         }
         setLastStatus(status);
@@ -102,7 +140,6 @@ function SplashVideo({ onLoaded, onFinish }: { onLoaded: () => void; onFinish: (
     />
   );
 }
-
 
 /**
  * Wraps children with animated fade-out after splash video and app load
@@ -136,15 +173,21 @@ function AnimatedSplashScreen({ children }: { children?: React.ReactNode }) {
     }
   }, [isAppReady, isSplashVideoComplete, minDurationReached, animation]);
 
-  useEffect(() => { SystemUI.setBackgroundColorAsync('#000'); }, []);
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync("#000");
+  }, []);
 
   const onVideoLoaded = useCallback(async () => {
-    try { await SplashScreen.hideAsync(); } catch {}
+    try {
+      await SplashScreen.hideAsync();
+    } catch {}
   }, []);
 
   // Safety: if the video never reports finish, complete after 4s
   useEffect(() => {
-    const t = setTimeout(() => { if (!isSplashVideoComplete) setVideoComplete(true); }, 4000);
+    const t = setTimeout(() => {
+      if (!isSplashVideoComplete) setVideoComplete(true);
+    }, 4000);
     return () => clearTimeout(t);
   }, [isSplashVideoComplete]);
 
@@ -164,7 +207,10 @@ function AnimatedSplashScreen({ children }: { children?: React.ReactNode }) {
       {!isSplashAnimationComplete && (
         <Animated.View
           pointerEvents="box-only"
-          style={[StyleSheet.absoluteFill, { opacity: animation, backgroundColor: '#000' }]}
+          style={[
+            StyleSheet.absoluteFill,
+            { opacity: animation, backgroundColor: "#000" },
+          ]}
         >
           {videoElement}
         </Animated.View>
@@ -173,11 +219,11 @@ function AnimatedSplashScreen({ children }: { children?: React.ReactNode }) {
   );
 }
 
- // Stop RTL mirroring globally
+// Stop RTL mirroring globally
 try {
   I18nManager.allowRTL(false);
   I18nManager.forceRTL(false);
-  I18nManager.swapLeftAndRightInRTL(false); 
+  I18nManager.swapLeftAndRightInRTL(false);
 } catch {}
 
 // Freeze system font scaling globally (TS-safe casts)
@@ -192,7 +238,6 @@ TextAny.defaultProps.maxFontSizeMultiplier = 1;
 
 TextInputAny.defaultProps.allowFontScaling = false;
 TextInputAny.defaultProps.maxFontSizeMultiplier = 1;
-
 
 const slideFadeHorizontal = ({ current, next, layouts }: any) => {
   const { width } = layouts.screen;
@@ -227,10 +272,6 @@ const slideFadeHorizontal = ({ current, next, layouts }: any) => {
   };
 };
 
-
-
-
-
 export default function Layout() {
   const [showWcButton, setShowWcButton] = useState(false);
   const pathname = usePathname();
@@ -240,11 +281,11 @@ export default function Layout() {
 
   const music = useContext(MusicContext); // may be undefined
 
-useEffect(() => {
-  if (demoAllowed === false && music?.isPlaying) {
-    music.toggleMusic();
-  }
-}, [demoAllowed, music]);
+  useEffect(() => {
+    if (demoAllowed === false && music?.isPlaying) {
+      music.toggleMusic();
+    }
+  }, [demoAllowed, music]);
 
   useDisableBackButton();
 
@@ -274,6 +315,8 @@ useEffect(() => {
     "/welcome",
     "/chat",
     "/entranceAnimation",
+    "/lyd",
+    "/darts",
   ].includes(pathname);
 
   const shouldWrapMusic = pathname !== "/entrance";
@@ -282,11 +325,11 @@ useEffect(() => {
     return (
       <View style={styles.centered}>
         <LottieView
-                source={withoutBg}
-                autoPlay
-                loop
-                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-               />
+          source={withoutBg}
+          autoPlay
+          loop
+          style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+        />
       </View>
     );
   }
@@ -309,56 +352,63 @@ useEffect(() => {
 
   return (
     <AnimatedSplashScreen>
-      <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000"}}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000" }}>
         <InactivityHandler>
           <AuthProvider>
             <PresenceWrapper>
               <MoneysProvider>
                 <ForegroundGate>
-                    <MusicProvider>
-                      <NotificationProvider>
-                        <FirstTimeProvider>
-                          <ProfileProvider>
-                            <NavbarContext.Provider value={{ showWcButton, setShowWcButton }}>
-                              <View style={styles.container}>
-                                <NotificationDisplay />
-                                <OfflineNotice />
-                                {!hideNavbar && <Navbar />}
-                                <Stack
-                                  detachInactiveScreens={false}
-                                  screenOptions={{
-                                    headerShown: false,
-                                    cardStyleInterpolator: slideFadeHorizontal,
-                                    transitionSpec: {
-                                      open:  { animation: 'timing', config: { duration: 600 } },
-                                      close: { animation: 'timing', config: { duration: 600 } },
+                  <MusicProvider>
+                    <NotificationProvider>
+                      <FirstTimeProvider>
+                        <ProfileProvider>
+                          <NavbarContext.Provider
+                            value={{ showWcButton, setShowWcButton }}
+                          >
+                            <View style={styles.container}>
+                              <NotificationDisplay />
+                              <OfflineNotice />
+                              {!hideNavbar && <Navbar />}
+                              <Stack
+                                detachInactiveScreens={false}
+                                screenOptions={{
+                                  headerShown: false,
+                                  cardStyleInterpolator: slideFadeHorizontal,
+                                  transitionSpec: {
+                                    open: {
+                                      animation: "timing",
+                                      config: { duration: 600 },
                                     },
-                                    cardStyle:    { backgroundColor: '#000' },
-                                    contentStyle: { backgroundColor: '#000' },
-                                    gestureEnabled: true,
-                                  }}
-                                />
-                                <StatusBar hidden />
-                              </View>
-                            </NavbarContext.Provider>
-                          </ProfileProvider>
-                        </FirstTimeProvider>
-                      </NotificationProvider>
-                    </MusicProvider>
+                                    close: {
+                                      animation: "timing",
+                                      config: { duration: 600 },
+                                    },
+                                  },
+                                  cardStyle: { backgroundColor: "#000" },
+                                  contentStyle: { backgroundColor: "#000" },
+                                  gestureEnabled: true,
+                                }}
+                              />
+                              <StatusBar hidden />
+                            </View>
+                          </NavbarContext.Provider>
+                        </ProfileProvider>
+                      </FirstTimeProvider>
+                    </NotificationProvider>
+                  </MusicProvider>
                 </ForegroundGate>
               </MoneysProvider>
             </PresenceWrapper>
           </AuthProvider>
         </InactivityHandler>
       </GestureHandlerRootView>
-      </AnimatedSplashScreen>
+    </AnimatedSplashScreen>
   );
-  
-  
 }
 
 function NotificationDisplay() {
-  const { visible, message, partnerId, senderName, hideNotification } = useContext(NotificationContext);
+  const { visible, message, partnerId, senderName, hideNotification } =
+    useContext(NotificationContext);
   return (
     <InAppNotification
       visible={visible}
@@ -371,8 +421,18 @@ function NotificationDisplay() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000'},
-  background: { flex: 1, justifyContent: "flex-start", alignItems: "center", backgroundColor: "#000" },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "black" },
+  container: { flex: 1, backgroundColor: "#000" },
+  background: {
+    flex: 1,
+    justifyContent: "flex-start",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "black",
+  },
   message: { fontSize: 32, textAlign: "center", padding: 20, color: "yellow" },
 });

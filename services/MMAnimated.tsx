@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     // if you want to nudge him, do it here (not in hit-test math)
-    bottom: "26%",
+    bottom: "20%",
     left: "20%",
     // DEBUG:
     // backgroundColor: "rgba(255,0,0,0.1)",

@@ -366,7 +366,7 @@ export default function BathroomScreen() {
     }
   }, [params.onboard, profileComplete, profile]);
 
-  // temporary camera for expo
+  // TEMPORARY camera for expo
   const handleTakePhoto = async () => {
     // ask for camera permission
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -500,6 +500,9 @@ export default function BathroomScreen() {
       }
     } catch (e: any) {
       if (e?.message === "timeout") {
+        // just for testing in emulators
+        setLocation("Test City, Testland");
+
         Alert.alert("Slow GPS", "Couldn’t get a fix. Try again near a window.");
       } else {
         console.error("Location error:", e);

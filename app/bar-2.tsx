@@ -1535,7 +1535,7 @@ export default function Bar2Screen() {
                 showControls={false}
                 enterOnMount
                 style={StyleSheet.absoluteFillObject}
-                minglesOffsetY={8}
+                minglesOffsetY={15}
                 onPress={() => {
                   // 👈 this runs AFTER the internal wiggle is triggered
                   if (welcomeTyping) {
