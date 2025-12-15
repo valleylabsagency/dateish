@@ -1442,7 +1442,7 @@ export default function Bar2Screen() {
               showControls={false}
               enterOnMount
               leaving={leaving}
-              minglesOffsetY={0}
+              minglesOffsetY={5}
               onLeaveComplete={() => {
                 setLeaving(false);
                 setShowStartOverlay(false); // ✅ Hide overlay after animation
@@ -1552,7 +1552,7 @@ export default function Bar2Screen() {
                 showControls={false}
                 enterOnMount
                 style={StyleSheet.absoluteFillObject}
-                minglesOffsetY={15}
+                minglesOffsetY={10}
                 onPress={() => {
                   // 👈 this runs AFTER the internal wiggle is triggered
                   if (welcomeTyping) {
