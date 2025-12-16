@@ -9,7 +9,7 @@ import {
 import { useRouter } from "expo-router";
 
 import Darts from "../games/Darts/Darts";
-import { submitHighscore } from "../services/highscores";
+import * as servicesHighscores from "../services/highscores";
 import { ProfileContext } from "../contexts/ProfileContext";
 
 export default function DartsScreen() {
@@ -24,7 +24,7 @@ export default function DartsScreen() {
     submittedRef.current = true;
 
     try {
-      await submitHighscore("darts", score, {
+      await servicesHighscores.submitLeaderboardEntry("darts", score, {
         name: profile?.name,
         photoUri: profile?.photoUri,
       });
