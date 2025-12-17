@@ -70,7 +70,9 @@ const styles = StyleSheet.create({
   },
   container: {
     width: width * 0.9,
-    height: height * 0.75,
+    // height: height * 0.75,
+    minHeight: 140, // small popups don't look tiny
+    maxHeight: height * 0.85, // long text / content won't go off screen
     backgroundColor: "#6e1944",
     borderRadius: 30,
     padding: 16,

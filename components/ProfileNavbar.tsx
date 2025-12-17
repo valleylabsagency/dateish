@@ -7,21 +7,19 @@ import {
   Image,
   Platform,
   Animated,
-  Dimensions
+  Dimensions,
 } from "react-native";
 import { MusicContext } from "../contexts/MusicContext";
-import { ProfileContext } from '../contexts/ProfileContext';
+import { ProfileContext } from "../contexts/ProfileContext";
 import { MoneysContext } from "../contexts/MoneysContext";
 import PopUp from "../components/PopUp";
-import LottieView from 'lottie-react-native';
-import animationData from '../assets/videos/mm-dancing.json';
+import LottieView from "lottie-react-native";
+import animationData from "../assets/videos/mm-dancing.json";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { showRewarded } from "@/services/ads";
 import { doc, updateDoc, increment } from "firebase/firestore";
 import { auth, firestore } from "@/firebase";
-
-
 
 interface ProfileNavbarProps {
   onBack: () => void;
@@ -31,16 +29,18 @@ interface ProfileNavbarProps {
 const withoutBg = {
   ...animationData,
   layers: animationData.layers.filter(
-    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+    (layer) => layer.ty !== 1 || layer.nm !== "Dark Blue Solid 1"
   ),
-}
+};
 
 const { width, height } = Dimensions.get("window");
 
-export default function ProfileNavbar({ onBack, showBack = true }: ProfileNavbarProps) {
+export default function ProfileNavbar({
+  onBack,
+  showBack = true,
+}: ProfileNavbarProps) {
   // Access the music context so we can toggle music or show loading
   const { isPlaying, soundLoading, toggleMusic } = useContext(MusicContext);
-  
 
   // We'll animate the speaker-lines bigger/smaller for 5s whenever music toggles on
   // but we do NOT hide them in between loops. Instead we let them remain at the last scale value
@@ -50,9 +50,9 @@ export default function ProfileNavbar({ onBack, showBack = true }: ProfileNavbar
   // We track whether lines are actually visible on screen at all
   const [linesVisible, setLinesVisible] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
-   const [popupFlag, setPopupFlag] = useState<string | null>(null);
+  const [popupFlag, setPopupFlag] = useState<string | null>(null);
 
-   type RewardState = { remaining: number; resetAt: number };
+  type RewardState = { remaining: number; resetAt: number };
 
   const [rewardRemaining, setRewardRemaining] = useState<number>(5);
   const [rewardLoading, setRewardLoading] = useState(false);
@@ -65,13 +65,20 @@ typeof profile?.moneys === "number"
   ? profile!.moneys!
   : (isVip ? 300 : 100);
 */
-const { width, height } = Dimensions.get("window");
-
+  const { width, height } = Dimensions.get("window");
 
   function computeNextResetAt(): number {
     const d = new Date();
-    const reset = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 17, 0, 0, 0); // 17:00 today
-    if (Date.now() >= reset.getTime()) reset.setDate(reset.getDate() + 1);         // else, today 17:00
+    const reset = new Date(
+      d.getFullYear(),
+      d.getMonth(),
+      d.getDate(),
+      17,
+      0,
+      0,
+      0
+    ); // 17:00 today
+    if (Date.now() >= reset.getTime()) reset.setDate(reset.getDate() + 1); // else, today 17:00
     return reset.getTime();
   }
 
@@ -85,18 +92,18 @@ const { width, height } = Dimensions.get("window");
     setRewardRemaining(state.remaining);
     return state;
   }
-  
+
   async function saveRewardState(next: RewardState) {
     setRewardRemaining(next.remaining);
     await AsyncStorage.setItem("adRewardsState", JSON.stringify(next));
   }
-  
+
   async function grantTenMoneys() {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     await updateDoc(doc(firestore, "users", uid), { moneys: increment(10) });
   }
-  
+
   async function handleWatchReward() {
     if (rewardRemaining <= 0 || rewardLoading) return;
     setRewardLoading(true);
@@ -112,15 +119,14 @@ const { width, height } = Dimensions.get("window");
       setRewardLoading(false);
     }
   }
- 
-   useEffect(() => {
-     if (showPopup && popupFlag === "moneys") {
-       ensureRewardState();
-     }
-   }, [showPopup, popupFlag]);
- 
-  const router = useRouter();
 
+  useEffect(() => {
+    if (showPopup && popupFlag === "moneys") {
+      ensureRewardState();
+    }
+  }, [showPopup, popupFlag]);
+
+  const router = useRouter();
 
   useEffect(() => {
     if (isPlaying) {
@@ -164,8 +170,8 @@ const { width, height } = Dimensions.get("window");
 
   return (
     <>
-    <View style={profileNavbarStyles.navbar}>
-    {showBack ? (
+      <View style={profileNavbarStyles.navbar}>
+        {showBack ? (
           <TouchableOpacity onPress={onBack}>
             <Image
               source={require("../assets/images/icons/back-arrow.png")}
@@ -177,7 +183,7 @@ const { width, height } = Dimensions.get("window");
           <View style={profileNavbarStyles.navPlaceholder} />
         )}
 
-      <View style={profileNavbarStyles.navSpacer} />
+        <View style={profileNavbarStyles.navSpacer} />
         {/*}
      <TouchableOpacity 
              style={styles.moneysBar}
@@ -193,38 +199,41 @@ const { width, height } = Dimensions.get("window");
              
            </TouchableOpacity> */}
 
-      {/* Speaker icon area */}
-      {soundLoading ? (
-        <LottieView
-                source={withoutBg}
-                autoPlay
-                loop
-                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-               />
-      ) : (
-        <TouchableOpacity onPress={toggleMusic} style={profileNavbarStyles.speakerWrapper}>
-          {/* speaker-no-lines is always there */}
-          <Image
-            source={require("../assets/images/icons/speaker-no-lines.png")}
-            style={profileNavbarStyles.speakerBase}
-            resizeMode="contain"
+        {/* Speaker icon area */}
+        {soundLoading ? (
+          <LottieView
+            source={withoutBg}
+            autoPlay
+            loop
+            style={{ width: 600, height: 600, backgroundColor: "transparent" }}
           />
-          {linesVisible && (
-            <Animated.Image
-              source={require("../assets/images/icons/speaker-lines.png")}
-              style={[
-                profileNavbarStyles.speakerLines,
-                {
-                  transform: [{ scale: linesAnim }],
-                },
-              ]}
+        ) : (
+          <TouchableOpacity
+            onPress={toggleMusic}
+            style={profileNavbarStyles.speakerWrapper}
+          >
+            {/* speaker-no-lines is always there */}
+            <Image
+              source={require("../assets/images/icons/speaker-no-lines.png")}
+              style={profileNavbarStyles.speakerBase}
               resizeMode="contain"
             />
-          )}
-        </TouchableOpacity>
-      )}
-    </View>
-    {/*}
+            {linesVisible && (
+              <Animated.Image
+                source={require("../assets/images/icons/speaker-lines.png")}
+                style={[
+                  profileNavbarStyles.speakerLines,
+                  {
+                    transform: [{ scale: linesAnim }],
+                  },
+                ]}
+                resizeMode="contain"
+              />
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+      {/*}
       <PopUp
       visible={showPopup}
       flag={popupFlag || undefined}
@@ -265,8 +274,7 @@ const { width, height } = Dimensions.get("window");
         </View>
       )}
     </PopUp> */}
-
-       </>
+    </>
   );
 }
 
@@ -280,6 +288,8 @@ const profileNavbarStyles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingBottom: 0,
     paddingTop: Platform.OS === "ios" ? 0 : 0,
+    zIndex: 1000,
+    elevation: 1000,
   },
   navIcon: {
     width: 50,
@@ -300,7 +310,7 @@ const profileNavbarStyles = StyleSheet.create({
     paddingVertical: 0,
     marginRight: "5%",
     backgroundColor: "#d8bfd8",
-    position: "relative"
+    position: "relative",
   },
   moneysAmount: {
     color: "#460b2a",
@@ -308,11 +318,11 @@ const profileNavbarStyles = StyleSheet.create({
     letterSpacing: 0,
     position: "relative",
     bottom: height * 0.004,
-    right: width * 0.01
+    right: width * 0.01,
   },
   moneysImage: {
     width: 65,
-    height: "95%"
+    height: "95%",
   },
   speakerWrapper: {
     width: 50,
@@ -365,7 +375,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     marginRight: "5%",
     backgroundColor: "#d8bfd8",
-    position: "relative"
+    position: "relative",
   },
   moneysAmount: {
     color: "#460b2a",
@@ -373,12 +383,12 @@ const styles = StyleSheet.create({
     letterSpacing: -2,
     position: "relative",
     bottom: height * 0.004,
-    right: width * 0.01
+    right: width * 0.01,
   },
   moneysImage: {
     width: 60,
 
-    height: "90%"
+    height: "90%",
   },
   speakerWrapper: {
     width: 50,
@@ -393,14 +403,14 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   speakerLines: {
-    width: 55, 
+    width: 55,
     height: 40,
     position: "absolute",
   },
   spendFallText: {
     position: "absolute",
-    left: "15%",         // tweak until it visually appears under the number
-    top: 0,           // starts near the top of the bar
+    left: "15%", // tweak until it visually appears under the number
+    top: 0, // starts near the top of the bar
     fontSize: 32,
     fontWeight: "700",
     color: "red", // nice “spent” red; change if you prefer
@@ -443,6 +453,3 @@ const moneyStyles = StyleSheet.create({
   },
   shopText: { color: "#ffe3d0", fontSize: 16 },
 });
-
-
-

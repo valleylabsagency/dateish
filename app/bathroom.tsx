@@ -890,26 +890,23 @@ export default function BathroomScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "black" }}>
+      {/* NAVBAR (measured) */}
       <View onLayout={(e) => setNavH(e.nativeEvent.layout.height)}>
         <ProfileNavbar
           showBack={hasSavedInSession}
           onBack={async () => {
-            // Before initial save, just behave like before (no auto-save),
-            // but still tell the bar we came from the bathroom.
             if (!hasSavedInSession) {
               router.replace("/bar-2");
               return;
             }
 
-            // After initial profile creation: auto-save any changes,
-            // then go back and re-arm Start Chatting.
             const ok = await saveProfileIfChanged();
-            if (ok) {
-              router.replace("/bar-2");
-            }
+            if (ok) router.replace("/bar-2");
           }}
         />
       </View>
+
+      {/* STAGE (starts below navbar) */}
       <View
         onLayout={(e) => {
           const { width, height } = e.nativeEvent.layout;
@@ -921,7 +918,7 @@ export default function BathroomScreen() {
           left: 0,
           right: 0,
           bottom: 0,
-          overflow: "hidden", // keeps the blur neatly clipped to the stage
+          overflow: "hidden",
           backgroundColor: "transparent",
         }}
       >
@@ -931,13 +928,14 @@ export default function BathroomScreen() {
             fadeDuration={0}
             style={{
               position: "absolute",
-              left: imgLeft, // 0
-              top: imgTop, // 0
-              width: dispW, // stage width
-              height: dispH, // stage height
+              left: imgLeft,
+              top: imgTop,
+              width: dispW,
+              height: dispH,
             }}
             resizeMode="stretch"
           />
+
           <View
             style={[
               styles.formContainer,
@@ -989,6 +987,7 @@ export default function BathroomScreen() {
                   />
                 )}
               </View>
+
               <TouchableOpacity
                 style={styles.editButton}
                 onPress={handleRequestLocation}
@@ -1018,6 +1017,7 @@ export default function BathroomScreen() {
                   color="grey"
                 />
               )}
+
               <TouchableOpacity
                 style={[styles.editButton, styles.editButtonPhoto]}
                 onPress={handleTakePhoto}
@@ -1032,6 +1032,7 @@ export default function BathroomScreen() {
                   {about || "Write something about yourself..."}
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.editButton, styles.bottomEdit]}
                 onPress={() => setEditingAbout(true)}
@@ -1042,122 +1043,7 @@ export default function BathroomScreen() {
           </View>
         </View>
 
-        {/* Existing Incomplete Profile Warning Modal */}
-        <Modal transparent visible={modalVisible} animationType="slide">
-          <View style={modalStyles.modalOverlay}>
-            <TouchableOpacity
-              style={modalStyles.closeButton}
-              onPress={() => setModalVisible(false)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Image source={closeIcon} style={styles.closeIcon} />
-            </TouchableOpacity>
-            <View style={modalStyles.modalContainer}>
-              <Text style={modalStyles.modalText}>{modalTypedText}</Text>
-              <View style={modalStyles.triangleContainer}>
-                <View style={modalStyles.outerTriangle} />
-                <View style={modalStyles.innerTriangle} />
-              </View>
-              <Animated.Image
-                source={require("../assets/images/mr-mingles.png")}
-                style={[
-                  modalStyles.mrMingles,
-                  { transform: [{ translateX: rollAnim }] },
-                ]}
-                resizeMode="contain"
-              />
-            </View>
-          </View>
-        </Modal>
-
-        {/* NEW: Onboarding Modal (uses same visual motif) */}
-        <Modal transparent visible={onboardingVisible} animationType="fade">
-          <View style={modalStyles.modalOverlay}>
-            <TouchableOpacity
-              style={modalStyles.closeButton}
-              onPress={() => setOnboardingVisible(false)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Image source={closeIcon} style={styles.closeIcon} />
-            </TouchableOpacity>
-            {renderOnboardingContent()}
-          </View>
-        </Modal>
-
-        {/* <Modal visible={cameraVisible} animationType="slide" transparent={false}>
-              <View style={{ flex: 1, backgroundColor: "black" }}>
-                {device ? (
-                  <Camera
-                    ref={cameraRef}
-                    style={{ flex: 1 }}
-                    device={device}
-                    isActive={cameraVisible}
-                    photo={true}
-                  />
-                ) : (
-                  <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                    <Text style={{ color: "#fff" }}>Loading camera…</Text>
-                  </View>
-                )}
-
-              
-                <View style={{ position: "absolute", bottom: 30, left: 0, right: 0, alignItems: "center" }}>
-                  <Text style={{ color: "#fff", marginBottom: 8 }}>
-                    Center your pretty face in the frame
-                  </Text>
-                  <TouchableOpacity
-                    onPress={captureAndValidate}
-                    style={{
-                      backgroundColor: "#6e1944",
-                      borderWidth: 4,
-                      borderColor: "#460b2a",
-                      paddingVertical: 10,
-                      paddingHorizontal: 24,
-                      borderRadius: 28,
-                    }}
-                  >
-                    <Text style={{ color: "#ffe3d0", fontWeight: "700" }}>
-                      {validating ? "Checking…" : "Capture"}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => setCameraVisible(false)}
-                    style={{ marginTop: 10, padding: 8 }}
-                  >
-                    <Text style={{ color: "#ddd" }}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Modal>  */}
-
-        {/* No-face “Mr. Mingles” popup */}
-        {/* <Modal transparent visible={noFaceVisible} animationType="fade">
-              <View style={modalStyles.modalOverlay}>
-                <TouchableOpacity
-                  style={modalStyles.closeButton}
-                  onPress={() => setNoFaceVisible(false)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Image source={closeIcon} style={styles.closeIcon} />
-                </TouchableOpacity>
-                <View style={modalStyles.modalContainer}>
-                  <Text style={modalStyles.modalText}>
-                    You need to take a picture that includes your pretty face.
-                  </Text>
-                  <View style={modalStyles.triangleContainer}>
-                    <View style={modalStyles.outerTriangle} />
-                    <View style={modalStyles.innerTriangle} />
-                  </View>
-                  <Animated.Image
-                    source={require("../assets/images/mr-mingles.png")}
-                    style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
-                    resizeMode="contain"
-                  />
-                </View>
-              </View>
-            </Modal> */}
-
+        {/* Floating hitboxes */}
         <View style={styles.floatingHitboxes} pointerEvents="box-none">
           {hasSavedInSession && (
             <TouchableOpacity
@@ -1174,6 +1060,7 @@ export default function BathroomScreen() {
           />
         </View>
 
+        {/* ChitChats modal */}
         <ChitChats
           visible={showChitChats}
           onClose={() => setShowChitChats(false)}
@@ -1184,8 +1071,10 @@ export default function BathroomScreen() {
           onRequiredChange={toggleRequired}
         />
 
+        {/* About editor modal */}
         {renderAboutEditor()}
 
+        {/* Saving overlay */}
         {isSaving && (
           <View style={styles.loadingOverlay}>
             <LottieView
@@ -1201,12 +1090,65 @@ export default function BathroomScreen() {
           </View>
         )}
 
+        {/* Save button only before first save */}
         {!hasSavedInSession && (
           <TouchableOpacity style={styles.saveBtn} onPress={handleSubmit}>
             <Text style={styles.saveBtnText}>Save Profile</Text>
           </TouchableOpacity>
         )}
       </View>
+
+      {/* ✅ MODALS OUTSIDE STAGE so overlay covers navbar/status bar too */}
+
+      {/* Incomplete profile warning modal */}
+      <Modal
+        transparent
+        visible={modalVisible}
+        animationType="slide"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+      >
+        <View style={modalStyles.modalOverlay}>
+          <TouchableOpacity
+            style={modalStyles.closeButton}
+            onPress={() => setModalVisible(false)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Image source={closeIcon} style={styles.closeIcon} />
+          </TouchableOpacity>
+
+          <View style={modalStyles.modalContainer}>
+            <Text style={modalStyles.modalText}>{modalTypedText}</Text>
+
+            <View style={modalStyles.triangleContainer}>
+              <View style={modalStyles.outerTriangle} />
+              <View style={modalStyles.innerTriangle} />
+            </View>
+
+            <Animated.Image
+              source={require("../assets/images/mr-mingles.png")}
+              style={[
+                modalStyles.mrMingles,
+                { transform: [{ translateX: rollAnim }] },
+              ]}
+              resizeMode="contain"
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Onboarding modal */}
+      <Modal
+        transparent
+        visible={onboardingVisible}
+        animationType="fade"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+      >
+        <View style={modalStyles.modalOverlay}>
+          {renderOnboardingContent()}
+        </View>
+      </Modal>
     </View>
   );
 }

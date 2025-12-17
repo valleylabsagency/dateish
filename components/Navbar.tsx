@@ -15,23 +15,22 @@ import { useRouter } from "expo-router";
 import { NavbarContext } from "../contexts/NavbarContext";
 import { MusicContext } from "../contexts/MusicContext";
 import PopUp from "../components/PopUp";
-import LottieView from 'lottie-react-native';
-import animationData from '../assets/videos/mm-dancing.json';
-import { ProfileContext } from '../contexts/ProfileContext';
+import LottieView from "lottie-react-native";
+import animationData from "../assets/videos/mm-dancing.json";
+import { ProfileContext } from "../contexts/ProfileContext";
 //import { MoneysContext } from "../contexts/MoneysContext";
 //import AsyncStorage from "@react-native-async-storage/async-storage";
 //import { doc, updateDoc, increment } from "firebase/firestore";
 //import { auth, firestore } from "@/firebase";
 //import { showRewarded } from "@/services/ads";
 
-
 const { width, height } = Dimensions.get("window");
 const withoutBg = {
   ...animationData,
   layers: animationData.layers.filter(
-    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+    (layer) => layer.ty !== 1 || layer.nm !== "Dark Blue Solid 1"
   ),
-}
+};
 
 type NavbarProps = {
   /** If provided, this is called instead of the default WC navigation. */
@@ -41,15 +40,19 @@ type NavbarProps = {
   lockNonBathroom?: boolean;
 };
 
-
-export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom }: NavbarProps) {
+export default function Navbar({
+  onBathroomPress,
+  bathroomRoute,
+  lockNonBathroom,
+}: NavbarProps) {
   const router = useRouter();
   const { showWcButton } = useContext(NavbarContext);
 
   const { profile, profileComplete } = useContext(ProfileContext);
 
   const bathroomPath =
-    bathroomRoute ?? (!profileComplete ? "/bathroom?onboard=true" : "/bathroom");
+    bathroomRoute ??
+    (!profileComplete ? "/bathroom?onboard=true" : "/bathroom");
 
   /*
   const { activeDrops } = useContext(MoneysContext);
@@ -68,8 +71,16 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
 
   function computeNextResetAt(): number {
     const d = new Date();
-    const reset = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 17, 0, 0, 0); // 17:00 today
-    if (Date.now() >= reset.getTime()) reset.setDate(reset.getDate() + 1);         // else, today 17:00
+    const reset = new Date(
+      d.getFullYear(),
+      d.getMonth(),
+      d.getDate(),
+      17,
+      0,
+      0,
+      0
+    ); // 17:00 today
+    if (Date.now() >= reset.getTime()) reset.setDate(reset.getDate() + 1); // else, today 17:00
     return reset.getTime();
   }
 
@@ -83,18 +94,18 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
     setRewardRemaining(state.remaining);
     return state;
   }
-  
+
   async function saveRewardState(next: RewardState) {
     setRewardRemaining(next.remaining);
     await AsyncStorage.setItem("adRewardsState", JSON.stringify(next));
   }
-  
+
   async function grantTenMoneys() {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     await updateDoc(doc(firestore, "users", uid), { moneys: increment(10) });
   }
-  
+
   async function handleWatchReward() {
     if (rewardRemaining <= 0 || rewardLoading) return;
     setRewardLoading(true);
@@ -110,16 +121,13 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
       setRewardLoading(false);
     }
   }
-  
-      
-
 
   // Access the music context so we can toggle music or show loading
   const { isPlaying, soundLoading, toggleMusic } = useContext(MusicContext);
 
   // We'll animate the speaker-lines bigger/smaller for 5s whenever music toggles on
   // but we do NOT hide them in between loops. Instead we let them remain at the last scale value
-  const linesAnim = useRef(new Animated.Value(1)).current; 
+  const linesAnim = useRef(new Animated.Value(1)).current;
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // We track whether lines are actually visible on screen at all
@@ -183,30 +191,28 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
 
   return (
     <>
-    <View style={styles.navbar}>
-      {/* Conditionally render the WC button */}
-      
-      <TouchableOpacity
-        onPress={() => {
-          if (onBathroomPress) {
-            onBathroomPress();
-          } else {
-            router.push(bathroomPath);
-          }
-        }}
-        accessibilityRole="button"
-        accessibilityLabel="Open bathroom"
-        testID="wc-button"
-      >
+      <View style={styles.navbar}>
+        {/* Conditionally render the WC button */}
+        <TouchableOpacity
+          onPress={() => {
+            if (onBathroomPress) {
+              onBathroomPress();
+            } else {
+              router.push(bathroomPath);
+            }
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Open bathroom"
+          testID="wc-button"
+        >
           <Image
             source={require("../assets/images/icons/WC.png")}
             style={styles.navIcon}
             resizeMode="contain"
           />
         </TouchableOpacity>
-     
-
-      <View style={styles.navSpacer} /> {/*}
+        <View style={styles.navSpacer} />{" "}
+        {/*}
       <TouchableOpacity 
         style={styles.moneysBar}
         disabled={!!lockNonBathroom}
@@ -238,48 +244,47 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
           ))}
         
       </TouchableOpacity> */}
-
-      {/* Speaker icon area */}
-      {soundLoading ? (
-        // If audio is loading, show a spinner
-        <LottieView
-                source={withoutBg}
-                autoPlay
-                loop
-                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-               />
-      ) : (
-        <TouchableOpacity
-        onPress={() => {
-          if (lockNonBathroom) return;
-          toggleMusic();
-        }}
-        style={styles.speakerWrapper}
-        disabled={!!lockNonBathroom}
-        pointerEvents={lockNonBathroom ? "none" : "auto"}
-      >
-          {/* speaker-no-lines is always there */}
-          <Image
-            source={require("../assets/images/icons/speaker-no-lines.png")}
-            style={styles.speakerBase}
-            resizeMode="contain"
+        {/* Speaker icon area */}
+        {soundLoading ? (
+          // If audio is loading, show a spinner
+          <LottieView
+            source={withoutBg}
+            autoPlay
+            loop
+            style={{ width: 150, height: 150, backgroundColor: "transparent" }}
           />
-          {linesVisible && (
-            <Animated.Image
-              source={require("../assets/images/icons/speaker-lines.png")}
-              style={[
-                styles.speakerLines,
-                {
-                  transform: [{ scale: linesAnim }],
-                },
-              ]}
+        ) : (
+          <TouchableOpacity
+            onPress={() => {
+              if (lockNonBathroom) return;
+              toggleMusic();
+            }}
+            style={styles.speakerWrapper}
+            disabled={!!lockNonBathroom}
+            pointerEvents={lockNonBathroom ? "none" : "auto"}
+          >
+            {/* speaker-no-lines is always there */}
+            <Image
+              source={require("../assets/images/icons/speaker-no-lines.png")}
+              style={styles.speakerBase}
               resizeMode="contain"
             />
-          )}
-        </TouchableOpacity>
-      )}
-    </View>
-{/*}
+            {linesVisible && (
+              <Animated.Image
+                source={require("../assets/images/icons/speaker-lines.png")}
+                style={[
+                  styles.speakerLines,
+                  {
+                    transform: [{ scale: linesAnim }],
+                  },
+                ]}
+                resizeMode="contain"
+              />
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+      {/*}
     <PopUp
   visible={showPopup}
   flag={popupFlag || undefined}
@@ -320,9 +325,7 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
     </View>
   )}
 </PopUp> */}
-
-
-</>
+    </>
   );
 }
 
@@ -358,7 +361,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     marginRight: "5%",
     backgroundColor: "#d8bfd8",
-    position: "relative"
+    position: "relative",
   },
   moneysAmount: {
     color: "#460b2a",
@@ -366,12 +369,12 @@ const styles = StyleSheet.create({
     letterSpacing: -2,
     position: "relative",
     bottom: height * 0.004,
-    right: width * 0.01
+    right: width * 0.01,
   },
   moneysImage: {
     width: 60,
 
-    height: "90%"
+    height: "90%",
   },
   speakerWrapper: {
     width: 50,
@@ -386,14 +389,14 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   speakerLines: {
-    width: 55, 
+    width: 55,
     height: 40,
     position: "absolute",
   },
   spendFallText: {
     position: "absolute",
-    left: "15%",         // tweak until it visually appears under the number
-    top: 0,           // starts near the top of the bar
+    left: "15%", // tweak until it visually appears under the number
+    top: 0, // starts near the top of the bar
     fontSize: 32,
     fontWeight: "700",
     color: "red", // nice “spent” red; change if you prefer
@@ -436,5 +439,3 @@ const moneyStyles = StyleSheet.create({
   },
   shopText: { color: "#ffe3d0", fontSize: 16 },
 });
-
-

@@ -1552,7 +1552,7 @@ export default function Bar2Screen() {
                 showControls={false}
                 enterOnMount
                 style={StyleSheet.absoluteFillObject}
-                minglesOffsetY={10}
+                minglesOffsetY={15}
                 onPress={() => {
                   // 👈 this runs AFTER the internal wiggle is triggered
                   if (welcomeTyping) {
@@ -1572,7 +1572,7 @@ export default function Bar2Screen() {
               style={{
                 position: "absolute",
                 left: offsetX + dispW * 0.05, // keep same side margins relative to art width
-                top: 2, // 👈 2px under the stage top (stage already sits under Navbar)
+                top: 15, // 👈 2px under the stage top (stage already sits under Navbar)
                 width: dispW * 0.9,
                 height: BUBBLE_HEIGHT,
                 zIndex: 30,
@@ -1628,19 +1628,21 @@ export default function Bar2Screen() {
         {!profileComplete &&
           cameFromEntrance &&
           pointerTarget === "bathroom" && (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.pointerBase,
-                styles.pointerBathroom,
-                {
-                  transform: [{ scale: pointerScale }, { rotate: "10deg" }],
-                  zIndex: 999,
-                },
-              ]}
-            >
-              <MaterialIcons name="pan-tool-alt" size={56} color="#ffe3d0" />
-            </Animated.View>
+            <View style={{ flex: 1, zIndex: 998 }}>
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.pointerBase,
+                  styles.pointerBathroom,
+                  {
+                    transform: [{ scale: pointerScale }, { rotate: "10deg" }],
+                    zIndex: 999,
+                  },
+                ]}
+              >
+                <MaterialIcons name="pan-tool-alt" size={56} color="#ffe3d0" />
+              </Animated.View>
+            </View>
           )}
 
         {/* TV */}
@@ -1801,7 +1803,7 @@ export default function Bar2Screen() {
       </View>
 
       {/* Skip (always above stage so it can't be covered) */}
-      {!profileComplete && cameFromEntrance && (
+      {!profileComplete && cameFromEntrance && pointerTarget !== "bathroom" && (
         <Animated.View
           style={{
             opacity: skipOpacity,

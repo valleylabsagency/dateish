@@ -274,6 +274,7 @@ export default function MinglesScreen() {
     setShowDrinkMenu(false);
   };
 
+  // Tips Jar
   const handleTipJar = async () => {
     /*
     try {
@@ -283,6 +284,29 @@ export default function MinglesScreen() {
     } catch (e: any) {
       console.error("Tip jar failed:", e.code, e.message);
     }*/
+  };
+
+  // const [showTipJarPopup, setShowTipJarPopup] = useState(false);
+
+  const tipJarMessages = [
+    "Tip jar’s open. Mr. Mingles has expensive tastes.",
+    "Drop a tip and I’ll pretend it was your idea.",
+    "Tips accepted in cash, compliments, or pure chaos.",
+  ];
+
+  const [tipJarIdx, setTipJarIdx] = useState(0);
+
+  const pickNewIndex = (len: number, prev: number) => {
+    if (len <= 1) return 0;
+    const r = Math.floor(Math.random() * (len - 1)); // 0..len-2
+    return r >= prev ? r + 1 : r; // skip prev
+  };
+
+  const openTipJarPopup = () => {
+    setPopupFlag("tips");
+    // pick a random message each time
+    setTipJarIdx((prev) => pickNewIndex(tipJarMessages.length, prev));
+    setShowPopupTips(true);
   };
 
   // ─── Derive drink icon + text ───────────────
@@ -579,7 +603,7 @@ export default function MinglesScreen() {
             />
             <Pressable
               style={[hotspotBase, rectInFront(0.05, 0.3, 0.18, 0.19)]}
-              onPress={handleTipJar}
+              onPress={openTipJarPopup}
             />
 
             {/* Front layer (glass, bar, etc.) – perfectly aligned */}
@@ -675,7 +699,26 @@ export default function MinglesScreen() {
         title="Shop"
         onClose={() => setShowPopupShop(false)}
       >
-        <ScrollView
+        <View
+          style={{
+            paddingVertical: 24,
+            paddingHorizontal: 16,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: FontNames.MontserratRegular,
+              fontSize: 20,
+              color: "#ffe3d0",
+              textAlign: "center",
+            }}
+          >
+            For now, everything is free!
+          </Text>
+        </View>
+        {/* <ScrollView
           style={shopStyles.scroll}
           contentContainerStyle={shopStyles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -726,7 +769,7 @@ export default function MinglesScreen() {
 
             <View style={{ height: 8 }} />
           </View>
-        </ScrollView>
+        </ScrollView> */}
       </PopUp>
 
       <PopUp
@@ -820,9 +863,28 @@ export default function MinglesScreen() {
         flag={popupFlag || undefined}
         title="Tips"
         onClose={() => setShowPopupTips(false)}
-      />
+      >
+        <View
+          style={{
+            paddingVertical: 20,
+            paddingHorizontal: 16,
+            alignItems: "center",
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: FontNames.MontserratRegular,
+              fontSize: 18,
+              color: "#ffe3d0",
+              textAlign: "center",
+            }}
+          >
+            {tipJarMessages[tipJarIdx]}
+          </Text>
+        </View>
+      </PopUp>
 
-      <PopUp
+      {/* <PopUp
         visible={showRatePrompt}
         title="Mr. Mingles"
         onClose={() => setShowRatePrompt(false)}
@@ -853,9 +915,9 @@ export default function MinglesScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </PopUp>
+      </PopUp> */}
 
-      <PopUp
+      {/* <PopUp
         visible={showNoThanks}
         title="Mr. Mingles"
         onClose={() => setShowNoThanks(false)}
@@ -863,7 +925,7 @@ export default function MinglesScreen() {
         <Text style={{ color: "#ffe3d0", fontSize: 18, textAlign: "center" }}>
           Ok no worries… Oh btw completely unrelated, here’s an ad :)
         </Text>
-      </PopUp>
+      </PopUp> */}
     </>
   );
 }
