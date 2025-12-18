@@ -359,42 +359,40 @@ export default function Layout() {
               <MoneysProvider>
                 <ForegroundGate>
                   <MusicProvider>
-                    <NotificationProvider>
-                      <FirstTimeProvider>
-                        <ProfileProvider>
-                          <NavbarContext.Provider
-                            value={{ showWcButton, setShowWcButton }}
-                          >
-                            <View style={styles.container}>
-                              <NotificationDisplay />
-                              <OfflineNotice />
-                              {!hideNavbar && <Navbar />}
-                              <Stack
-                                detachInactiveScreens={false}
-                                screenOptions={{
-                                  headerShown: false,
-                                  cardStyleInterpolator: slideFadeHorizontal,
-                                  transitionSpec: {
-                                    open: {
-                                      animation: "timing",
-                                      config: { duration: 600 },
-                                    },
-                                    close: {
-                                      animation: "timing",
-                                      config: { duration: 600 },
-                                    },
+                    <FirstTimeProvider>
+                      <ProfileProvider>
+                        <NavbarContext.Provider
+                          value={{ showWcButton, setShowWcButton }}
+                        >
+                          <View style={styles.container}>
+                            <NotificationDisplay />
+                            <OfflineNotice />
+                            {!hideNavbar && <Navbar />}
+                            <Stack
+                              detachInactiveScreens={false}
+                              screenOptions={{
+                                headerShown: false,
+                                cardStyleInterpolator: slideFadeHorizontal,
+                                transitionSpec: {
+                                  open: {
+                                    animation: "timing",
+                                    config: { duration: 600 },
                                   },
-                                  cardStyle: { backgroundColor: "#000" },
-                                  contentStyle: { backgroundColor: "#000" },
-                                  gestureEnabled: true,
-                                }}
-                              />
-                              <StatusBar hidden />
-                            </View>
-                          </NavbarContext.Provider>
-                        </ProfileProvider>
-                      </FirstTimeProvider>
-                    </NotificationProvider>
+                                  close: {
+                                    animation: "timing",
+                                    config: { duration: 600 },
+                                  },
+                                },
+                                cardStyle: { backgroundColor: "#000" },
+                                contentStyle: { backgroundColor: "#000" },
+                                gestureEnabled: true,
+                              }}
+                            />
+                            <StatusBar hidden />
+                          </View>
+                        </NavbarContext.Provider>
+                      </ProfileProvider>
+                    </FirstTimeProvider>
                   </MusicProvider>
                 </ForegroundGate>
               </MoneysProvider>

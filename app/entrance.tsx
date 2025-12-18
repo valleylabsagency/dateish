@@ -47,7 +47,7 @@ import MusicToggleButton from "@/components/MusicToggleButton";
 import { MusicContext } from "../contexts/MusicContext";
 
 const { width, height } = Dimensions.get("window");
-const MESSAGE = "Happy Hour daily! ";
+const DEFAULT_BANNER_TEXT = "Happy Hour daily! ";
 
 const withoutBg = {
   ...animationData,
@@ -212,6 +212,97 @@ export default function EntranceScreen() {
 
   const navOnceRef = useRef(false);
 
+  const [bannerText, setBannerText] = useState(DEFAULT_BANNER_TEXT);
+  const [maskWidth, setMaskWidth] = useState(0);
+  const MARQUEE_GAP = 20; // px, tweak if you want
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const ref = doc(firestore, "appConfig", "ui");
+        const snap = await getDoc(ref);
+
+        const raw = (snap.data()?.entranceBannerText ?? "").toString();
+        const flat = raw
+          .replace(/[\r\n\u2028\u2029]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (alive && flat) {
+          setBannerText(flat.endsWith(" ") ? flat : flat + " ");
+        }
+      } catch (e) {
+        // keep default on error
+        console.log("Failed to load entrance banner text, using default.", e);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Reset animation measurements when text changes
+  useEffect(() => {
+    setTextWidth(0);
+    scrollX.setValue(width);
+    console.log(bannerText);
+  }, [bannerText]);
+
+  // marquee loop
+  useEffect(() => {
+    if (!textWidth || !maskWidth) return;
+    console.log("textWidth", textWidth, "maskWidth", maskWidth);
+
+    const timeoutId = setTimeout(() => {
+      scrollX.stopAnimation();
+
+      // start fully offscreen to the right
+      scrollX.setValue(maskWidth + MARQUEE_GAP);
+
+      const loop = RNAnimated.loop(
+        RNAnimated.sequence([
+          RNAnimated.timing(scrollX, {
+            // go fully offscreen to the left
+            toValue: -(textWidth + MARQUEE_GAP),
+            duration: 8000,
+            easing: Easing.linear,
+            useNativeDriver: true,
+            isInteraction: false,
+          }),
+          RNAnimated.timing(scrollX, {
+            toValue: maskWidth + MARQUEE_GAP,
+            duration: 0,
+            useNativeDriver: true,
+            isInteraction: false,
+          }),
+        ])
+      );
+
+      loop.start();
+
+      // cleanup for loop
+      return () => {
+        loop.stop();
+        scrollX.stopAnimation();
+      };
+    }, 5500); // adjust delay if needed
+
+    return () => {
+      clearTimeout(timeoutId);
+      scrollX.stopAnimation();
+    };
+  }, [textWidth, maskWidth, bannerText]);
+
+  useEffect(() => {
+    RNAnimated.timing(vipRollAnim, {
+      toValue: notVipVisible ? 0 : 500,
+      duration: notVipVisible ? 1000 : 0,
+      useNativeDriver: true,
+    }).start();
+  }, [notVipVisible]);
+
   const goToEntranceAnim = () => {
     if (navOnceRef.current) return;
     navOnceRef.current = true;
@@ -349,37 +440,6 @@ export default function EntranceScreen() {
     const id = setInterval(update, 60_000);
     return () => clearInterval(id);
   }, [isVip]);
-
-  // marquee loop
-  useEffect(() => {
-    if (!textWidth) return;
-    scrollX.setValue(width);
-    const loop = RNAnimated.loop(
-      RNAnimated.sequence([
-        RNAnimated.timing(scrollX, {
-          toValue: -textWidth,
-          duration: 8000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-        RNAnimated.timing(scrollX, {
-          toValue: width,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [textWidth]);
-
-  useEffect(() => {
-    RNAnimated.timing(vipRollAnim, {
-      toValue: notVipVisible ? 0 : 500,
-      duration: notVipVisible ? 1000 : 0,
-      useNativeDriver: true,
-    }).start();
-  }, [notVipVisible]);
 
   useEffect(() => {
     let id: NodeJS.Timeout | undefined;
@@ -685,24 +745,37 @@ export default function EntranceScreen() {
             resizeMode="stretch"
           >
             <View
-              style={[
-                styles.bannerMask,
-                {
-                  left: BORDER_PX,
-                  right: BORDER_PX,
-                },
-              ]}
+              style={styles.bannerMask}
+              onLayout={(e) => setMaskWidth(e.nativeEvent.layout.width)}
             >
-              <RNAnimated.Text
-                onLayout={(e) => setTextWidth(e.nativeEvent.layout.width)}
-                style={[
-                  styles.bannerText,
-                  { transform: [{ translateX: scrollX }] },
-                ]}
-                numberOfLines={1}
-              >
-                {MESSAGE}
-              </RNAnimated.Text>
+              {/* OFFSCREEN measurer (must not be constrained) */}
+              <View style={styles.measureWrap} pointerEvents="none">
+                <Text
+                  style={[styles.bannerText, styles.hiddenMeasure]}
+                  numberOfLines={1}
+                  allowFontScaling={false}
+                  onLayout={(e) => {
+                    const w = Math.ceil(e.nativeEvent.layout.width);
+                    if (w && w !== textWidth) setTextWidth(w);
+                  }}
+                >
+                  {bannerText}
+                </Text>
+              </View>
+
+              {/* VISIBLE marquee (IMPORTANT: width = textWidth) */}
+              {!!textWidth && !!maskWidth && (
+                <RNAnimated.Text
+                  style={[
+                    styles.bannerText,
+                    { width: textWidth },
+                    { transform: [{ translateX: scrollX }] },
+                  ]}
+                  allowFontScaling={false}
+                >
+                  {bannerText}
+                </RNAnimated.Text>
+              )}
             </View>
           </ImageBackground>
         </View>
@@ -1346,6 +1419,41 @@ export default function EntranceScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  measureWrap: {
+    position: "absolute",
+    left: -9999,
+    top: -9999,
+  },
+  hiddenMeasure: {
+    position: "absolute",
+    opacity: 0,
+    left: 0,
+    top: 0,
+  },
+  measureText: {
+    fontFamily: FontNames.ArcadePixelRegular,
+    fontSize: 32,
+    lineHeight: 32,
+    // width: "100%",
+  },
+
+  bannerTextMeasure: {
+    fontFamily: FontNames.ArcadePixelRegular,
+    fontSize: 32,
+    lineHeight: 32,
+    // IMPORTANT: no position:absolute here
+  },
+
+  bannerTextMarquee: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    fontFamily: FontNames.ArcadePixelRegular,
+    fontSize: 32,
+    lineHeight: 32,
+    color: "red",
+  },
+
   loading: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#000",
@@ -1370,13 +1478,19 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: height * 0.012,
     bottom: 0,
-    overflow: "hidden",
+    left: 5,
+    right: 5,
+    overflow: "hidden", // visible window; longer text will scroll through
   },
   bannerText: {
+    position: "absolute",
+    left: 0,
     fontFamily: FontNames.ArcadePixelRegular,
     fontSize: 32,
     lineHeight: 32,
     color: "red",
+    flexWrap: "nowrap",
+    // force single line; no wrapping
   },
   doorTouchable: {
     position: "absolute",

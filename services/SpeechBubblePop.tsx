@@ -1,5 +1,5 @@
 // SpeechBubblePop.tsx
-import React, { useEffect, ReactNode } from "react";
+import React, { useEffect, ReactNode, useRef } from "react";
 import {
   Image,
   ImageSourcePropType,
@@ -14,6 +14,7 @@ import Animated, {
   withTiming,
   withDelay,
   runOnJS,
+  cancelAnimation,
 } from "react-native-reanimated";
 
 type Anchor = { x: number; y: number }; // each in [0..1]
@@ -42,6 +43,9 @@ type Props = {
 
   /** Optional content rendered on top of the bubble image. */
   children?: ReactNode;
+
+  /** Animate the POP-IN once on mount if visible is true. */
+  animateOnMount?: boolean;
 };
 
 const SpeechBubblePop: React.FC<Props> = ({
@@ -54,56 +58,85 @@ const SpeechBubblePop: React.FC<Props> = ({
   delayTime = 0,
   onHidden,
   children,
+  animateOnMount = true,
 }) => {
-  const scale = useSharedValue(0);
-  const opacity = useSharedValue(0);
+  const scale = useSharedValue(visible ? 1 : 0);
+  const opacity = useSharedValue(visible ? 1 : 0);
+
+  const prevVisible = useRef<boolean>(visible);
+  const didMount = useRef(false);
+
+  const popIn = () => {
+    cancelAnimation(scale);
+    cancelAnimation(opacity);
+
+    scale.value = 0.2;
+    opacity.value = 0;
+
+    scale.value = withDelay(
+      delayTime,
+      withSequence(
+        withTiming(1.1, { duration: 130 }),
+        withTiming(0.9, { duration: 90 }),
+        withTiming(1, { duration: 80 })
+      )
+    );
+
+    opacity.value = withDelay(delayTime, withTiming(1, { duration: 120 }));
+  };
+
+  const popOut = () => {
+    cancelAnimation(scale);
+    cancelAnimation(opacity);
+
+    scale.value = withTiming(0.8, { duration: 120 }, (finished) => {
+      if (finished && onHidden) runOnJS(onHidden)();
+    });
+    opacity.value = withTiming(0, { duration: 120 });
+  };
 
   useEffect(() => {
-    if (visible) {
-      // POP IN
-      scale.value = 0.2;
-      opacity.value = 0;
+    // ✅ First mount behavior:
+    // If visible=true and animateOnMount=true, run pop-in once.
+    if (!didMount.current) {
+      didMount.current = true;
 
-      scale.value = withDelay(
-        delayTime,
-        withSequence(
-          withTiming(1.1, { duration: 130 }),
-          withTiming(0.9, { duration: 90 }),
-          withTiming(1, { duration: 80 })
-        )
-      );
+      prevVisible.current = visible;
 
-      opacity.value = withDelay(delayTime, withTiming(1, { duration: 120 }));
-    } else {
-      // POP OUT
-      scale.value = withTiming(0.8, { duration: 120 }, (finished) => {
-        if (finished && onHidden) {
-          runOnJS(onHidden)();
-        }
-      });
-      opacity.value = withTiming(0, { duration: 120 });
+      if (visible && animateOnMount) {
+        popIn();
+      } else {
+        // No animation: just set correct static state
+        scale.value = visible ? 1 : 0;
+        opacity.value = visible ? 1 : 0;
+      }
+      return;
     }
-  }, [visible, delayTime, onHidden, scale, opacity]);
+
+    // ✅ After mount: animate ONLY when `visible` actually changes
+    const wasVisible = prevVisible.current;
+    prevVisible.current = visible;
+
+    if (wasVisible === visible) return; // text/children changes won't retrigger
+
+    if (visible) popIn();
+    else popOut();
+  }, [visible, delayTime, onHidden, animateOnMount]);
 
   const animatedStyle = useAnimatedStyle(() => {
     const ax = anchor.x ?? 0.5;
     const ay = anchor.y ?? 1;
 
-    const sx = scale.value;
-    const sy = scale.value;
+    const s = scale.value;
 
-    const tx = (0.5 - ax) * width * (1 - sx);
-    const ty = (0.5 - ay) * height * (1 - sy);
+    const tx = (0.5 - ax) * width * (1 - s);
+    const ty = (0.5 - ay) * height * (1 - s);
 
     return {
       opacity: opacity.value,
-      transform: [
-        { translateX: tx },
-        { translateY: ty },
-        { scale: scale.value },
-      ],
+      transform: [{ translateX: tx }, { translateY: ty }, { scale: s }],
     };
-  });
+  }, [width, height, anchor.x, anchor.y]);
 
   return (
     <Animated.View style={[{ width, height }, animatedStyle, style]}>

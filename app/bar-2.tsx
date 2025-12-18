@@ -142,6 +142,11 @@ const WELCOME_MESSAGES = [
   "Alright, enough chit chat! Go to the bathroom and make yourself a profile.",
 ];
 
+const BAR_MM_SPEEACH_BUBBLE = [
+  "Drink responsibly! Or better yet, smoke responsibly!",
+  "Talk to some humans! I'm sure they're not all assholes...",
+];
+
 const LAST_WELCOME_INDEX = WELCOME_MESSAGES.length - 1;
 
 export default function Bar2Screen() {
@@ -462,6 +467,9 @@ export default function Bar2Screen() {
   // Link guard
   const [noLinksVisible, setNoLinksVisible] = useState(false);
 
+  //MM speech bubble texts
+  const [mmBubbleIndex, setMmBubbleIndex] = useState(0);
+
   // Automatically mark user "in the bar" when they come from the Entrance
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -716,6 +724,17 @@ export default function Bar2Screen() {
   const [hasIncomingOnly, setHasIncomingOnly] = useState(false);
 
   const [introPlayed, setIntroPlayed] = useState<boolean>(false);
+
+  //MM bar speech bubble_reset
+  useEffect(() => {
+    if (showStartOverlay) {
+      setMmBubbleIndex(0);
+    }
+  }, [showStartOverlay]);
+
+  const handleMinglesBubbleAdvance = () => {
+    setMmBubbleIndex((prev) => (prev + 1) % BAR_MM_SPEEACH_BUBBLE.length);
+  };
 
   // presence
 
@@ -1450,10 +1469,10 @@ export default function Bar2Screen() {
                 setStarted(true);
               }}
               onPress={() => {
-                console.log("MM pressed");
+                handleMinglesBubbleAdvance();
               }}
               style={StyleSheet.absoluteFill}
-            />
+            ></MMAnimated>
           </View>
         )}
 
@@ -1481,7 +1500,20 @@ export default function Bar2Screen() {
                 onHidden={() => {
                   setShowStartOverlay(false);
                 }}
-              />
+              >
+                <View
+                  style={{
+                    flex: 1,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    paddingHorizontal: 20,
+                  }}
+                >
+                  <Text style={styles.bubbleText}>
+                    {BAR_MM_SPEEACH_BUBBLE[mmBubbleIndex]}
+                  </Text>
+                </View>
+              </SpeechBubblePop>
             </View>
 
             {/* Start Chatting button */}
