@@ -143,8 +143,9 @@ const WELCOME_MESSAGES = [
 ];
 
 const BAR_MM_SPEEACH_BUBBLE = [
-  "Drink responsibly! Or better yet, smoke responsibly!",
+  "Have fun, flirt freely, drink responsibly.",
   "Talk to some humans! I'm sure they're not all assholes...",
+  "I'm not like all the other bots on dating apps... I promise. ;)",
 ];
 
 const LAST_WELCOME_INDEX = WELCOME_MESSAGES.length - 1;
@@ -1736,7 +1737,7 @@ export default function Bar2Screen() {
                   frontTop +
                   frontHeight * STOOLS_ROW_Y_FRAC +
                   STOOLS_ROW_NUDGE_PX,
-                zIndex: 25,
+                zIndex: 31,
                 height: AVATAR_SIZE_PX, // keeps touch targets tidy
                 justifyContent: "center",
               },

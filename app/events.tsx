@@ -30,7 +30,7 @@ export default function EventsScreen() {
   const onShare = async () => {
     try {
       const message =
-        "Dateish is new—come join me! 🎉\n\nDownload and hop into the bar:";
+        "I found this cool app called Dateish, kinda weird but cool! 🎉\n\nHere's a link to download:";
       const url = "https://dateish.app"; // TODO: replace with your real app store / website link
 
       // iOS prefers url separately; Android is fine with message containing url
@@ -64,8 +64,9 @@ export default function EventsScreen() {
         {/* Centered overlay content */}
         <View style={styles.contentContainer}>
           <Text style={styles.description}>
-            <Text style={styles.bold}>Dateish</Text> is new so there aren’t many
-            people here yet……
+            <Text style={styles.bold}>
+              Dateish is new so there aren’t many people here yet……
+            </Text>
           </Text>
           <Text style={styles.callToAction}>Help us find more people!</Text>
 

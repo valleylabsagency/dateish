@@ -1,14 +1,14 @@
-import React, { useRef, useState } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
-import { useRouter } from 'expo-router';
-import LottieView from 'lottie-react-native';
-import animationData from '../assets/videos/mm-dancing.json';
+import React, { useRef, useState } from "react";
+import { View, StyleSheet, Platform } from "react-native";
+import { Video, ResizeMode } from "expo-av";
+import { useRouter } from "expo-router";
+import LottieView from "lottie-react-native";
+import animationData from "../assets/videos/mm-dancing.json";
 
 const withoutBg = {
   ...animationData,
   layers: animationData.layers.filter(
-    (layer) => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+    (layer) => layer.ty !== 1 || layer.nm !== "Dark Blue Solid 1"
   ),
 };
 
@@ -17,7 +17,11 @@ export default function EntranceAnimation() {
   const [ready, setReady] = useState(false);
   const video = useRef<Video>(null);
 
-  const goNext = () => router.replace({ pathname: "/bar-2", params: { cameFromEntrance: "true" } });
+  const goNext = () =>
+    router.replace({
+      pathname: "/bar-2",
+      params: { cameFromEntrance: "true" },
+    });
 
   const onPlaybackStatusUpdate = (status: any) => {
     // Defensive: only access props when loaded
@@ -30,7 +34,7 @@ export default function EntranceAnimation() {
     <View style={styles.container}>
       <Video
         ref={video}
-        source={require('../assets/images/entrance-animation.mp4')}
+        source={require("../assets/images/entrance-animation.mp4")}
         style={StyleSheet.absoluteFill}
         // ✅ Avoid stretch; use COVER for consistent aspect/decoder behavior
         resizeMode={ResizeMode.COVER}
@@ -61,7 +65,7 @@ export default function EntranceAnimation() {
             source={withoutBg}
             autoPlay
             loop
-            style={{ width: 600, height: 600, backgroundColor: 'transparent' }}
+            style={{ width: 600, height: 600, backgroundColor: "transparent" }}
           />
         </View>
       )}
@@ -70,11 +74,11 @@ export default function EntranceAnimation() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: "#000" },
   loading: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
   },
 });

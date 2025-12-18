@@ -242,8 +242,9 @@ export default function MinglesScreen() {
   // ─── Bubble messages ─────────────────────────
   const messages = [
     "What would you like to drink?",
-    "It's Happy Hour! Everything is half price!",
-    "Go talk to some humans!",
+    "Wanna get more likes and matches? Go to tinder!",
+    "Bored of getting “Hi” and “sup”? Add ChitChats to your profile! \n (In the bathroom)",
+    "Future plans:\nLive Shows, Happy Hour, Game Nights, DJ sets, and more!",
   ];
   const [idx, setIdx] = useState(0);
   const back = () => setIdx((i) => (i - 1 + messages.length) % messages.length);
@@ -289,9 +290,16 @@ export default function MinglesScreen() {
   // const [showTipJarPopup, setShowTipJarPopup] = useState(false);
 
   const tipJarMessages = [
-    "Tip jar’s open. Mr. Mingles has expensive tastes.",
-    "Drop a tip and I’ll pretend it was your idea.",
-    "Tips accepted in cash, compliments, or pure chaos.",
+    "Try talking to whoever just for fun. Work on being more interesting with someone that’s not intimidating to you.",
+    "Being selfish doesn’t necessarily mean being an asshole.",
+    "Always bring snacks on a first date. If the date sucks, at least you won’t be hungry.",
+    "Date someone who’s honest, kind, and emotionally available. Or, y’know, just tall. We all make choices.",
+    "If they give you butterflies, it means you’re gonna have to take care of them now.",
+    "They’re not “mysterious.” They just have bad communication skills.",
+    "If the conversation flows naturally, that’s chemistry. If it flows like a job interview, that’s LinkedIn.",
+    "Good communication means saying what you want. Not hinting until they guess wrong and then resenting them forever.",
+    "Ghosting is rude, so was Hitler. You wanna be like Hitler?",
+    "Bananas are berries, strawberries are not. Dating is also that confusing.",
   ];
 
   const [tipJarIdx, setTipJarIdx] = useState(0);
