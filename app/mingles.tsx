@@ -290,16 +290,16 @@ export default function MinglesScreen() {
   // const [showTipJarPopup, setShowTipJarPopup] = useState(false);
 
   const tipJarMessages = [
-    "Try talking to whoever just for fun. Work on being more interesting with someone that’s not intimidating to you.",
+    "Try talking to whoever just for fun.\nWork on being more interesting with someone that’s not intimidating to you.",
     "Being selfish doesn’t necessarily mean being an asshole.",
-    "Always bring snacks on a first date. If the date sucks, at least you won’t be hungry.",
-    "Date someone who’s honest, kind, and emotionally available. Or, y’know, just tall. We all make choices.",
+    "Always bring snacks on a first date.\nIf the date sucks, at least you won’t be hungry.",
+    "Date someone who’s honest, kind, and emotionally available.\nOr, y’know, just tall.\nWe all make choices.",
     "If they give you butterflies, it means you’re gonna have to take care of them now.",
-    "They’re not “mysterious.” They just have bad communication skills.",
-    "If the conversation flows naturally, that’s chemistry. If it flows like a job interview, that’s LinkedIn.",
-    "Good communication means saying what you want. Not hinting until they guess wrong and then resenting them forever.",
-    "Ghosting is rude, so was Hitler. You wanna be like Hitler?",
-    "Bananas are berries, strawberries are not. Dating is also that confusing.",
+    "They’re not “mysterious.”\nThey just have bad communication skills.",
+    "If the conversation flows naturally, that’s chemistry.\nIf it flows like a job interview, that’s LinkedIn.",
+    "Good communication means saying what you want.\nNot hinting until they guess wrong and then resenting them forever.",
+    "Ghosting is rude, so was Hitler.\nYou wanna be like Hitler?",
+    "Bananas are berries, strawberries are not.\nDating is also that confusing.",
   ];
 
   const [tipJarIdx, setTipJarIdx] = useState(0);

@@ -10,6 +10,7 @@ import {
   Animated,
   Platform,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { NavbarContext } from "../contexts/NavbarContext";
@@ -247,11 +248,10 @@ export default function Navbar({
         {/* Speaker icon area */}
         {soundLoading ? (
           // If audio is loading, show a spinner
-          <LottieView
-            source={withoutBg}
-            autoPlay
-            loop
-            style={{ width: 150, height: 150, backgroundColor: "transparent" }}
+          <ActivityIndicator
+            size="small" // or "large"
+            color="#999" // match your UI
+            style={styles.locationInlineLoader}
           />
         ) : (
           <TouchableOpacity
@@ -403,6 +403,11 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.25)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  locationInlineLoader: {
+    position: "absolute",
+    right: 12,
+    alignSelf: "center",
   },
 });
 

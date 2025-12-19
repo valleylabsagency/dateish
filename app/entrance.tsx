@@ -47,7 +47,7 @@ import MusicToggleButton from "@/components/MusicToggleButton";
 import { MusicContext } from "../contexts/MusicContext";
 
 const { width, height } = Dimensions.get("window");
-const DEFAULT_BANNER_TEXT = "Happy Hour daily! ";
+const DEFAULT_BANNER_TEXT = "We Hate Dating Apps Too. Welcome to Dateish!";
 
 const withoutBg = {
   ...animationData,
@@ -212,15 +212,23 @@ export default function EntranceScreen() {
 
   const navOnceRef = useRef(false);
 
-  const [bannerText, setBannerText] = useState(DEFAULT_BANNER_TEXT);
+  // LED Banner
+  const [bannerText, setBannerText] = useState("");
   const [maskWidth, setMaskWidth] = useState(0);
+  const bannerVersionRef = useRef(0);
+  const [bannerVersion, setBannerVersion] = useState(0); // used to key the measurer
   const MARQUEE_GAP = 20; // px, tweak if you want
+  const FORCE_BANNER_ERROR = true; // <-- flip this
 
   useEffect(() => {
     let alive = true;
 
     (async () => {
       try {
+        // Test for failure to fetch text from Firebase
+        // if (FORCE_BANNER_ERROR) {
+        //   throw new Error("Forced banner fetch failure (test)");
+        // }
         const ref = doc(firestore, "appConfig", "ui");
         const snap = await getDoc(ref);
 
@@ -235,6 +243,7 @@ export default function EntranceScreen() {
       } catch (e) {
         // keep default on error
         console.log("Failed to load entrance banner text, using default.", e);
+        setBannerText(DEFAULT_BANNER_TEXT);
       }
     })();
 
@@ -245,26 +254,31 @@ export default function EntranceScreen() {
 
   // Reset animation measurements when text changes
   useEffect(() => {
+    bannerVersionRef.current += 1;
+    setBannerVersion(bannerVersionRef.current);
+
     setTextWidth(0);
+    scrollX.stopAnimation();
     scrollX.setValue(width);
+
     console.log(bannerText);
   }, [bannerText]);
 
   // marquee loop
   useEffect(() => {
     if (!textWidth || !maskWidth) return;
+
     console.log("textWidth", textWidth, "maskWidth", maskWidth);
+
+    let loop: RNAnimated.CompositeAnimation | null = null;
 
     const timeoutId = setTimeout(() => {
       scrollX.stopAnimation();
-
-      // start fully offscreen to the right
       scrollX.setValue(maskWidth + MARQUEE_GAP);
 
-      const loop = RNAnimated.loop(
+      loop = RNAnimated.loop(
         RNAnimated.sequence([
           RNAnimated.timing(scrollX, {
-            // go fully offscreen to the left
             toValue: -(textWidth + MARQUEE_GAP),
             duration: 8000,
             easing: Easing.linear,
@@ -281,16 +295,11 @@ export default function EntranceScreen() {
       );
 
       loop.start();
-
-      // cleanup for loop
-      return () => {
-        loop.stop();
-        scrollX.stopAnimation();
-      };
-    }, 5500); // adjust delay if needed
+    }, 5500);
 
     return () => {
       clearTimeout(timeoutId);
+      if (loop) loop.stop();
       scrollX.stopAnimation();
     };
   }, [textWidth, maskWidth, bannerText]);
@@ -751,12 +760,17 @@ export default function EntranceScreen() {
               {/* OFFSCREEN measurer (must not be constrained) */}
               <View style={styles.measureWrap} pointerEvents="none">
                 <Text
+                  key={bannerVersion} // <-- forces a fresh native Text instance each bannerText change
                   style={[styles.bannerText, styles.hiddenMeasure]}
                   numberOfLines={1}
                   allowFontScaling={false}
                   onLayout={(e) => {
                     const w = Math.ceil(e.nativeEvent.layout.width);
-                    if (w && w !== textWidth) setTextWidth(w);
+
+                    // only accept measurement for the CURRENT version
+                    if (bannerVersion !== bannerVersionRef.current) return;
+
+                    if (w > 0) setTextWidth(w);
                   }}
                 >
                   {bannerText}

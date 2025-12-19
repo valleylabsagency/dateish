@@ -145,7 +145,7 @@ const WELCOME_MESSAGES = [
 const BAR_MM_SPEEACH_BUBBLE = [
   "Have fun, flirt freely, drink responsibly.",
   "Talk to some humans! I'm sure they're not all assholes...",
-  "I'm not like all the other bots on dating apps... I promise. ;)",
+  "I'm not like all the other bots on dating apps... I promise. :)",
 ];
 
 const LAST_WELCOME_INDEX = WELCOME_MESSAGES.length - 1;

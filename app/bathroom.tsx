@@ -15,6 +15,7 @@ import {
   Alert,
   Linking,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -978,11 +979,18 @@ export default function BathroomScreen() {
                   onChangeText={setLocation}
                   editable={false}
                 />
-                {locationLoading && (
+                {/* {locationLoading && (
                   <LottieView
                     source={withoutBg}
                     autoPlay
                     loop
+                    style={styles.locationInlineLoader}
+                  />
+                )} */}
+                {locationLoading && (
+                  <ActivityIndicator
+                    size="small" // or "large"
+                    color="#999" // match your UI
                     style={styles.locationInlineLoader}
                   />
                 )}
