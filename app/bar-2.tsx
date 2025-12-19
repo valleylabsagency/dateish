@@ -2268,7 +2268,7 @@ export default function Bar2Screen() {
                 onPress={() => setCreepVisible(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={creepStyles.mingModalCloseButtonText}>X</Text>
+                <Image source={closeIcon} style={styles.closeIcon} />{" "}
               </TouchableOpacity>
 
               <Text style={creepStyles.mingModalText}>{creepTyped}</Text>
@@ -2487,9 +2487,11 @@ const styles = StyleSheet.create({
   },
 
   closeIcon: {
-    width: 20,
-    height: 18,
+    width: 24,
+    height: 24,
     tintColor: "#F5E1C4",
+    top: 5,
+    right: 5,
   },
   drinkIcon: {
     position: "absolute",
