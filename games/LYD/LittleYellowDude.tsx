@@ -1,23 +1,27 @@
-// LittleYellowDude.tsx — Skia — D-pad + knives + fastest-marriage timer + scalable game & bg
-// - D-pad controls (tap/hold to steer), styled yellow with centered big arrows.
-// - Enemies can't use portals; player can.
-// - Timer centered (goal: marry fastest); win overlay shows time; restart on win/lose.
-// - Knives: 4 pickups. On pickup, knife attaches, kills enemies, lasts 5s + flashes 2s.
-// - Knife rotation is IN-PLACE via KNIFE_ORIENT_DEGREES.
-// - Background image with scale/offset knobs.
-// - Whole game (maze + sprites) scalable via GAME_SCALE and SHIFT.
-// - Ready? -> Go! intro; gameplay & timer start on "Go!" end.
-// - Exposes onFinish(seconds, formatted, result) via props when run ends.
+// LittleYellowDude.tsx — Skia — Option B responsive layout using ScreenShell
+//
+// Layout:
+// background (absolute)
+// column:
+//   Title
+//   HUD row: Timer + collected items (same line)
+//   Content (Game area measured; Canvas fills it)
+//   Controller (D-pad)
+//
+// Notes:
+// - Game sizing based on measured content area (Option B).
+// - Inventory thumbs in RN <Image> in HUD.
+// - Overlays cover only the game area.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Dimensions,
   StatusBar,
   StyleSheet,
   View,
   Text,
   Pressable,
   Image,
+  LayoutChangeEvent,
 } from "react-native";
 import {
   Canvas,
@@ -31,6 +35,8 @@ import {
   Image as SkiaImage,
   useImage,
 } from "@shopify/react-native-skia";
+
+import { ScreenShell } from "../../components/screenShell"; // <-- adjust path if needed
 
 /** Left half (mirrored per row). Row 9 fix kept (last '0' removed). */
 export const LEFT_HALF_ROWS_RAW: string[] = [
@@ -64,18 +70,15 @@ const mirrorRow = (left: string) => {
   return n + n.split("").reverse().join("");
 };
 
-const DESIGN_WIDTH = 360; // S24 logical width you logged
-const DESIGN_HEIGHT = 703; // S24 logical height you logged
-
 const UI_CONFIG = { MAZE_Y_OFFSET: -68 };
 
 /* ==== global background size/position controls ==== */
-const BG_SCALE = 1.28; // 1 = fit; >1 bigger
+const BG_SCALE = 1.15; // 1 = fit; >1 bigger
 const BG_SHIFT_X = 0; // px
 const BG_SHIFT_Y = 48; // px
 
 /* ==== global game size/position controls ==== */
-const GAME_SCALE = 0.85; // 1 = fit screen; <1 smaller; >1 larger (may crop)
+const GAME_SCALE = 1; // <1 smaller; >1 larger (may crop)
 const GAME_SHIFT_X = 0; // px shift after centering
 const GAME_SHIFT_Y = 30; // px shift after centering
 
@@ -128,7 +131,6 @@ const PORTALS: PortalPair[] = [
 
 /* ===================== PROPS ===================== */
 type LittleYellowDudeProps = {
-  /** Called once when the run ends (win or lose). */
   onFinish?: (
     seconds: number,
     formatted: string,
@@ -143,45 +145,80 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
     onFinishRef.current = onFinish;
   }, [onFinish]);
 
-  // Grid & sizing
+  // Grid
   const FULL = useMemo(() => LEFT_HALF_ROWS_RAW.map(mirrorRow), []);
   const rows = FULL.length;
   const cols = FULL.reduce((m, r) => Math.max(m, r.length), 0);
 
-  // We still know the real device, but we don't use it for layout,
-  // only for the outer background / centering if you ever want it.
-  const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+  const wallAt = (r: number, c: number) =>
+    r >= 0 && r < rows && c >= 0 && c < cols && FULL[r][c] === "0";
+  const walkableAt = (r: number, c: number) =>
+    r >= 0 && r < rows && c >= 0 && c < cols && FULL[r][c] !== "0";
 
-  // === use the fixed S24 design size for all layout numbers ===
-  const width = DESIGN_WIDTH;
-  const height = DESIGN_HEIGHT;
+  // Measure the game area (content slot)
+  const [gameBox, setGameBox] = useState<{ w: number; h: number } | null>(null);
+  const onGameLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    const w = Math.floor(width);
+    const h = Math.floor(height);
+    if (w > 0 && h > 0) {
+      setGameBox((prev) => {
+        if (prev && prev.w === w && prev.h === h) return prev;
+        return { w, h };
+      });
+    }
+  };
 
-  const BASE_MARGIN = 16;
-  const BASE_CELL = Math.max(
-    10,
-    Math.min(
-      Math.floor((width - BASE_MARGIN * 2) / cols),
-      Math.floor((height - BASE_MARGIN * 2) / rows)
-    )
-  );
+  // Derived sizing from measured game area
+  const layout = useMemo(() => {
+    const w = gameBox?.w ?? 0;
+    const h = gameBox?.h ?? 0;
+    if (w <= 0 || h <= 0) {
+      return {
+        ready: false,
+        width: 0,
+        height: 0,
+        CELL: 10,
+        STAGE_W: 0,
+        STAGE_H: 0,
+        PADX: 0,
+        PADY: 0,
+      };
+    }
 
-  const CELL_BASE = Math.min(width / cols, height / rows);
-  const CELL = CELL_BASE * GAME_SCALE; // scale the whole game
-  const STAGE_W = cols * CELL;
-  const STAGE_H = rows * CELL;
-  const PADX = (width - STAGE_W) / 2 + GAME_SHIFT_X;
-  const PADY = (height - STAGE_H) / 2 + GAME_SHIFT_Y;
+    const BASE_MARGIN = 16;
 
-  // Inventory thumbs
-  const INV_ITEM_SIZE = Math.max(24, CELL * 0.9) * 1.5;
-  const INV_GAP = Math.max(4, CELL * 0.15) - 10;
-  const INV_X0 = PADX + 8;
-  const INV_Y_BASE = Math.max(
-    8,
-    PADY + UI_CONFIG.MAZE_Y_OFFSET - INV_ITEM_SIZE - 8
-  );
+    const CELL_BASE = Math.min(
+      (w - BASE_MARGIN * 2) / cols,
+      (h - BASE_MARGIN * 2) / rows
+    );
+    const CELL = Math.max(8, CELL_BASE * GAME_SCALE);
 
-  // Walls
+    const STAGE_W = cols * CELL;
+    const STAGE_H = rows * CELL;
+
+    const PADX = (w - STAGE_W) / 2 + GAME_SHIFT_X;
+    const PADY = (h - STAGE_H) / 2 + GAME_SHIFT_Y;
+
+    return {
+      ready: true,
+      width: w,
+      height: h,
+      CELL,
+      STAGE_W,
+      STAGE_H,
+      PADX,
+      PADY,
+    };
+  }, [gameBox, cols, rows]);
+
+  const CELL = layout.CELL;
+  const STAGE_W = layout.STAGE_W;
+  const STAGE_H = layout.STAGE_H;
+  const PADX = layout.PADX;
+  const PADY = layout.PADY;
+
+  // Walls styling depends on CELL
   const WALL_FILL = "#051433ff";
   const CORE_COLOR = "#8ecaff",
     MID_COLOR = "rgba(142,202,255,0.45)",
@@ -196,14 +233,9 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   const CORE_W = Math.max(0.5, CELL * WALL.core);
   const MID_W = Math.max(CORE_W + 0.5, CELL * WALL.mid);
   const OUTER_W = Math.max(MID_W + 0.5, CELL * WALL.outer);
-  const MID_BLUR = CELL * WALL.midBlur,
-    OUTER_BLUR = CELL * WALL.outerBlur;
+  const MID_BLUR = CELL * WALL.midBlur;
+  const OUTER_BLUR = CELL * WALL.outerBlur;
   const CORNER_R = 20;
-
-  const wallAt = (r: number, c: number) =>
-    r >= 0 && r < rows && c >= 0 && c < cols && FULL[r][c] === "0";
-  const walkableAt = (r: number, c: number) =>
-    r >= 0 && r < rows && c >= 0 && c < cols && FULL[r][c] !== "0";
 
   // Outline paths
   type EdgeMap = Map<string, Edge[]>;
@@ -257,6 +289,7 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   }, [rows, cols, FULL]);
 
   const wallPaths = useMemo(() => {
+    if (!layout.ready) return [];
     const startMap: EdgeMap = new Map();
     edges.forEach((e) => {
       const k = `${e.x0},${e.y0}`;
@@ -266,48 +299,59 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
     });
     const rotL = (dx: number, dy: number) => ({ dx: dy, dy: -dx });
     const rotR = (dx: number, dy: number) => ({ dx: -dy, dy: dx });
-    const visited = new Set<string>(),
-      out: any[] = [];
+    const visited = new Set<string>();
+    const out: any[] = [];
+
     for (const e0 of edges) {
       if (visited.has(e0.id)) continue;
       const p = Skia.Path.Make();
-      let start = { x: e0.x0, y: e0.y0 },
-        dir = { dx: e0.dx, dy: e0.dy },
-        cur = e0;
+      let start = { x: e0.x0, y: e0.y0 };
+      let dir = { dx: e0.dx, dy: e0.dy };
+      let cur = e0;
+
       p.moveTo(start.x * CELL, start.y * CELL);
       p.lineTo(cur.x1 * CELL, cur.y1 * CELL);
       visited.add(cur.id);
+
       const startKey = `${start.x},${start.y}`;
-      let curEndKey = `${cur.x1},${cur.y1}`,
-        guard = 0;
+      let curEndKey = `${cur.x1},${cur.y1}`;
+      let guard = 0;
+
       while (guard++ < edges.length * 6) {
         if (curEndKey === startKey) break;
         const candidates = (startMap.get(curEndKey) || []).filter(
           (ed) => !visited.has(ed.id)
         );
         if (!candidates.length) break;
-        const left = rotL(dir.dx, dir.dy),
-          straight = dir,
-          right = rotR(dir.dx, dir.dy);
+
+        const left = rotL(dir.dx, dir.dy);
+        const straight = dir;
+        const right = rotR(dir.dx, dir.dy);
+
         const pick = (dx: number, dy: number) =>
           candidates.find((ed) => ed.dx === dx && ed.dy === dy);
+
         const next =
           pick(left.dx, left.dy) ||
           pick(straight.dx, straight.dy) ||
           pick(right.dx, right.dy) ||
           null;
         if (!next) break;
+
         p.lineTo(next.x1 * CELL, next.y1 * CELL);
         visited.add(next.id);
+
         dir = { dx: next.dx, dy: next.dy };
         cur = next;
         curEndKey = `${cur.x1},${cur.y1}`;
       }
+
       p.close();
       out.push(p);
     }
+
     return out;
-  }, [edges, CELL]);
+  }, [edges, CELL, layout.ready]);
 
   // Portals (player-only)
   const portalMap = useMemo(() => {
@@ -346,23 +390,16 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   const headingRef = useRef(0);
   const [tick, setTick] = useState(0);
 
-  // Movement speeds follow game scale
-  const SPEED_PX_PER_S = CELL * 5.5;
-
-  // Sprite (2-frame)
-  const LYD_SIZE = Math.max(28, CELL * 1.6);
-  const LYD_COLLISION_R = LYD_SIZE * 0.35;
-  const WALK_FPS = 7,
-    WALK_PERIOD = 1 / WALK_FPS;
-  const lydStand = useImage(require("./lyd/LITTLE_YELLOW_GUY_STAND.png"));
-  const lydWalk = useImage(require("./lyd/LITTLE_YELLOW_GUY_WALK.png"));
-  const curFrameRef = useRef<"stand" | "walk">("stand");
-  const walkAccRef = useRef(0);
+  useEffect(() => {
+    const { r, c } = cellRef.current;
+    posRef.current = { x: c * CELL + CELL / 2, y: r * CELL + CELL / 2 };
+  }, [CELL]);
 
   const centerOf = (r: number, c: number) => ({
     x: c * CELL + CELL / 2,
     y: r * CELL + CELL / 2,
   });
+
   const angleFor = (d: Dir) =>
     d.dx === 1
       ? 0
@@ -373,17 +410,21 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
       : d.dy === 1
       ? Math.PI / 2
       : headingRef.current;
+
   const canMove = (r: number, c: number, d: Dir) =>
     walkableAt(r + d.dy, c + d.dx);
 
-  // Quest item spawn overrides
-  const ITEM_SPAWN_BY_ID: Partial<Record<string, { r: number; c: number }>> = {
-    ROSES: { r: 1, c: cols - 2 },
-    GIRLY_FRIENDSTON: { r: 22, c: 1 },
-    DATE: { r: 11, c: 12 },
-    RING: { r: 22, c: 22 },
-    WEDDING: { r: 13, c: 12 },
-  };
+  const SPEED_PX_PER_S = CELL * 5.5;
+
+  // Sprite (2-frame)
+  const LYD_SIZE = Math.max(28, CELL * 1.6);
+  const LYD_COLLISION_R = LYD_SIZE * 0.35;
+  const WALK_FPS = 7;
+  const WALK_PERIOD = 1 / WALK_FPS;
+  const lydStand = useImage(require("./lyd/LITTLE_YELLOW_GUY_STAND.png"));
+  const lydWalk = useImage(require("./lyd/LITTLE_YELLOW_GUY_WALK.png"));
+  const curFrameRef = useRef<"stand" | "walk">("stand");
+  const walkAccRef = useRef(0);
 
   const setDesired = (d: Dir) => {
     if (isOpposite(dirRef.current, d)) {
@@ -406,13 +447,14 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
       DIRS.Down,
       DIRS.Up,
     ];
-    for (const d of order)
+    for (const d of order) {
       if (canMove(r, c, d)) {
         dirRef.current = d;
         headingRef.current = angleFor(d);
         targetRef.current = { r: r + d.dy, c: c + d.dx };
         break;
       }
+    }
   }, [CELL]);
 
   /* ===================== QUEST ITEMS (queue) ===================== */
@@ -428,6 +470,14 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   const currentItemImage = curItem ? itemImages[itemIndex] : null;
   const itemPixelSize = (it: ItemDef | null) =>
     Math.max(12, (it?.size ?? 1.8) * CELL);
+
+  const ITEM_SPAWN_BY_ID: Partial<Record<string, { r: number; c: number }>> = {
+    ROSES: { r: 1, c: cols - 2 },
+    GIRLY_FRIENDSTON: { r: 22, c: 1 },
+    DATE: { r: 11, c: 12 },
+    RING: { r: 22, c: 22 },
+    WEDDING: { r: 13, c: 12 },
+  };
 
   useEffect(() => {
     if (!curItem) {
@@ -460,6 +510,7 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
     behavior?: EnemyBehavior;
     speedMult?: number;
   };
+
   const ENEMIES: EnemyDef[] = [
     {
       id: "CABBAGE",
@@ -518,13 +569,13 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
       speedMult: 1.0,
     },
   ];
+
   const ENEMY_SPAWN_POINTS = [
     { r: 23, c: 11 },
     { r: 23, c: 12 },
   ];
   const ENEMY_SPAWN_EVERY_MS = 6000;
 
-  // Enemy speed follows game scale
   const ENEMY_BASE_SPEED = CELL * 3.6;
 
   const enemyImages = ENEMIES.map((e) => useImage(e.src));
@@ -539,6 +590,7 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
     }
     return a;
   }, []);
+
   type ActiveEnemy = {
     idx: number;
     r: number;
@@ -557,19 +609,21 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
 
   const trySpawnEnemy = () => {
     if (nextSpawnIndexRef.current >= enemyOrder.length) return;
+
     const sp =
       ENEMY_SPAWN_POINTS[
         spawnPointCursorRef.current % ENEMY_SPAWN_POINTS.length
       ];
     spawnPointCursorRef.current++;
+
     let { r, c } = sp;
     if (!walkableAt(r, c)) {
       let found: null | { r: number; c: number } = null;
       for (let rad = 1; rad <= 3 && !found; rad++) {
         for (let dr = -rad; dr <= rad; dr++)
           for (let dc = -rad; dc <= rad; dc++) {
-            const rr = r + dr,
-              cc = c + dc;
+            const rr = r + dr;
+            const cc = c + dc;
             if (walkableAt(rr, cc)) {
               found = { r: rr, c: cc };
               break;
@@ -581,9 +635,11 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
         c = found.c;
       }
     }
-    const idx = enemyOrder[nextSpawnIndexRef.current++],
-      def = ENEMIES[idx],
-      ctr = centerOf(r, c);
+
+    const idx = enemyOrder[nextSpawnIndexRef.current++];
+    const def = ENEMIES[idx];
+    const ctr = centerOf(r, c);
+
     activeEnemiesRef.current.push({
       idx,
       r,
@@ -601,7 +657,6 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
 
-  // Intro phase: 'ready' -> 'go' -> 'play'
   type Phase = "ready" | "go" | "play";
   const [phase, setPhase] = useState<Phase>("ready");
   const phaseRef = useRef<Phase>("ready");
@@ -621,13 +676,12 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   const [elapsed, setElapsed] = useState(0);
   const formatTime = (s: number) => {
     const ms = Math.max(0, Math.floor(s * 1000));
-    const m = Math.floor(ms / 60000),
-      sec = Math.floor((ms % 60000) / 1000),
-      t = Math.floor((ms % 1000) / 100);
+    const m = Math.floor(ms / 60000);
+    const sec = Math.floor((ms % 60000) / 1000);
+    const t = Math.floor((ms % 1000) / 100);
     return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}.${t}`;
   };
 
-  // Report final time exactly once
   const reportedRef = useRef(false);
   useEffect(() => {
     if (!reportedRef.current && (won || gameOver)) {
@@ -640,17 +694,15 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   /* ===================== KNIVES ===================== */
   const KNIFE_IMG = useImage(require("./lyd/KNIFE.png"));
   const KNIFE_SIZE = Math.max(24, CELL * 1.4);
-  const KNIFE_OFFSET = LYD_SIZE * 0.7; // center-to-center
+  const KNIFE_OFFSET = LYD_SIZE * 0.7;
   const KNIFE_KILL_RADIUS = Math.max(CELL * 0.55, KNIFE_SIZE * 0.45);
   const KNIFE_ALIVE_MS = 5000;
   const KNIFE_FLASH_MS = 2000;
   const KNIFE_FLASH_PERIOD_MS = 120;
 
-  // Fixed extra rotation (degrees) for the knife sprite (in-place).
   const KNIFE_ORIENT_DEGREES = 225;
   const deg2rad = (d: number) => (d * Math.PI) / 180;
 
-  // Knife spawns (edit freely)
   const KNIFE_SPAWNS = useMemo(
     () => [
       { r: 11, c: 4 },
@@ -670,7 +722,6 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   type ActiveKnife = { startMs: number };
   const activeKnifeRef = useRef<ActiveKnife | null>(null);
 
-  // Helper: spawn tile for given quest item (used on restart)
   const computeSpawnForItem = (
     it: ItemDef | null
   ): { r: number; c: number } | null => {
@@ -691,7 +742,6 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   const beginIntro = () => {
     clearIntroTimers();
     setPhase("ready");
-    // short Ready -> Go -> Play
     introTimersRef.current.push(
       setTimeout(() => setPhase("go"), 2000) as unknown as number
     );
@@ -714,7 +764,6 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
     targetRef.current = null;
     headingRef.current = 0;
 
-    // Reset quest items + spawn first one now (ROSES)
     setItemIndex(0);
     setItemPos(computeSpawnForItem(ITEMS[0]));
 
@@ -733,14 +782,13 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
     walkAccRef.current = 0;
     curFrameRef.current = "stand";
 
-    // allow reporting again for the new run
     reportedRef.current = false;
-
     beginIntro();
   };
 
   /* ===================== LOOP ===================== */
   const lydLastWarpTimeRef = useRef(0);
+
   const chooseEnemyNextDir = (
     r: number,
     c: number,
@@ -753,15 +801,18 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
     if (!options.length) return { dx: 0, dy: 0 };
     const nonRev = options.filter((d) => !isOpposite(keep, d));
     const cand = nonRev.length ? nonRev : options;
+
     if (behavior === "random")
       return cand[Math.floor(Math.random() * cand.length)];
-    const pr = cellRef.current.r,
-      pc = cellRef.current.c;
-    let best = cand[0],
-      score = Infinity;
+
+    const pr = cellRef.current.r;
+    const pc = cellRef.current.c;
+    let best = cand[0];
+    let score = Infinity;
+
     for (const d of cand) {
-      const rr = r + d.dy,
-        cc = c + d.dx;
+      const rr = r + d.dy;
+      const cc = c + d.dx;
       const s = (rr - pr) * (rr - pr) + (cc - pc) * (cc - pc);
       if (s < score) {
         score = s;
@@ -772,13 +823,16 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   };
 
   useEffect(() => {
-    let mounted = true,
-      last = performance.now(),
-      raf = 0;
+    if (!layout.ready) return;
+
+    let mounted = true;
+    let last = performance.now();
+    let raf = 0;
+
     const loop = () => {
       if (!mounted) return;
-      const now = performance.now(),
-        dt = Math.min(0.05, (now - last) / 1000);
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
 
       const frozen =
@@ -786,7 +840,7 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
 
       if (!frozen) {
         setElapsed((t) => t + dt);
-        // enemy timed spawns
+
         enemySpawnAccumRef.current += dt;
         if (enemySpawnAccumRef.current * 1000 >= ENEMY_SPAWN_EVERY_MS) {
           enemySpawnAccumRef.current -= ENEMY_SPAWN_EVERY_MS / 1000;
@@ -799,23 +853,25 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
         let leftover = SPEED_PX_PER_S * dt;
         while (leftover > 0) {
           const d = dirRef.current;
+
           if ((d.dx === 0 && d.dy === 0) || !targetRef.current) {
-            const { r, c } = cellRef.current,
-              desired = desiredDirRef.current;
+            const { r, c } = cellRef.current;
+            const desired = desiredDirRef.current;
             if (canMove(r, c, desired)) {
               dirRef.current = desired;
               headingRef.current = angleFor(desired);
               targetRef.current = { r: r + desired.dy, c: c + desired.dx };
             } else break;
           }
-          let { r: tr, c: tc } = targetRef.current!,
-            { x: tx, y: ty } = centerOf(tr, tc);
-          const dx = tx - posRef.current.x,
-            dy = ty - posRef.current.y,
-            dist = Math.hypot(dx, dy);
+
+          let { r: tr, c: tc } = targetRef.current!;
+          let { x: tx, y: ty } = centerOf(tr, tc);
+
+          const dx = tx - posRef.current.x;
+          const dy = ty - posRef.current.y;
+          const dist = Math.hypot(dx, dy);
 
           if (dist <= 1e-4) {
-            // Arrived at tile center
             cellRef.current = { r: tr, c: tc };
 
             // Item pickup
@@ -850,13 +906,15 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
             }
 
             // choose next
-            const desired = desiredDirRef.current,
-              keep = dirRef.current;
-            const canDesired = canMove(tr, tc, desired),
-              canKeep = canMove(tr, tc, keep);
+            const desired = desiredDirRef.current;
+            const keep = dirRef.current;
+            const canDesired = canMove(tr, tc, desired);
+            const canKeep = canMove(tr, tc, keep);
+
             let next: Dir = { dx: 0, dy: 0 };
             if (canDesired) next = desired;
             else if (canKeep) next = keep;
+
             dirRef.current = next;
             headingRef.current = angleFor(next);
             targetRef.current =
@@ -864,16 +922,19 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
             continue;
           }
 
-          const step = Math.min(leftover, dist),
-            ux = dx / dist,
-            uy = dy / dist;
+          const step = Math.min(leftover, dist);
+          const ux = dx / dist;
+          const uy = dy / dist;
           posRef.current.x += ux * step;
           posRef.current.y += uy * step;
           leftover -= step;
+
           if (step === dist) {
             posRef.current.x = tx;
             posRef.current.y = ty;
-          } else break;
+          } else {
+            break;
+          }
         }
       }
 
@@ -888,14 +949,18 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
               en.dir = cand;
               en.target = { r: en.r + cand.dy, c: en.c + cand.dx };
             }
-            let { r: tr, c: tc } = en.target!,
-              { x: tx, y: ty } = centerOf(tr, tc);
-            const dx = tx - en.x,
-              dy = ty - en.y,
-              dist = Math.hypot(dx, dy);
+
+            const { r: tr, c: tc } = en.target!;
+            const { x: tx, y: ty } = centerOf(tr, tc);
+
+            const dx = tx - en.x;
+            const dy = ty - en.y;
+            const dist = Math.hypot(dx, dy);
+
             if (dist <= 1e-4) {
               en.r = tr;
               en.c = tc;
+
               const next = chooseEnemyNextDir(tr, tc, en.dir, en.behavior);
               en.dir = next;
               en.target =
@@ -904,21 +969,24 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
                   : null;
               continue;
             }
-            const step = Math.min(leftover, dist),
-              ux = dx / dist,
-              uy = dy / dist;
+
+            const step = Math.min(leftover, dist);
+            const ux = dx / dist;
+            const uy = dy / dist;
             en.x += ux * step;
             en.y += uy * step;
             leftover -= step;
+
             if (step === dist) {
               en.x = tx;
               en.y = ty;
-            } else break;
+            } else {
+              break;
+            }
           }
         }
 
         // Player-enemy collision (knife protects player)
-        // If a knife is active, body contact kills enemies instead of you.
         const px = posRef.current.x;
         const py = posRef.current.y;
         for (let i = activeEnemiesRef.current.length - 1; i >= 0; i--) {
@@ -927,9 +995,9 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
           const rx = en.x - px;
           const ry = en.y - py;
           const rad = LYD_COLLISION_R + enemyCollisionRadius(def);
+
           if (rx * rx + ry * ry <= rad * rad) {
             if (activeKnifeRef.current) {
-              // Holding a knife: enemy dies on contact
               activeEnemiesRef.current.splice(i, 1);
               continue;
             } else {
@@ -939,25 +1007,28 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
           }
         }
 
-        // Knife lifetime + kills (in-place rotation)
+        // Knife lifetime + kills
         if (activeKnifeRef.current) {
-          const t0 = activeKnifeRef.current.startMs,
-            aliveEnd = t0 + KNIFE_ALIVE_MS,
-            flashEnd = aliveEnd + KNIFE_FLASH_MS;
+          const t0 = activeKnifeRef.current.startMs;
+          const aliveEnd = t0 + KNIFE_ALIVE_MS;
+          const flashEnd = aliveEnd + KNIFE_FLASH_MS;
+
           if (now >= flashEnd) {
             activeKnifeRef.current = null;
           } else {
             const baseAngle = angleFor(dirRef.current);
-            const offsetAngle = baseAngle; // where the knife sits
-            const renderAngle = baseAngle + deg2rad(KNIFE_ORIENT_DEGREES); // blade orientation
-            const cx = posRef.current.x + Math.cos(offsetAngle) * KNIFE_OFFSET;
-            const cy = posRef.current.y + Math.sin(offsetAngle) * KNIFE_OFFSET;
+            const renderAngle = baseAngle + deg2rad(KNIFE_ORIENT_DEGREES);
+
+            const cx = posRef.current.x + Math.cos(baseAngle) * KNIFE_OFFSET;
+            const cy = posRef.current.y + Math.sin(baseAngle) * KNIFE_OFFSET;
+
             const tipX = cx + Math.cos(renderAngle) * (KNIFE_SIZE * 0.35);
             const tipY = cy + Math.sin(renderAngle) * (KNIFE_SIZE * 0.35);
+
             for (let i = activeEnemiesRef.current.length - 1; i >= 0; i--) {
-              const e = activeEnemiesRef.current[i],
-                dx = e.x - tipX,
-                dy = e.y - tipY;
+              const e = activeEnemiesRef.current[i];
+              const dx = e.x - tipX;
+              const dy = e.y - tipY;
               if (dx * dx + dy * dy <= KNIFE_KILL_RADIUS * KNIFE_KILL_RADIUS) {
                 activeEnemiesRef.current.splice(i, 1);
               }
@@ -984,14 +1055,28 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
       setTick((t) => (t + 1) % 1_000_000);
       raf = requestAnimationFrame(loop);
     };
+
     raf = requestAnimationFrame(loop);
     return () => {
       cancelAnimationFrame(raf);
       mounted = false;
     };
-  }, [CELL, portalMap, curItem?.id]);
+  }, [
+    layout.ready,
+    CELL,
+    SPEED_PX_PER_S,
+    ENEMY_BASE_SPEED,
+    portalMap,
+    curItem?.id,
+    KNIFE_OFFSET,
+    KNIFE_SIZE,
+    KNIFE_KILL_RADIUS,
+    LYD_COLLISION_R,
+    WALK_PERIOD,
+    rows,
+    cols,
+  ]);
 
-  const { r: rcR, c: rcC } = cellRef.current;
   const currentLYDImage =
     (curFrameRef.current === "walk" && lydWalk ? lydWalk : lydStand) || lydWalk;
   const dir = dirRef.current;
@@ -1000,331 +1085,326 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
 
   /* ===================== RENDER ===================== */
   return (
-    <View style={styles.screen}>
-      {/* Full-screen background stays device-sized */}
-      <View style={styles.bgWrap} pointerEvents="none">
-        <Image
-          source={require("./lyd/BACKGROUND.png")}
-          style={[
-            styles.bgImage,
-            {
-              transform: [
-                { scale: BG_SCALE },
-                { translateX: BG_SHIFT_X },
-                { translateY: BG_SHIFT_Y },
-              ],
-            },
-          ]}
-          resizeMode="contain"
-        />
-      </View>
-
-      <StatusBar hidden />
-
-      {/* This is your virtual S24 screen.
-         On S24: fits perfectly.
-         On smaller screens: cropped.
-         On larger screens: same size box in the middle (because of screen style). */}
-      <View style={{ width: DESIGN_WIDTH, height: DESIGN_HEIGHT }}>
-        {/* Big centered timer */}
-        <View style={styles.timerHud}>
-          <Text style={styles.timerText}> {formatTime(elapsed)}</Text>
+    <ScreenShell
+      backgroundSource={require("./lyd/BACKGROUND_NO_TITLE.png")}
+      bgTransform={[
+        { scale: BG_SCALE },
+        { translateX: BG_SHIFT_X },
+        { translateY: BG_SHIFT_Y },
+      ]}
+      top={
+        <>
+          <StatusBar hidden />
+          <Image
+            source={require("./lyd/TITLE.png")}
+            style={styles.title}
+            resizeMode="contain"
+          />
+        </>
+      }
+      hud={
+        <View style={styles.hudRow}>
+          <View style={styles.invRow}>
+            {ITEMS.map((it, i) => {
+              const collected = i < collectedCount;
+              return (
+                <View key={`slot-${it.id}`} style={styles.invSlot}>
+                  {collected ? (
+                    <Image
+                      source={it.src}
+                      style={styles.invThumb}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={styles.invPlaceholder} />
+                  )}
+                </View>
+              );
+            })}
+          </View>
+          <Text style={styles.timerText}>{formatTime(elapsed)}</Text>
         </View>
+      }
+      bottom={
+        // lift D-pad up
+        <View style={{ transform: [{ translateY: -60 }] }}>
+          <View style={styles.pad}>
+            <View style={styles.padRow}>
+              <Pad
+                label="▲"
+                onPress={() =>
+                  phase === "play" && !gameOver && !won && setDesired(DIRS.Up)
+                }
+              />
+            </View>
 
-        {/* Intro overlay: Ready? / Go! */}
+            <View style={styles.padRow}>
+              <Pad
+                label="◀"
+                onPress={() =>
+                  phase === "play" && !gameOver && !won && setDesired(DIRS.Left)
+                }
+              />
+              <View style={{ width: 40 }} />
+              <Pad
+                label="▶"
+                onPress={() =>
+                  phase === "play" &&
+                  !gameOver &&
+                  !won &&
+                  setDesired(DIRS.Right)
+                }
+              />
+            </View>
+
+            <View style={styles.padRow}>
+              <Pad
+                label="▼"
+                onPress={() =>
+                  phase === "play" && !gameOver && !won && setDesired(DIRS.Down)
+                }
+              />
+            </View>
+          </View>
+        </View>
+      }
+    >
+      {/* Game area (fills content slot) */}
+      <View style={styles.gameWrap} onLayout={onGameLayout}>
+        {!layout.ready ? null : (
+          <Canvas style={{ width: layout.width, height: layout.height }}>
+            <Group
+              transform={[
+                { translateX: PADX },
+                { translateY: PADY + UI_CONFIG.MAZE_Y_OFFSET },
+              ]}
+            >
+              <Rect x={0} y={0} width={STAGE_W} height={STAGE_H} color="#000" />
+
+              {/* Walls */}
+              <Group>
+                {wallPaths.map((p, i) => (
+                  <Path
+                    key={`fill-${i}-${tick}`}
+                    path={p}
+                    style="fill"
+                    color={WALL_FILL}
+                  />
+                ))}
+              </Group>
+              <Group>
+                <BlurMask blur={OUTER_BLUR} style="outer" />
+                {wallPaths.map((p, i) => (
+                  <Path
+                    key={`o-${i}-${tick}`}
+                    path={p}
+                    color={OUTER_COLOR}
+                    style="stroke"
+                    strokeWidth={OUTER_W}
+                    strokeJoin="round"
+                    strokeCap="round"
+                  >
+                    <CornerPathEffect r={CORNER_R} />
+                  </Path>
+                ))}
+              </Group>
+              <Group>
+                <BlurMask blur={MID_BLUR} style="outer" />
+                {wallPaths.map((p, i) => (
+                  <Path
+                    key={`m-${i}-${tick}`}
+                    path={p}
+                    color={MID_COLOR}
+                    style="stroke"
+                    strokeWidth={MID_W}
+                    strokeJoin="round"
+                    strokeCap="round"
+                  >
+                    <CornerPathEffect r={CORNER_R} />
+                  </Path>
+                ))}
+              </Group>
+              <Group>
+                {wallPaths.map((p, i) => (
+                  <Path
+                    key={`c-${i}-${tick}`}
+                    path={p}
+                    color={CORE_COLOR}
+                    style="stroke"
+                    strokeWidth={CORE_W}
+                    strokeJoin="round"
+                    strokeCap="round"
+                  >
+                    <CornerPathEffect r={CORNER_R} />
+                  </Path>
+                ))}
+              </Group>
+
+              {/* Portals */}
+              <Group>
+                {PORTALS.map((pair, idx) => (
+                  <React.Fragment key={`portalpair-${idx}`}>
+                    {[pair.a, pair.b].map((e, ei) => (
+                      <Circle
+                        key={`portal-${idx}-${ei}`}
+                        cx={e.c * CELL + CELL / 2}
+                        cy={e.r * CELL + CELL / 2}
+                        r={CELL * 0.3}
+                        color={e.color}
+                      />
+                    ))}
+                  </React.Fragment>
+                ))}
+              </Group>
+
+              {/* Quest item */}
+              {itemPos && currentItemImage && (
+                <SkiaImage
+                  image={currentItemImage}
+                  x={itemPos.c * CELL + CELL / 2 - itemPixelSize(curItem) / 2}
+                  y={itemPos.r * CELL + CELL / 2 - itemPixelSize(curItem) / 2}
+                  width={itemPixelSize(curItem)}
+                  height={itemPixelSize(curItem)}
+                />
+              )}
+
+              {/* Knife pickups */}
+              {KNIFE_IMG &&
+                KNIFE_SPAWNS.map((k, idx) =>
+                  knifePickups[idx] ? (
+                    <SkiaImage
+                      key={`knife-pickup-${idx}`}
+                      image={KNIFE_IMG}
+                      x={k.c * CELL + CELL / 2 - KNIFE_SIZE / 2}
+                      y={k.r * CELL + CELL / 2 - KNIFE_SIZE / 2}
+                      width={KNIFE_SIZE}
+                      height={KNIFE_SIZE}
+                    />
+                  ) : null
+                )}
+
+              {/* Enemies */}
+              <Group>
+                {activeEnemiesRef.current.map((en, i) => {
+                  const def = ENEMIES[en.idx];
+                  const img = enemyImages[en.idx];
+                  if (!img) return null;
+                  const sz = enemyPixelSize(def);
+                  return (
+                    <SkiaImage
+                      key={`enemy-${i}-${def.id}`}
+                      image={img}
+                      x={en.x - sz / 2}
+                      y={en.y - sz / 2}
+                      width={sz}
+                      height={sz}
+                    />
+                  );
+                })}
+              </Group>
+
+              {/* LYD */}
+              {currentLYDImage && (
+                <Group
+                  transform={[
+                    { translateX: posRef.current.x },
+                    { translateY: posRef.current.y },
+                    { rotate: rot },
+                    { scaleX },
+                  ]}
+                >
+                  <SkiaImage
+                    image={currentLYDImage}
+                    x={-LYD_SIZE / 2}
+                    y={-LYD_SIZE / 2}
+                    width={LYD_SIZE}
+                    height={LYD_SIZE}
+                  />
+                </Group>
+              )}
+
+              {/* Active knife (attached; flashing near end) */}
+              {KNIFE_IMG &&
+                activeKnifeRef.current &&
+                (() => {
+                  const t0 = activeKnifeRef.current!.startMs;
+                  const aliveEnd = t0 + KNIFE_ALIVE_MS;
+                  const flashing = performance.now() >= aliveEnd;
+                  const visible =
+                    !flashing ||
+                    Math.floor(
+                      (performance.now() - aliveEnd) / KNIFE_FLASH_PERIOD_MS
+                    ) %
+                      2 ===
+                      0;
+
+                  if (!visible) return null;
+
+                  const baseAngle = angleFor(dirRef.current);
+                  const renderAngle = baseAngle + deg2rad(KNIFE_ORIENT_DEGREES);
+                  const cx =
+                    posRef.current.x + Math.cos(baseAngle) * KNIFE_OFFSET;
+                  const cy =
+                    posRef.current.y + Math.sin(baseAngle) * KNIFE_OFFSET;
+
+                  return (
+                    <Group
+                      transform={[
+                        { translateX: cx },
+                        { translateY: cy },
+                        { rotate: renderAngle },
+                      ]}
+                    >
+                      <SkiaImage
+                        image={KNIFE_IMG}
+                        x={-KNIFE_SIZE / 2}
+                        y={-KNIFE_SIZE / 2}
+                        width={KNIFE_SIZE}
+                        height={KNIFE_SIZE}
+                      />
+                    </Group>
+                  );
+                })()}
+            </Group>
+          </Canvas>
+        )}
+
+        {/* Overlays cover only game area */}
         {(phase === "ready" || phase === "go") && (
-          <View style={styles.introWrap}>
+          <View style={styles.introWrap} pointerEvents="none">
             <Text style={phase === "ready" ? styles.readyText : styles.goText}>
               {phase === "ready" ? "Ready?" : "Go!"}
             </Text>
           </View>
         )}
 
-        {/* Canvas locked to design size */}
-        <Canvas style={{ width, height }}>
-          {/* Inventory */}
-          {Array.from({ length: collectedCount }).map((_, i) => {
-            const img = itemImages[i];
-            if (!img) return null;
-            const x = INV_X0 + i * (INV_ITEM_SIZE + INV_GAP);
-            return (
-              <SkiaImage
-                key={`inv-${i}`}
-                image={img}
-                x={x}
-                y={INV_Y_BASE}
-                width={INV_ITEM_SIZE}
-                height={INV_ITEM_SIZE}
-              />
-            );
-          })}
-
-          {/* Stage */}
-          <Group
-            transform={[
-              { translateX: PADX },
-              { translateY: PADY + UI_CONFIG.MAZE_Y_OFFSET },
-            ]}
-          >
-            {/* ... everything inside the stage exactly as you had it ... */}
-            {/* Rect, walls, portals, items, enemies, LYD, knife, etc */}
-
-            <Rect x={0} y={0} width={STAGE_W} height={STAGE_H} color="#000" />
-
-            {/* Walls */}
-            <Group>
-              {wallPaths.map((p, i) => (
-                <Path
-                  key={`fill-${i}-${tick}`}
-                  path={p}
-                  style="fill"
-                  color={WALL_FILL}
-                />
-              ))}
-            </Group>
-            <Group>
-              <BlurMask blur={OUTER_BLUR} style="outer" />
-              {wallPaths.map((p, i) => (
-                <Path
-                  key={`o-${i}-${tick}`}
-                  path={p}
-                  color={OUTER_COLOR}
-                  style="stroke"
-                  strokeWidth={OUTER_W}
-                  strokeJoin="round"
-                  strokeCap="round"
-                >
-                  <CornerPathEffect r={CORNER_R} />
-                </Path>
-              ))}
-            </Group>
-            <Group>
-              <BlurMask blur={MID_BLUR} style="outer" />
-              {wallPaths.map((p, i) => (
-                <Path
-                  key={`m-${i}-${tick}`}
-                  path={p}
-                  color={MID_COLOR}
-                  style="stroke"
-                  strokeWidth={MID_W}
-                  strokeJoin="round"
-                  strokeCap="round"
-                >
-                  <CornerPathEffect r={CORNER_R} />
-                </Path>
-              ))}
-            </Group>
-            <Group>
-              {wallPaths.map((p, i) => (
-                <Path
-                  key={`c-${i}-${tick}`}
-                  path={p}
-                  color={CORE_COLOR}
-                  style="stroke"
-                  strokeWidth={Math.max(0.5, CELL * 0.04)}
-                  strokeJoin="round"
-                  strokeCap="round"
-                >
-                  <CornerPathEffect r={CORNER_R} />
-                </Path>
-              ))}
-            </Group>
-
-            {/* Portals */}
-            <Group>
-              {PORTALS.map((pair, idx) => (
-                <React.Fragment key={`portalpair-${idx}`}>
-                  {[pair.a, pair.b].map((e, ei) => (
-                    <Circle
-                      key={`portal-${idx}-${ei}`}
-                      cx={e.c * CELL + CELL / 2}
-                      cy={e.r * CELL + CELL / 2}
-                      r={CELL * 0.3}
-                      color={e.color}
-                    />
-                  ))}
-                </React.Fragment>
-              ))}
-            </Group>
-
-            {/* Quest item */}
-            {itemPos && currentItemImage && (
-              <SkiaImage
-                image={currentItemImage}
-                x={itemPos.c * CELL + CELL / 2 - itemPixelSize(curItem) / 2}
-                y={itemPos.r * CELL + CELL / 2 - itemPixelSize(curItem) / 2}
-                width={itemPixelSize(curItem)}
-                height={itemPixelSize(curItem)}
-              />
-            )}
-
-            {/* Knife pickups */}
-            {KNIFE_IMG &&
-              KNIFE_SPAWNS.map((k, idx) =>
-                knifePickups[idx] ? (
-                  <SkiaImage
-                    key={`knife-pickup-${idx}`}
-                    image={KNIFE_IMG}
-                    x={k.c * CELL + CELL / 2 - KNIFE_SIZE / 2}
-                    y={k.r * CELL + CELL / 2 - KNIFE_SIZE / 2}
-                    width={KNIFE_SIZE}
-                    height={KNIFE_SIZE}
-                  />
-                ) : null
-              )}
-
-            {/* Enemies */}
-            <Group>
-              {activeEnemiesRef.current.map((en, i) => {
-                const def = ENEMIES[en.idx],
-                  img = enemyImages[en.idx];
-                if (!img) return null;
-                const sz = enemyPixelSize(def);
-                return (
-                  <SkiaImage
-                    key={`enemy-${i}-${def.id}`}
-                    image={img}
-                    x={en.x - sz / 2}
-                    y={en.y - sz / 2}
-                    width={sz}
-                    height={sz}
-                  />
-                );
-              })}
-            </Group>
-
-            {/* LYD */}
-            {currentLYDImage && (
-              <Group
-                transform={[
-                  { translateX: posRef.current.x },
-                  { translateY: posRef.current.y },
-                  { rotate: rot },
-                  { scaleX },
-                ]}
-              >
-                <SkiaImage
-                  image={currentLYDImage}
-                  x={-LYD_SIZE / 2}
-                  y={-LYD_SIZE / 2}
-                  width={LYD_SIZE}
-                  height={LYD_SIZE}
-                />
-              </Group>
-            )}
-
-            {/* Active knife (attached; flashing near end) */}
-            {KNIFE_IMG &&
-              activeKnifeRef.current &&
-              (() => {
-                const t0 = activeKnifeRef.current!.startMs;
-                const aliveEnd = t0 + KNIFE_ALIVE_MS;
-                const flashing = performance.now() >= aliveEnd;
-                const visible =
-                  !flashing ||
-                  Math.floor(
-                    (performance.now() - aliveEnd) / KNIFE_FLASH_PERIOD_MS
-                  ) %
-                    2 ===
-                    0;
-                if (!visible) return null;
-                const baseAngle = angleFor(dirRef.current);
-                const offsetAngle = baseAngle;
-                const renderAngle = baseAngle + deg2rad(KNIFE_ORIENT_DEGREES);
-                const cx =
-                  posRef.current.x + Math.cos(offsetAngle) * KNIFE_OFFSET;
-                const cy =
-                  posRef.current.y + Math.sin(offsetAngle) * KNIFE_OFFSET;
-                return (
-                  <Group
-                    transform={[
-                      { translateX: cx },
-                      { translateY: cy },
-                      { rotate: renderAngle },
-                    ]}
-                  >
-                    <SkiaImage
-                      image={KNIFE_IMG}
-                      x={-KNIFE_SIZE / 2}
-                      y={-KNIFE_SIZE / 2}
-                      width={KNIFE_SIZE}
-                      height={KNIFE_SIZE}
-                    />
-                  </Group>
-                );
-              })()}
-          </Group>
-        </Canvas>
-
-        {/* Win overlay with time */}
         {won && (
           <View style={styles.overlayWrap}>
             <Text style={styles.winText}>
               Congrats! You Got Married!{" "}
               <Text style={styles.winTime}>{formatTime(elapsed)}</Text>
             </Text>
-            <View style={styles.restartBtn}>
-              <Text style={styles.restartTxt} onPress={restartGame}>
-                Restart
-              </Text>
-            </View>
+            <Pressable style={styles.restartBtn} onPress={restartGame}>
+              <Text style={styles.restartTxt}>Restart</Text>
+            </Pressable>
           </View>
         )}
 
-        {/* Game Over */}
         {gameOver && (
           <View style={styles.overlayWrap}>
             <Text style={styles.gameOverText}>GAME OVER</Text>
-            <View style={styles.restartBtn}>
-              <Text style={styles.restartTxt} onPress={restartGame}>
-                Restart
-              </Text>
-            </View>
+            <Pressable style={styles.restartBtn} onPress={restartGame}>
+              <Text style={styles.restartTxt}>Restart</Text>
+            </Pressable>
           </View>
         )}
-
-        {/* === D-PAD === */}
-        <View style={styles.pad}>
-          <View style={styles.padRow}>
-            <Pad
-              label="▲"
-              onPress={() =>
-                phase === "play" && !gameOver && !won && setDesired(DIRS.Up)
-              }
-            />
-          </View>
-          <View style={styles.padRow}>
-            <Pad
-              label="◀"
-              onPress={() =>
-                phase === "play" && !gameOver && !won && setDesired(DIRS.Left)
-              }
-            />
-            <View style={{ width: 40 }} />
-            <Pad
-              label="▶"
-              onPress={() =>
-                phase === "play" && !gameOver && !won && setDesired(DIRS.Right)
-              }
-            />
-          </View>
-          <View style={styles.padRow}>
-            <Pad
-              label="▼"
-              onPress={() =>
-                phase === "play" && !gameOver && !won && setDesired(DIRS.Down)
-              }
-            />
-          </View>
-        </View>
       </View>
-    </View>
+    </ScreenShell>
   );
 }
 
 /* ===================== D-PAD BUTTON ===================== */
 function Pad({ label, onPress }: { label: string; onPress: () => void }) {
-  // micro-nudges to visually center each glyph
   const nudge = React.useMemo(() => {
     switch (label) {
       case "▲":
@@ -1367,35 +1447,37 @@ function Pad({ label, onPress }: { label: string; onPress: () => void }) {
 
 /* ===================== STYLES ===================== */
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#050816",
+  // Title (inside ScreenShell top slot)
+  title: {
+    alignSelf: "center",
+    width: "88%",
+    height: 90,
+    marginTop: 0, // shell already provides spacing
+    marginBottom: 0,
+  },
+
+  // HUD row: timer + inventory (inside ScreenShell hud slot)
+  hudRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 8,
+    height: 44, // lock it
+  },
+  invRow: { flexDirection: "row", alignItems: "center" },
+  invSlot: {
+    width: 38,
+    height: 38,
+    marginRight: 6, // avoid `gap`
     alignItems: "center",
     justifyContent: "center",
   },
+  invThumb: { width: 38, height: 38, opacity: 0.95 },
+  invPlaceholder: { width: 38, height: 38, opacity: 0 },
 
-  // Background
-  bgWrap: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "flex-start",
-  },
-  bgImage: {
-    width: "100%",
-    height: "100%",
-  },
-
-  // Big centered timer
-  timerHud: {
-    position: "absolute",
-    top: 120,
-    right: 25,
-    alignItems: "center",
-    zIndex: 20,
-  },
   timerText: {
     color: "#e5e7eb",
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "900",
     letterSpacing: 1,
     textShadowColor: "rgba(0,0,0,0.5)",
@@ -1403,20 +1485,19 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
 
+  // Game area (fills ScreenShell content slot)
+  gameWrap: { flex: 1 },
+
   // Intro overlay
   introWrap: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
     zIndex: 25,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.15)",
   },
   readyText: {
-    color: "#fbbf24", // amber
+    color: "#fbbf24",
     fontSize: 58,
     fontWeight: "900",
     letterSpacing: 1,
@@ -1424,7 +1505,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 10,
   },
   goText: {
-    color: "#22c55e", // green
+    color: "#22c55e",
     fontSize: 72,
     fontWeight: "900",
     letterSpacing: 1,
@@ -1432,16 +1513,10 @@ const styles = StyleSheet.create({
     textShadowRadius: 12,
   },
 
-  // Optional debug (small)
-  hudLeft: { position: "absolute", top: 18, left: 16, zIndex: 21 },
-  hudTxt: { color: "#9ca3af", fontSize: 14, fontWeight: "700" },
-
+  // Win / GameOver overlays
   overlayWrap: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 30,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.35)",
@@ -1464,7 +1539,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   winTime: { color: "#e5e7eb", fontSize: 32, fontWeight: "900" },
-
   restartBtn: {
     marginTop: 6,
     paddingHorizontal: 20,
@@ -1476,28 +1550,24 @@ const styles = StyleSheet.create({
   },
   restartTxt: { color: "#e5e7eb", fontSize: 18, fontWeight: "800" },
 
-  // D-pad (with your tighter gaps)
-  pad: {
-    position: "absolute",
-    bottom: 50,
-    alignSelf: "center",
-    alignItems: "center",
-    gap: 0,
-  },
+  // Controller (inside ScreenShell bottom slot)
+  pad: { alignSelf: "center", alignItems: "center" },
   padRow: {
     flexDirection: "row",
     gap: 10,
     alignItems: "center",
     justifyContent: "center",
+    // removed bottom: 60 (that causes drift)
   },
 
+  // D-pad buttons
   padBtn: {
     width: 50,
     height: 50,
     borderRadius: 33,
-    backgroundColor: "#FACC15", // yellow face
+    backgroundColor: "#FACC15",
     borderWidth: 2,
-    borderColor: "#F59E0B", // darker rim
+    borderColor: "#F59E0B",
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
