@@ -31,7 +31,11 @@ import { MoneysProvider } from "../contexts/MoneysContext";
 import { ProfileProvider } from "../contexts/ProfileContext";
 import { FirstTimeProvider } from "../contexts/FirstTimeContext";
 import { MusicProvider, MusicContext } from "@/contexts/MusicContext";
-import { NotificationContext } from "@/contexts/NotificationContext";
+import {
+  NotificationContext,
+  NotificationProvider,
+} from "@/contexts/NotificationContext";
+import { NewMessageProvider } from "@/contexts/NewMessageContext";
 import InactivityHandler from "../components/InactivityHandler";
 import PresenceWrapper from "@/contexts/PresenceContext";
 import { AuthProvider } from "../contexts/AuthContext";
@@ -363,48 +367,52 @@ export default function Layout() {
                   <MusicProvider>
                     <FirstTimeProvider>
                       <ProfileProvider>
-                        <NavbarContext.Provider
-                          value={{ showWcButton, setShowWcButton }}
-                        >
-                          <View style={styles.container}>
-                            <NotificationDisplay />
-                            <OfflineNotice />
+                        <NotificationProvider>
+                          <NewMessageProvider>
+                            <NavbarContext.Provider
+                              value={{ showWcButton, setShowWcButton }}
+                            >
+                              <View style={styles.container}>
+                                <NotificationDisplay />
+                                <OfflineNotice />
 
-                            <LastCallOverlay
-                              visible={!hideMMPopup && lastCall.visible}
-                              onClose={lastCall.dismiss}
-                            />
+                                <LastCallOverlay
+                                  visible={!hideMMPopup && lastCall.visible}
+                                  onClose={lastCall.dismiss}
+                                />
 
-                            <BarClosedOverlay
-                              visible={!hideMMPopup && barClosed.visible}
-                              onClose={barClosed.dismiss}
-                            />
+                                <BarClosedOverlay
+                                  visible={!hideMMPopup && barClosed.visible}
+                                  onClose={barClosed.dismiss}
+                                />
 
-                            {!hideNavbar && <Navbar />}
+                                {!hideNavbar && <Navbar />}
 
-                            <Stack
-                              detachInactiveScreens={false}
-                              screenOptions={{
-                                headerShown: false,
-                                cardStyleInterpolator: slideFadeHorizontal,
-                                transitionSpec: {
-                                  open: {
-                                    animation: "timing",
-                                    config: { duration: 600 },
-                                  },
-                                  close: {
-                                    animation: "timing",
-                                    config: { duration: 600 },
-                                  },
-                                },
-                                cardStyle: { backgroundColor: "#000" },
-                                contentStyle: { backgroundColor: "#000" },
-                                gestureEnabled: true,
-                              }}
-                            />
-                            <StatusBar hidden />
-                          </View>
-                        </NavbarContext.Provider>
+                                <Stack
+                                  detachInactiveScreens={false}
+                                  screenOptions={{
+                                    headerShown: false,
+                                    cardStyleInterpolator: slideFadeHorizontal,
+                                    transitionSpec: {
+                                      open: {
+                                        animation: "timing",
+                                        config: { duration: 600 },
+                                      },
+                                      close: {
+                                        animation: "timing",
+                                        config: { duration: 600 },
+                                      },
+                                    },
+                                    cardStyle: { backgroundColor: "#000" },
+                                    contentStyle: { backgroundColor: "#000" },
+                                    gestureEnabled: true,
+                                  }}
+                                />
+                                <StatusBar hidden />
+                              </View>
+                            </NavbarContext.Provider>
+                          </NewMessageProvider>
+                        </NotificationProvider>
                       </ProfileProvider>
                     </FirstTimeProvider>
                   </MusicProvider>

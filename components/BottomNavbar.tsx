@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useContext } from "react";
 import { View, TouchableOpacity, Image, StyleSheet, Text } from "react-native";
 import { useRouter, usePathname } from "expo-router";
+import { NewMessageContext } from "../contexts/NewMessageContext";
 
 const tabs = [
   {
@@ -33,9 +34,10 @@ const tabs = [
 export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
   const router = useRouter();
   const currentPath = usePathname();
+  const { newUserMessageCount } = useContext(NewMessageContext);
 
   const handleTabPress = (route: string) => {
-    if (route !== currentPath) router.push(route);
+    if (route !== currentPath) router.push(route as any);
   };
 
   return (
@@ -44,6 +46,7 @@ export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
         const isSelected = currentPath === tab.route;
         const isBar = tab.label === "Bar";
         const isStage = tab.label === "Events";
+        const isInbox = tab.label === "Inbox";
 
         return (
           <TouchableOpacity
@@ -67,6 +70,13 @@ export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
                   isStage && styles.stageIcon,
                 ]}
               />
+              {isInbox && newUserMessageCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {newUserMessageCount > 9 ? "9+" : newUserMessageCount}
+                  </Text>
+                </View>
+              )}
             </View>
             <Text
               numberOfLines={1}
@@ -176,5 +186,22 @@ const styles = StyleSheet.create({
   selectedLabel: {
     fontWeight: "bold",
     color: PINK,
+  },
+  badge: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    backgroundColor: "rgba(196, 42, 42, 1)",
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 5,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
   },
 });
