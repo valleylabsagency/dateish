@@ -10,6 +10,13 @@ import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {onValueWritten} from "firebase-functions/v2/database";
 import {onCall, HttpsError, onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import {setGlobalOptions} from "firebase-functions/v2";
+
+setGlobalOptions({
+  region: "us-central1",
+  maxInstances: 10,
+});
+
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -58,10 +65,10 @@ export const dailyFillMoneys = onSchedule(
 );
 
 // Happy Hour helper: 5pm–9pm local (ET assumed server-side)
-function isHappyHour(date = new Date()) {
+/*function isHappyHour(date = new Date()) {
   const h = date.getHours();
   return h >= 17 && h < 21;
-}
+} */
 
 // Spend moneys atomically
 export const spendMoneys = onCall({region: "us-central1"}, async (req) => {
@@ -110,6 +117,7 @@ async function sendPush(
     title,
     body,
     data,
+    channelId: "default",
   }));
   for (let i = 0; i < messages.length; i += 100) {
     const chunk = messages.slice(i, i + 100);
@@ -206,6 +214,7 @@ export const pushOnNewMessage = onDocumentCreated(
         senderName: msg.senderName || "",
       },
       priority: "high",
+      channelId: "default",
     }));
 
     const res = await fetch("https://exp.host/--/api/v2/push/send", {

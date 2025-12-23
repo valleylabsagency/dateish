@@ -61,11 +61,12 @@ import {
 import { ProfileContext } from "../contexts/ProfileContext";
 import { useIsFocused } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
-import Navbar from "@/components/Navbar";
-import { spendMoneys, getMessageCost } from "../services/moneys";
+import Navbar from "../components/Navbar";
+import { spendMoneys, getMessageCost } from '../services/moneys';
 import { MoneysContext } from "../contexts/MoneysContext";
 import PopUp from "../components/PopUp";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 // top of file
 import * as NavigationBar from "expo-navigation-bar";
 import { MusicContext } from "../contexts/MusicContext";
@@ -73,13 +74,9 @@ import { MusicContext } from "../contexts/MusicContext";
 // NEW
 import * as MailComposer from "expo-mail-composer";
 import MMAnimated from "@/services/MMAnimated";
-import {
-  Linking,
-  useWindowDimensions,
-  Platform,
-  Keyboard,
-  TouchableWithoutFeedback,
-} from "react-native";
+import { Linking, useWindowDimensions, Platform, Keyboard, TouchableWithoutFeedback } from "react-native";
+import { NavbarContext } from "../contexts/NavbarContext";
+
 import SpeechBubblePop from "@/services/SpeechBubblePop";
 
 const BG_IMG = require("../assets/images/bar-back.png");
@@ -150,6 +147,7 @@ const BAR_MM_SPEEACH_BUBBLE = [
 
 const LAST_WELCOME_INDEX = WELCOME_MESSAGES.length - 1;
 
+
 export default function Bar2Screen() {
   // Inside music starts after entrance animation ends
   const { setBar2Visible } = useContext(MusicContext);
@@ -178,6 +176,7 @@ export default function Bar2Screen() {
     params.fromBathroomFirst === true;
 
   const { profileComplete } = useContext(ProfileContext);
+  
 
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
@@ -205,6 +204,9 @@ export default function Bar2Screen() {
   const insets = useSafeAreaInsets();
   // Safe, device-correct visible area above the navbar (or full height if no navbar)
   const [topNavH, setTopNavH] = useState(0); // fixed navbar height
+
+const { setShowWcButton } = useContext(NavbarContext);
+
 
   const [stageH, setStageH] = useState<number | null>(null);
   const hasBottomBar = !!profileComplete;
@@ -444,6 +446,7 @@ export default function Bar2Screen() {
   // toast for “message sent / Chit Chat Sent”
   const [toastText, setToastText] = useState<string | null>(null);
 
+
   // “don’t be a creep” popup
   const [creepVisible, setCreepVisible] = useState(false);
   const creepRollAnim = useRef(new Animated.Value(500)).current;
@@ -467,6 +470,22 @@ export default function Bar2Screen() {
 
   // Link guard
   const [noLinksVisible, setNoLinksVisible] = useState(false);
+
+  useEffect(() => {
+  // Default off unless we explicitly enable it
+  const shouldShow =
+    // Only relevant during onboarding flow in the bar
+    !profileComplete &&
+    cameFromEntrance &&
+    // Only when we're on the final message AND it's fully displayed (not still typing)
+    welcomeIndex === LAST_WELCOME_INDEX &&
+    !welcomeTyping;
+
+  setShowWcButton(shouldShow);
+
+  // Safety cleanup so it doesn't "stick" when leaving the screen
+  return () => setShowWcButton(false);
+}, [profileComplete, cameFromEntrance, welcomeIndex, welcomeTyping, setShowWcButton]);
 
   //MM speech bubble texts
   const [mmBubbleIndex, setMmBubbleIndex] = useState(0);
@@ -577,37 +596,36 @@ export default function Bar2Screen() {
     return () => id && clearInterval(id);
   }, [creepVisible]);
 
-  // restore started + overlay behavior from storage + entrance + first-time bathroom
+    // restore started + overlay behavior from storage + entrance + first-time bathroom
   useEffect(() => {
     let alive = true;
 
     (async () => {
       try {
-        const promptVal = await AsyncStorage.getItem("bar2ShowPrompt");
+        const everVal = await AsyncStorage.getItem("bar2HasEverStarted");
         if (!alive) return;
 
-        const promptArmed = promptVal === "true";
+        const everStarted = everVal === "true";
+        setHasEverStarted(everStarted);
 
-        // 🚪 1) Coming from Entrance or first-time Bathroom:
-        // Always arm the Start Chatting overlay, no matter what happened before.
+        // 1) Coming from Entrance or first-time Bathroom:
+        // ALWAYS show Start Chatting, even if they’ve used the bar before.
         if (cameFromEntrance || fromBathroomFirst) {
           setStarted(false);
           setShowStartOverlay(true);
-          await AsyncStorage.setItem("bar2ShowPrompt", "true");
           return;
         }
 
-        // 🧷 2) Not coming from Entrance/Bathroom, but overlay was armed earlier:
-        // Keep it armed until they actually press Start Chatting.
-        if (promptArmed) {
+        // 2) Not from Entrance/Bathroom:
+        // If they have ever pressed Start Chatting, skip overlay forever.
+        if (everStarted) {
+          setStarted(true);
+          setShowStartOverlay(false);
+        } else {
+          // First ever visit to bar not via entrance → show overlay once.
           setStarted(false);
           setShowStartOverlay(true);
-          return;
         }
-
-        // ✅ 3) Normal state: no prompt armed → assume they’re “in the bar”
-        setStarted(true);
-        setShowStartOverlay(false);
       } catch {
         // Fallback: let them see the bar normally
         setStarted(true);
@@ -623,9 +641,10 @@ export default function Bar2Screen() {
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
       if (!u) {
-        await AsyncStorage.removeItem("bar2ShowPrompt");
+        await AsyncStorage.removeItem("bar2HasEverStarted");
         setStarted(false);
         setShowStartOverlay(false);
+        setHasEverStarted(false);
       }
     });
     return () => unsub();
@@ -700,6 +719,7 @@ export default function Bar2Screen() {
   // start state
   const [started, setStarted] = useState(false);
   const [showStartOverlay, setShowStartOverlay] = useState(false);
+  const [hasEverStarted, setHasEverStarted] = useState(false);
 
   const [leaving, setLeaving] = useState(false);
 
@@ -723,6 +743,8 @@ export default function Bar2Screen() {
   const [deletionFlag, setDeletionFlag] = useState<"you" | "them" | null>(null); // who deleted
   const [checkingDeletion, setCheckingDeletion] = useState(false);
   const [hasIncomingOnly, setHasIncomingOnly] = useState(false);
+  const [hasTwoWayHistory, setHasTwoWayHistory] = useState(false);
+
 
   const [introPlayed, setIntroPlayed] = useState<boolean>(false);
 
@@ -825,6 +847,35 @@ export default function Bar2Screen() {
     })();
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const [openVal, idVal] = await Promise.all([
+          AsyncStorage.getItem(PROFILE_MODAL_KEY),
+          AsyncStorage.getItem(PROFILE_ID_KEY),
+        ]);
+        if (!alive) return;
+
+        if (openVal === "true" && idVal) {
+          const found = profiles.find(p => p.id === idVal);
+          if (found) {
+            setSelectedProfile(found);
+            setModalVisible(true);
+          }
+        }
+      } catch (e) {
+        console.log("restore profile modal failed", e);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [profiles]);
+
+
   // 2) subscribe to realtime online status
   useEffect(() => {
     const db = getDatabase();
@@ -865,6 +916,7 @@ export default function Bar2Screen() {
         if (alive) {
           setDeletionFlag(null);
           setHasIncomingOnly(false);
+          setHasTwoWayHistory(false);
         }
         return;
       }
@@ -911,7 +963,18 @@ export default function Bar2Screen() {
 
             // “They already sent you a message” = they’ve sent something, you haven’t
             incomingOnly = anyFromThem && !anyFromMe;
+
+            // Ongoing convo = both have sent at least one message
+            const twoWay = anyFromThem && anyFromMe;
+
+            if (!alive) return;
+
+            setHasTwoWayHistory(twoWay && !localDeletion); // don’t treat deleted chats as ongoing
+          } else {
+            if (!alive) return;
+            setHasTwoWayHistory(false);
           }
+
         }
 
         if (!alive) return;
@@ -938,8 +1001,34 @@ export default function Bar2Screen() {
     };
   }, [modalVisible, selectedProfile]);
 
-  const deletedByThem = deletionFlag === "them";
-  const deletedByYou = deletionFlag === "you";
+  const PROFILE_MODAL_KEY = "bar2ProfileModalOpen";
+  const PROFILE_ID_KEY = "bar2SelectedProfileId";
+
+  const openProfileModal = (profile: any) => {
+    setSelectedProfile(profile);
+    setModalVisible(true);
+    setShowDrinkSpeech(false);
+
+    AsyncStorage.multiSet([
+      [PROFILE_MODAL_KEY, "true"],
+      [PROFILE_ID_KEY, profile.id],
+    ]).catch(() => {});
+  };
+
+  const closeProfileModal = () => {
+    setModalVisible(false);
+    setSelectedProfile(null);
+    setHasTwoWayHistory(false);
+
+    AsyncStorage.multiRemove([PROFILE_MODAL_KEY, PROFILE_ID_KEY]).catch(() => {});
+  };
+
+
+
+  
+
+  const deletedByThem = deletionFlag === 'them';
+  const deletedByYou = deletionFlag === 'you';
   const messagingBlocked = deletedByYou;
 
   // If this profile goes offline while their card is open
@@ -1144,27 +1233,58 @@ export default function Bar2Screen() {
     ].join("\n");
   }
 
-  const goToChatFromProfile = () => {
+  const goToChatFromProfile = async () => {
     if (!auth.currentUser || !selectedProfile) return;
 
     const currentUserId = auth.currentUser.uid;
     const partnerId = selectedProfile.id;
     const chatId = [currentUserId, partnerId].sort().join("_");
+    const chatDocRef = doc(firestore, "chats", chatId);
 
-    // Close any open overlays before navigation
-    setModalVisible(false);
-    setChitChatModalVisible(false);
-    setFirstMessageModalVisible(false);
+    try {
+      const snap = await getDoc(chatDocRef);
 
-    router.push({
-      pathname: "/ChitChats",
-      params: {
-        chatId, // for versions of ChitChats that read chatId directly
-        partnerId, // for versions that build the chatId from partnerId
-        fromBar: "true", // if you use this to tweak behavior in ChitChats
-      },
-    } as any);
+      if (!snap.exists()) {
+        // Make sure the chat exists so ChatScreen has a doc to work with
+        await setDoc(chatDocRef, {
+          users: [currentUserId, partnerId],
+          visibleFor: [currentUserId, partnerId],
+          updatedAt: serverTimestamp(),
+          lastMessage: "",
+          lastMessageSender: null,
+        });
+      } else {
+        // Make sure it's visible for both again
+        await updateDoc(chatDocRef, {
+          visibleFor: arrayUnion(currentUserId, partnerId),
+        });
+      }
+
+      // Now safely close overlays
+      setModalVisible(false);
+      setChitChatModalVisible(false);
+      setFirstMessageModalVisible(false);
+
+      // ✅ Navigate to the real chat screen
+      router.push({
+        pathname: "/chat",
+        params: {
+          partner: partnerId,   // what ChatScreen.tsx expects
+          // you can add `fromBar: "true"` too if you ever want special behavior there
+        },
+      } as any);
+    } catch (err) {
+      console.error("goToChatFromProfile error:", err);
+      Alert.alert(
+        "Error",
+        "We couldn't open this chat right now. Please try again."
+      );
+    }
   };
+
+
+
+
 
   async function sendReportEmail() {
     try {
@@ -1221,8 +1341,9 @@ export default function Bar2Screen() {
     }
   }
 
-  const handleChatPress = async () => {
-    if (messagingBlocked || !auth.currentUser || !selectedProfile) return;
+    // Shared helper: can I send another message to this person?
+  const canSendInitialToSelected = async (): Promise<boolean> => {
+    if (messagingBlocked || !auth.currentUser || !selectedProfile) return false;
 
     try {
       const currentUserId = auth.currentUser.uid;
@@ -1232,55 +1353,66 @@ export default function Bar2Screen() {
 
       const chatSnap = await getDoc(chatDocRef);
 
-      // If there is no chat doc at all, they truly haven’t talked → first message allowed
-      if (!chatSnap.exists()) {
-        openFirstMessageModal();
-        return;
-      }
+      // No chat at all → first contact is allowed
+      if (!chatSnap.exists()) return true;
 
       const msgsRef = collection(firestore, "chats", chatId, "messages");
       const msgsSnap = await getDocs(
         query(msgsRef, orderBy("createdAt", "asc"), limit(50))
       );
 
-      // No messages for some reason → treat as a fresh convo
-      if (msgsSnap.empty) {
-        openFirstMessageModal();
-        return;
-      }
+      // No messages → treat as fresh convo
+      if (msgsSnap.empty) return true;
 
       let mySent = 0;
       let theirSent = 0;
 
       msgsSnap.forEach((d) => {
         const m = d.data() as any;
-        // Be robust to different field names just in case
         const senderId = m.sender || m.senderId || m.from;
-
         if (!senderId) return;
         if (senderId === currentUserId) mySent++;
         else if (senderId === partnerId) theirSent++;
       });
 
       // 🚨 CREEP RULE:
-      // You have sent messages, they have sent none → "Don't be a creep"
+      // You’ve sent stuff, they haven’t replied at all → block
       if (mySent > 0 && theirSent === 0) {
         setCreepVisible(true);
-        return;
+        return false;
       }
 
-      // Otherwise they’ve replied or there’s some 2-way history → allow sending
-      openFirstMessageModal();
+      // Otherwise it’s either first time OR there’s 2-way history → OK
+      return true;
     } catch (err) {
-      console.error("handleChatPress failed:", err);
+      console.error("canSendInitialToSelected failed:", err);
       Alert.alert(
         "Error",
         "We couldn't check your chat history right now. Try again in a moment."
       );
-      // Note: we DON'T open the first-message modal on error anymore,
-      // so you can't bypass the creep check via a Firestore error.
+      return false;
     }
   };
+
+
+  const handleChatPress = async () => {
+    const ok = await canSendInitialToSelected();
+    if (!ok) return;
+
+    // If allowed, behave like normal Chat: open the first-message modal
+    openFirstMessageModal();
+  };
+
+  const handleChitChatPress = async () => {
+    const ok = await canSendInitialToSelected();
+    if (!ok) return;
+
+    // If allowed, proceed with the existing Chit Chat flow
+    openChitChatModal();
+  };
+
+
+
 
   const onMinglesPress = () => {
     if (welcomeTyping) return;
@@ -1331,8 +1463,9 @@ export default function Bar2Screen() {
       // Stay in browse – just close modal and show toast
       setFirstMessageText("");
       setFirstMessageModalVisible(false);
-      setModalVisible(false);
+      closeProfileModal();
       setToastText("Message sent");
+
       setTimeout(() => setToastText(null), 2000);
     } catch (err: any) {
       console.error(err);
@@ -1405,19 +1538,15 @@ export default function Bar2Screen() {
   // ─────────────────────────── RENDER ───────────────────────────
   return (
     <View
-      style={{
-        flex: 1,
-        backgroundColor: "#592540",
-        // cancel parent SafeArea bottom padding when there’s no BottomNavbar
-        marginBottom: hasBottomBar ? 0 : -insets.bottom,
-      }}
-    >
-      <Navbar
-        bathroomRoute={
-          !profileComplete ? "/bathroom?onboard=true" : "/bathroom"
-        }
-        lockNonBathroom={isLastWelcome}
-      />
+    style={{
+      flex: 1,
+      backgroundColor: "#592540",
+      // cancel parent SafeArea bottom padding when there’s no BottomNavbar
+      marginBottom: hasBottomBar ? 0 : -insets.bottom,
+    }}
+  >
+
+
 
       {/* ==== STAGE (locks all layers to the same art space) ==== */}
       <View
@@ -1483,13 +1612,41 @@ export default function Bar2Screen() {
             <View
               style={{
                 position: "absolute",
-                left: offsetX + dispW * 0.05,
-                top: 50,
-                width: dispW * 0.9,
-                height: dispW * 0.45, // ⬅️ FIX: give it a real fixed height
-                zIndex: 30,
-                // backgroundColor: "rgba(0,255,0,0.3)", // 👈 TEMP: debug
-              }}
+                left: btnLeft,
+                top: btnTop - 50,
+                width: btnW,
+                height: btnH,
+                zIndex: 40,
+              },
+            ]}
+            onPress={async () => {
+              setBubbleVisible(false);
+              setLeaving(true);
+              setShowStartOverlay(false);
+              setTimeout(() => setStarted(true), 1100);
+
+              try {
+                const db = getDatabase();
+                const statusRef = rtdbRef(db, `status/${auth.currentUser!.uid}`);
+                rtdbUpdate(statusRef, {
+                  online: true,
+                  bar: true,
+                  lastActive: Date.now(),
+                }).catch(() => {});
+
+                // Mark that they've started at least once
+                setHasEverStarted(true);
+                await AsyncStorage.setItem("bar2HasEverStarted", "true");
+              } catch {}
+            }}
+
+          >
+            <Text
+              style={styles.startButtonText}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}   // shrink instead of truncating
+              ellipsizeMode="clip"     // just in case, don’t show "…"
             >
               <SpeechBubblePop
                 source={require("../assets/images/speech-bubble.png")}
@@ -1769,11 +1926,7 @@ export default function Bar2Screen() {
                     borderColor: "white",
                     marginRight: "8%",
                   }}
-                  onPress={() => {
-                    setSelectedProfile(p);
-                    setModalVisible(true);
-                    setShowDrinkSpeech(false);
-                  }}
+                  onPress={() => openProfileModal(p)}
                 >
                   <Image
                     source={{ uri: p.photoUri }}
@@ -1866,9 +2019,18 @@ export default function Bar2Screen() {
 
       {/* ─── PROFILE DETAIL OVERLAY (non-blocking) ──────────────────── */}
       {modalVisible && (
-        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-          <View style={styles.modalOverlay} pointerEvents="box-none">
-            <View style={styles.modalContent} pointerEvents="auto">
+        <View
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="box-none"          
+        >
+          <View
+            style={styles.modalOverlay}
+            pointerEvents="box-none"
+          >
+            <View
+              style={styles.modalContent}
+              pointerEvents="auto"          
+            >{/*}
               {deletionFlag && (
                 <View style={styles.deletionBanner}>
                   <Text style={styles.deletionBannerText}>
@@ -1877,13 +2039,14 @@ export default function Bar2Screen() {
                       : "They deleted this chat"}
                   </Text>
                 </View>
-              )}
+              )} */}
 
               <TouchableOpacity
-                onPress={() => setModalVisible(false)}
+                onPress={closeProfileModal}
                 style={styles.closeButton}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
+
                 <Image
                   style={{ width: 20, height: 20 }}
                   source={require("../assets/images/x.png")}
@@ -1940,6 +2103,7 @@ export default function Bar2Screen() {
                       <Text style={styles.infoLine}>
                         {selectedProfile.name} deleted your convo.
                       </Text>
+
                       <View
                         style={[
                           styles.bottomButtons,
@@ -1948,19 +2112,50 @@ export default function Bar2Screen() {
                       >
                         <TouchableOpacity
                           style={styles.modalChatButton}
-                          onPress={handleChatPress} // behaves like your normal Chat flow
+                          onPress={handleChatPress}   // behaves like "Chat" button
                         >
-                          <Text style={styles.modalChatButtonText}>
-                            Try Again?
+                          <Text style={styles.modalChatButtonText}>Go To Chat</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : deletedByYou ? (
+                    <>
+                      <Text style={styles.infoLine}>
+                        You deleted this convo.
+                      </Text>
+
+                      <View
+                        style={[
+                          styles.bottomButtons,
+                          { justifyContent: "center", marginTop: 10 },
+                        ]}
+                      >
+                        <TouchableOpacity
+                          style={[
+                            styles.modalChatButton,
+                            isSelectedOffline && styles.modalChatButtonDisabled,
+                          ]}
+                          onPress={handleChatPress}     // same "start a new first message" flow
+                          disabled={isSelectedOffline}
+                        >
+                          <Text
+                            style={[
+                              styles.modalChatButtonText,
+                              isSelectedOffline && styles.modalChatButtonTextDisabled,
+                              {color: "red", fontWeight: "bold"}
+                            ]}
+                          >
+                            Go To Chat
                           </Text>
                         </TouchableOpacity>
                       </View>
                     </>
-                  ) : hasIncomingOnly ? (
+                  )  : hasIncomingOnly ? (
                     <>
                       <Text style={styles.infoLine}>
                         {selectedProfile.name} already sent you a message.
                       </Text>
+
                       <View
                         style={[
                           styles.bottomButtons,
@@ -1977,6 +2172,34 @@ export default function Bar2Screen() {
                         </TouchableOpacity>
                       </View>
                     </>
+                  ) : hasTwoWayHistory ? (
+                    <View
+                      style={[
+                        styles.bottomButtons,
+                        { justifyContent: "center", marginTop: 10 },
+                      ]}
+                    >
+                      <TouchableOpacity
+                        style={[
+                          styles.modalChatButton,
+                          (messagingBlocked || isSelectedOffline) &&
+                            styles.modalChatButtonDisabled,
+                        ]}
+                        onPress={goToChatFromProfile}
+                        disabled={messagingBlocked || isSelectedOffline}
+                      >
+                        <Text
+                          style={[
+                            styles.modalChatButtonText,
+                            (messagingBlocked || isSelectedOffline) &&
+                              styles.modalChatButtonTextDisabled,
+                            {color: "red", fontWeight: "bold"}
+                          ]}
+                        >
+                          Go To Chat
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   ) : (
                     <View style={buttonContainerStyle}>
                       {showChatButton && (
@@ -2008,7 +2231,7 @@ export default function Bar2Screen() {
                             (messagingBlocked || isSelectedOffline) &&
                               styles.modalChatButtonDisabled,
                           ]}
-                          onPress={openChitChatModal}
+                          onPress={handleChitChatPress}
                           disabled={messagingBlocked || isSelectedOffline}
                         >
                           <Text
@@ -2024,13 +2247,15 @@ export default function Bar2Screen() {
                       )}
                     </View>
                   )}
+
                 </>
               )}
               {isSelectedOffline && (
-                <View style={styles.offlineOverlayInModal} pointerEvents="none">
-                  <View style={styles.offlineBadge}>
-                    <Text style={styles.offlineText}>They left the bar</Text>
-                  </View>
+              <View style={styles.offlineOverlayInModal} pointerEvents="none">
+                <View style={styles.offlineBadge}>
+                 <Text style={styles.offlineText}>
+                  {(selectedProfile?.name || "They")} left the bar
+                </Text>
                 </View>
               )}
             </View>
@@ -2154,16 +2379,57 @@ export default function Bar2Screen() {
                   },
                 ]}
                 pointerEvents="auto"
+              >{/*}
+              {deletionFlag && (
+                <View style={styles.deletionBanner}>
+                  <Text style={styles.deletionBannerText}>
+                    {deletionFlag === 'you' ? 'You deleted this chat' : 'They deleted this chat'}
+                  </Text>
+                </View>
+              )} */}
+
+              <TouchableOpacity
+                onPress={() => setFirstMessageModalVisible(false)}
+                style={styles.closeButton}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                {deletionFlag && (
-                  <View style={styles.deletionBanner}>
-                    <Text style={styles.deletionBannerText}>
-                      {deletionFlag === "you"
-                        ? "You deleted this chat"
-                        : "They deleted this chat"}
+                <Image
+                  style={{ width: 20, height: 20 }}
+                  source={require("../assets/images/x.png")}
+                />
+              </TouchableOpacity>
+
+              {selectedProfile && (
+                <>
+                  <ScrollView
+                    contentContainerStyle={[
+                      styles.modalBody,
+                      { paddingBottom: 28 + insets.bottom },
+                    ]}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    <Text
+                      style={[
+                        styles.modalLocation,
+                        { marginTop: 12, marginBottom: 4, fontSize: 18, textAlign: "center", margin: "auto" },
+                      ]}
+                    >
+                      Your first message
                     </Text>
-                  </View>
-                )}
+                    <TextInput
+                       style={[
+                        styles.replyInput,
+                        { minHeight: 140, maxHeight: 260 }, // ⬅️ bigger box
+                      ]}
+                      value={firstMessageText}
+                      onChangeText={(t) => stripLinksAndWarn(t, setFirstMessageText)}
+                      placeholder="Say something nice…"
+                      placeholderTextColor="#7A4C6E"
+                      multiline
+                      blurOnSubmit
+                      returnKeyType="done"
+                      onSubmitEditing={Keyboard.dismiss}
+                    />
 
                 <TouchableOpacity
                   onPress={() => setFirstMessageModalVisible(false)}
@@ -2447,6 +2713,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
+    paddingTop: 60,
   },
   modalContent: {
     width: "85%",
@@ -2611,20 +2878,22 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   replyInput: {
-    width: 300,
-    height: 180,
+    width: "100%",             // use full container width
+    maxWidth: 320,             // keeps it nice on big phones
     minHeight: 80,
+    maxHeight: 180,
     borderColor: "#40122E",
     borderWidth: 6,
     borderRadius: 12,
     padding: 12,
     color: "#F5E1C4",
     backgroundColor: "#6E2A48",
+    marginTop: 16,             // smaller top margin
     marginBottom: 0,
-    marginTop: 40,
-    marginHorizontal: "auto",
+    alignSelf: "center",       // center inside ccContainer
     textAlignVertical: "top",
   },
+
   replyButton: {
     backgroundColor: "#6e1944",
     borderTopWidth: 3,

@@ -149,6 +149,7 @@ export default function BathroomScreen() {
   const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0);
 
   const [hasSavedInSession, setHasSavedInSession] = useState(!!profileComplete);
+  const [dismissedOnboarding, setDismissedOnboarding] = useState(false);
 
   // DOB step fields + refs for auto-advance
   const [dobDD, setDobDD] = useState("");
@@ -345,19 +346,31 @@ export default function BathroomScreen() {
     return Boolean(p?.name && p?.age && p?.location && p?.about && p?.photoUri);
   }
 
-  // OPEN ONBOARDING when routed from bar welcome (onboard=true) AND we *know* profile is incomplete
+  // OPEN ONBOARDING only when routed from bar (?onboard=true) AND profile is incomplete
   useEffect(() => {
-    // Prefer the context flag if it’s reliable; otherwise fall back to local computed completeness
     const effectiveComplete =
       (typeof profileComplete === "boolean" ? profileComplete : undefined) ??
       isProfileCompleteLocal(profile);
 
-    // Do nothing until we can actually tell (avoid false “incomplete” before load)
+    // Do nothing until we actually know
     if (effectiveComplete === undefined) return;
 
+    const comingFromBar = params.onboard === "true";
+
     const shouldOnboard =
-      (params.onboard === "true" || !effectiveComplete) &&
-      effectiveComplete === false;
+      comingFromBar &&
+      !effectiveComplete &&
+      !hasSavedInSession &&
+      !dismissedOnboarding;
+
+    if (shouldOnboard) {
+      setOnboardingStep(0);
+      setOnboardingVisible(true);
+    } else if (!comingFromBar || effectiveComplete || dismissedOnboarding) {
+      setOnboardingVisible(false);
+    }
+  }, [params.onboard, profileComplete, profile, hasSavedInSession, dismissedOnboarding]);
+
 
     if (shouldOnboard) {
       setOnboardingStep(0);
@@ -642,7 +655,8 @@ export default function BathroomScreen() {
       setOnboardingStep(3);
     } else if (onboardingStep === 3) {
       setOnboardingVisible(false);
-      // user can complete remaining fields now
+      setDismissedOnboarding(true);
+     
     }
   };
 
@@ -896,13 +910,18 @@ export default function BathroomScreen() {
         <ProfileNavbar
           showBack={hasSavedInSession}
           onBack={async () => {
+            /*// Before initial save, just behave like before (no auto-save),
+            // but still tell the bar we came from the bathroom.
             if (!hasSavedInSession) {
-              router.replace("/bar-2");
+              router.back();
               return;
             }
 
             const ok = await saveProfileIfChanged();
-            if (ok) router.replace("/bar-2");
+            if (ok) {
+              router.back;
+            }*/
+            router.back()
           }}
         />
       </View>
@@ -1067,6 +1086,67 @@ export default function BathroomScreen() {
             pointerEvents="auto"
           />
         </View>
+       
+          
+            
+            {/* Existing Incomplete Profile Warning Modal */}
+            <Modal transparent visible={modalVisible} animationType="slide">
+              <View style={modalStyles.modalOverlay}>
+                <TouchableOpacity
+                  style={modalStyles.closeButton}
+                  onPress={() => setModalVisible(false)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Image source={closeIcon} style={styles.closeIcon} />
+                </TouchableOpacity>
+                <View style={modalStyles.modalContainer}>
+                  <Text style={modalStyles.modalText}>{modalTypedText}</Text>
+                  <View style={modalStyles.triangleContainer}>
+                    <View style={modalStyles.outerTriangle} />
+                    <View style={modalStyles.innerTriangle} />
+                  </View>
+                  <Animated.Image
+                    source={require("../assets/images/mr-mingles.png")}
+                    style={[modalStyles.mrMingles, { transform: [{ translateX: rollAnim }] }]}
+                    resizeMode="contain"
+                  />
+                </View>
+              </View>
+            </Modal>
+
+            {onboardingVisible && (
+              <View style={modalStyles.overlayInScreen} pointerEvents="auto">
+                <TouchableOpacity
+                  style={modalStyles.closeButton}
+                  onPress={() => {
+                    setOnboardingVisible(false);
+                    setDismissedOnboarding(true);
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Image source={closeIcon} style={styles.closeIcon} />
+                </TouchableOpacity>
+
+                {renderOnboardingContent()}
+              </View>
+            )}
+
+          
+          <Modal visible={cameraVisible} animationType="slide" transparent={false}>
+              <View style={{ flex: 1, backgroundColor: "black" }}>
+                {device ? (
+                  <Camera
+                    ref={cameraRef}
+                    style={{ flex: 1 }}
+                    device={device}
+                    isActive={cameraVisible}
+                    photo={true}
+                  />
+                ) : (
+                  <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ color: "#fff" }}>Loading camera…</Text>
+                  </View>
+                )}
 
         {/* ChitChats modal */}
         <ChitChats
@@ -1370,6 +1450,14 @@ const modalStyles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.8)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  overlayInScreen: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 50,           // below navbar
+    elevation: 50,
   },
   closeButton: {
     position: "absolute",

@@ -20,6 +20,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { showRewarded } from "@/services/ads";
 import { doc, updateDoc, increment } from "firebase/firestore";
 import { auth, firestore } from "@/firebase";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface ProfileNavbarProps {
   onBack: () => void;
@@ -58,6 +59,9 @@ export default function ProfileNavbar({
   const [rewardLoading, setRewardLoading] = useState(false);
 
   const { profile } = useContext(ProfileContext);
+   const insets = useSafeAreaInsets();
+  const insetTop = Math.max(6, insets.top * 0.6); // tweak multiplier
+  
   /*
   const isVip = !!profile?.isVip;
 const displayMoneys =
@@ -169,9 +173,17 @@ typeof profile?.moneys === "number"
   }, [isPlaying]);
 
   return (
-    <>
-      <View style={profileNavbarStyles.navbar}>
-        {showBack ? (
+    <View
+      style={[
+        styles.navbar,
+        {
+          paddingTop: insetTop,
+          height: (Platform.OS === "ios" ? 85 : 65) + insetTop,
+        },
+      ]}
+    >
+    <View style={profileNavbarStyles.navbar}>
+    {showBack ? (
           <TouchableOpacity onPress={onBack}>
             <Image
               source={require("../assets/images/icons/back-arrow.png")}
@@ -274,7 +286,8 @@ typeof profile?.moneys === "number"
         </View>
       )}
     </PopUp> */}
-    </>
+
+       </View>
   );
 }
 

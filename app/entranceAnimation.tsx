@@ -31,6 +31,7 @@ export default function EntranceAnimation() {
   };
 
   return (
+
     <View style={styles.container}>
       <Video
         ref={video}

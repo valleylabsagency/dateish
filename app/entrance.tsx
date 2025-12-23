@@ -731,6 +731,9 @@ export default function EntranceScreen() {
 
   //  MAIN + AUTH SHEET
   return (
+   
+
+   
     <View style={styles.container}>
       {/* — Main entrance screen — */}
       <ImageBackground

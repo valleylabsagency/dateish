@@ -66,6 +66,7 @@ export default function InAppNotification({
         styles.notificationContainer,
         { transform: [{ translateY }] },
       ]}
+      pointerEvents="box-none"
     >
       {visible && (
         <TouchableOpacity

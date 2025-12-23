@@ -83,7 +83,7 @@
         }
       ],
       ["expo-build-properties", {
-        "ios": { "deploymentTarget": "15.1" }
+        "ios": { "deploymentTarget": "15.5" }
       }]
     ],
     "experiments": {

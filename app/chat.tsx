@@ -100,6 +100,10 @@ export default function ChatScreen() {
   const [mingDisplayedText, setMingDisplayedText] = useState("");
   const [hasSentInitial, setHasSentInitial] = useState(false);
   const fullMingText = "Wait for them to answer. Don't be a creep!";
+  const [partnerDeletedChat, setPartnerDeletedChat] = useState(false);
+  const [partnerOnline, setPartnerOnline] = useState(true);
+
+
 
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput | null>(null);
@@ -118,14 +122,16 @@ export default function ChatScreen() {
   };
 
   const openTyping = () => {
-    setTypingFlag(true);
-    setTypingModalVisible(true);
-  };
-  const closeTyping = (send?: boolean) => {
-    setTypingFlag(false);
-    setTypingModalVisible(false);
-    if (send) sendMessage();
-  };
+  if (inputDisabled) return;
+  setTypingFlag(true);
+  setTypingModalVisible(true);
+};
+
+const closeTyping = (send?: boolean) => {
+  setTypingFlag(false);
+  setTypingModalVisible(false);
+  if (send && !inputDisabled) sendMessage();
+};
 
   useEffect(() => {
     if (!typingRef.current) return;
@@ -140,12 +146,26 @@ export default function ChatScreen() {
       ? [currentUserId, partnerId].sort().join("_")
       : null;
 
-  // ────────────────────────────────────────────────────────────────────
-  //  🌟  INITIAL CHIT‑CHAT SEED
-  // If we got an `initial` param, decode & parse it, then
-  // setMessages to [ prompt, response ] before firestore kicks in.
-  useEffect(() => {
-    if (!initial || hasSentInitial || !chatId) return;
+  const inputDisabled = !partnerOnline || partnerDeletedChat;
+
+
+      // ────────────────────────────────────────────────────────────────────
+//  🌟  INITIAL CHIT‑CHAT SEED
+// If we got an `initial` param, decode & parse it, then
+// setMessages to [ prompt, response ] before firestore kicks in.
+useEffect(() => {
+  if (!initial || hasSentInitial || !chatId) return;
+
+  let prompt: string, response: string;
+  try {
+    ({ prompt, response } = JSON.parse(
+      decodeURIComponent(initial)
+    ) as { prompt: string; response: string });
+  } catch (e) {
+    console.warn("Bad initial payload:", e);
+    setHasSentInitial(true);
+    return;
+  }
 
     let prompt: string, response: string;
     try {
@@ -288,22 +308,63 @@ export default function ChatScreen() {
     return () => clearInterval(intervalId);
   }, [mingModalVisible]);
 
+  
   useEffect(() => {
-    if (!chatId) return;
+    if (!chatId || !currentUserId || !partnerId) return;
+
     const chatRef = doc(firestore, "chats", chatId);
     const unsubscribe = onSnapshot(chatRef, (snap) => {
-      const data = snap.data();
-      // If the partner removed *you* from visibleFor:
-      if (data?.visibleFor && !data.visibleFor.includes(currentUserId)) {
-        Alert.alert(
-          `${partnerProfile?.name || "They"} deleted this conversation.`,
-          "Time to move on!",
-          [{ text: "OK", onPress: () => router.replace("/inbox") }]
-        );
+      const data: any = snap.data() || {};
+      const visibleFor: string[] = Array.isArray(data.visibleFor)
+        ? data.visibleFor
+        : [];
+
+      const youVisible   = visibleFor.includes(currentUserId);
+      const themVisible  = visibleFor.includes(partnerId);
+
+      // 👉 You deleted it on your side
+      if (!youVisible && themVisible) {
+        setPartnerDeletedChat(false);
+        setCurrentChatId(null);
+        // Optionally kick back to inbox since this chat is hidden for you
+        router.replace("/inbox");
+        return;
       }
+
+      // 👉 They deleted it on their side
+      if (youVisible && !themVisible) {
+        setPartnerDeletedChat(true);   // this drives the "They deleted this convo" overlay
+        setCurrentChatId(null);
+        return;
+      }
+
+      // No deletion / both visible
+      setPartnerDeletedChat(false);
     });
+
     return () => unsubscribe();
-  }, [chatId, currentUserId, partnerProfile]);
+  }, [chatId, currentUserId, partnerId, setCurrentChatId]);
+
+
+// 2a) initialize the RTDB ref once you know chatId:
+useEffect(() => {
+  if (!chatId) return;
+  typingRef.current = ref(db, `/typing/${chatId}/${currentUserId}`);
+  return () => {
+    if (typingRef.current) set(typingRef.current, false)
+  }
+}, [chatId, currentUserId]);
+
+// 2b) write your own typing state:
+const onInputFocus = () => {
+  setTypingModalVisible(true);
+  if (typingRef.current) set(typingRef.current, true)
+};
+const onInputBlurOrSend = () => {
+  setTypingModalVisible(false);
+  if (typingRef.current) set(typingRef.current, false)
+};
+
 
   // 2a) initialize the RTDB ref once you know chatId:
   useEffect(() => {
@@ -319,22 +380,25 @@ export default function ChatScreen() {
     setTypingModalVisible(true);
     if (typingRef.current) set(typingRef.current, true);
   };
-  const onInputBlurOrSend = () => {
-    setTypingModalVisible(false);
-    if (typingRef.current) set(typingRef.current, false);
+  onValue(partnerTypingRef, cb);
+  return () => off(partnerTypingRef, "value", cb);
+}, [db, chatId, partnerId]);
+
+
+// subscribe to their online/offline status:
+useEffect(() => {
+  if (!partnerId) return;
+
+  const statusRef = ref(db, `/status/${partnerId}/online`);
+  const cb = (snap: any) => {
+    setPartnerOnline(!!snap.val());
   };
 
-  // 2c) subscribe to partner’s typing:
-  useEffect(() => {
-    if (!chatId || !partnerId) return;
-    const partnerTypingRef = ref(db, `/typing/${chatId}/${partnerId}`);
-    const cb = (snap: any) => {
-      const v = !!snap.val();
-      setPartnerTyping(v);
-    };
-    onValue(partnerTypingRef, cb);
-    return () => off(partnerTypingRef, "value", cb);
-  }, [db, chatId, partnerId]);
+  onValue(statusRef, cb);
+  return () => off(statusRef, "value", cb);
+}, [db, partnerId]);
+
+
 
   // subscribe to their online/offline status:
   useEffect(() => {
@@ -363,6 +427,7 @@ export default function ChatScreen() {
   }
 
   const sendMessage = async () => {
+    if (inputDisabled) return;
     if (inputMessage.trim() === "" || !chatId) return;
     //setTypingModalVisible(false);
     Keyboard.dismiss();
@@ -498,6 +563,14 @@ export default function ChatScreen() {
       resizeMode="stretch"
     >
       <ProfileNavbar onBack={() => router.back()} />
+      {!partnerOnline && (
+  <View style={styles.offlineBanner}>
+    <Text style={styles.offlineBannerText}>
+      {(partnerProfile?.name || "User")} is offline
+    </Text>
+  </View>
+)}
+
 
       <KeyboardAvoidingView
         style={styles.container}
@@ -572,25 +645,26 @@ export default function ChatScreen() {
           <TouchableOpacity
             onPress={openTyping}
             activeOpacity={0.8}
-            style={{ flex: 1 }}
+            style={{ flex: 1, opacity: inputDisabled ? 0.5 : 1 }}
+            disabled={inputDisabled}
           >
             <View style={styles.textInput}>
-              <Text
-                numberOfLines={1}
-                style={{ color: inputMessage ? "#111" : "#999", fontSize: 16 }}
-              >
-                {inputMessage || "Type your message..."}
+              <Text numberOfLines={1} style={{ color: inputMessage ? "#111" : "#999", fontSize: 16 }}>
+                {inputMessage || (inputDisabled ? "User is offline" : "Type your message...")}
               </Text>
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.sendButton}
+            style={[styles.sendButton, inputDisabled && { opacity: 0.5 }]}
             onPress={() => closeTyping(true)}
+            disabled={inputDisabled}
           >
             <Text style={styles.sendButtonText}>Send</Text>
           </TouchableOpacity>
         </View>
+
+
       </KeyboardAvoidingView>
 
       {/* Typing Modal */}
@@ -705,16 +779,24 @@ export default function ChatScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <TouchableOpacity
-              onPress={() => setShowPartnerModal(false)}
-              style={styles.closeButton}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Image
-                style={styles.closeIcon}
-                source={require("../assets/images/x.png")}
-              />
-            </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setShowPartnerModal(false)}
+            style={styles.closeButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Image
+              style={styles.closeIcon}
+              source={require("../assets/images/x.png")}
+            />
+            {!partnerOnline && (
+            <View style={styles.offlineBannerInModal}>
+              <Text style={styles.offlineBannerText}>
+                {(partnerProfile?.name || "User")} is offline
+              </Text>
+            </View>
+          )}
+
+          </TouchableOpacity>
 
             {partnerProfile && (
               <>
@@ -806,6 +888,34 @@ export default function ChatScreen() {
           </View>
         </View>
       </Modal>
+      {partnerDeletedChat && (
+  <View style={styles.deletedOverlay} pointerEvents="auto">
+    <View style={styles.deletedBox}>
+      <TouchableOpacity
+        onPress={() => router.replace("/inbox")}
+        style={styles.deletedCloseButton}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      >
+        <Image
+          source={require("../assets/images/x.png")}
+          style={styles.deletedCloseIcon}
+        />
+      </TouchableOpacity>
+
+      <Text style={styles.deletedText}>
+        {(partnerProfile?.name || "They")} deleted this convo
+      </Text>
+
+      <TouchableOpacity
+        onPress={() => router.replace("/inbox")}
+        style={styles.deletedBackButton}
+      >
+        <Text style={styles.deletedBackButtonText}>Back</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+)}
+
 
       <View style={styles.bottomNavbarContainer}>
         <BottomNavbar selectedTab="Chats" />
@@ -1190,6 +1300,100 @@ const styles = ScaledSheet.create({
     bottom: "-95%",
     right: "-20%",
   },
+   
+  deletedText: {
+    color: "#fff",
+    fontSize: "22@ms",
+    textAlign: "center",
+    fontFamily: FontNames.MontserratRegular,
+  },
+  deletedOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+  },
+deletedBox: {
+  width: "85%",
+  borderWidth: "6@ms",
+  borderColor: "#460b2a",
+  backgroundColor: "#592540",
+  borderRadius: "16@ms",
+  paddingVertical: "22@ms",
+  paddingHorizontal: "18@ms",
+  alignItems: "center",
+  position: "relative",
+},
+deletedText: {
+  color: "#ffe3d0",
+  fontSize: "18@ms",
+  textAlign: "center",
+  fontFamily: FontNames.MontserratRegular,
+},
+deletedCloseButton: {
+  position: "absolute",
+  top: "10@ms",
+  right: "10@ms",
+  width: "40@ms",
+  height: "40@ms",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 100,
+},
+deletedCloseIcon: {
+  width: "22@ms",
+  height: "22@ms",
+  tintColor: "#F5E1C4",
+},
+deletedBackButton: {
+  marginTop: "14@ms",
+  backgroundColor: "#6e1944",
+  borderWidth: "3@ms",
+  borderColor: "#460b2a",
+  paddingVertical: "8@ms",
+  paddingHorizontal: "18@ms",
+  borderRadius: "18@ms",
+},
+deletedBackButtonText: {
+  color: "#ffe3d0",
+  fontSize: "16@ms",
+  fontFamily: FontNames.MontserratRegular,
+},
+offlineBanner: {
+  alignSelf: "center",
+  marginTop: "10@vs",
+  marginBottom: "6@vs",
+  backgroundColor: "#b1001a",
+  borderWidth: "3@ms",
+  borderColor: "#460b2a",
+  paddingVertical: "6@ms",
+  paddingHorizontal: "14@ms",
+  borderRadius: "14@ms",
+  zIndex: 2000,
+},
+offlineBannerInModal: {
+  alignSelf: "center",
+  marginBottom: "10@vs",
+  backgroundColor: "#b1001a",
+  borderWidth: "3@ms",
+  borderColor: "#460b2a",
+  paddingVertical: "6@ms",
+  paddingHorizontal: "14@ms",
+  borderRadius: "14@ms",
+},
+offlineBannerText: {
+  color: "#fff",
+  fontSize: "14@ms",
+  fontFamily: FontNames.MontserratRegular,
+},
+
+
+
 });
 
 export { ChatScreen };

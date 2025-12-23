@@ -52,7 +52,13 @@ import animationData from "../assets/videos/mm-dancing.json";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as SystemUI from "expo-system-ui";
 
-import { createStackNavigator } from "@react-navigation/stack";
+
+import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
+
+const BaseStack = createStackNavigator();
+const Stack = withLayoutContext(BaseStack.Navigator);
+
+//import { initAds } from "@/services/ads";
 
 import { ScaledSheet } from "react-native-size-matters";
 import { FontNames } from "@/constants/fonts";
@@ -373,8 +379,9 @@ export default function Layout() {
                               value={{ showWcButton, setShowWcButton }}
                             >
                               <View style={styles.container}>
-                                <NotificationDisplay />
                                 <OfflineNotice />
+                                <PushNavBridge />
+                               {!hideNavbar && <Navbar />}
 
                                 <LastCallOverlay
                                   visible={!hideMMPopup && lastCall.visible}
@@ -385,9 +392,6 @@ export default function Layout() {
                                   visible={!hideMMPopup && barClosed.visible}
                                   onClose={barClosed.dismiss}
                                 />
-
-                                {!hideNavbar && <Navbar />}
-
                                 <Stack
                                   detachInactiveScreens={false}
                                   screenOptions={{
@@ -408,6 +412,7 @@ export default function Layout() {
                                     gestureEnabled: true,
                                   }}
                                 />
+                                 <NotificationDisplay />
                                 <StatusBar hidden />
                               </View>
                             </NavbarContext.Provider>
