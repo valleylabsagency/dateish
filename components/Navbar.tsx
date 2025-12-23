@@ -8,6 +8,7 @@ import {
   Animated,
   Platform,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -62,7 +63,8 @@ export default function Navbar({
   const shouldShowWc = typeof showBathroomButton === "boolean" ? showBathroomButton : showWcButton;
 
   const bathroomPath =
-    bathroomRoute ?? (!profileComplete ? "/bathroom?onboard=true" : "/bathroom");
+    bathroomRoute ??
+    (!profileComplete ? "/bathroom?onboard=true" : "/bathroom");
 
   const { isPlaying, soundLoading, toggleMusic } = useContext(MusicContext);
 

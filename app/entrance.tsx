@@ -9,74 +9,132 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  Animated,
   Easing,
   Modal,
   Alert,
-  Linking
+  Linking,
+  Animated as RNAnimated,
 } from "react-native";
+import Animated from "react-native-reanimated";
+
 import { Video } from "expo-av";
 import { useFonts } from "expo-font";
 import { useRouter } from "expo-router";
 import { FirstTimeContext } from "../contexts/FirstTimeContext";
 import { signUp, login } from "../services/authservice";
 import { FontNames } from "../constants/fonts";
-import closeIcon from '../assets/images/x.png';
+import closeIcon from "../assets/images/x.png";
 import PopUp from "../components/PopUp";
-import LottieView from 'lottie-react-native';
-import animationData from '../assets/videos/mm-dancing.json';
+import LottieView from "lottie-react-native";
+import animationData from "../assets/videos/mm-dancing.json";
 import { onAuthStateChanged } from "firebase/auth";
-import { getDoc, setDoc, updateDoc, doc, onSnapshot, serverTimestamp, setLogLevel } from "firebase/firestore";
+import {
+  getDoc,
+  setDoc,
+  updateDoc,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  setLogLevel,
+} from "firebase/firestore";
 import { auth, firestore } from "../firebase";
-import ConfettiCannon from 'react-native-confetti-cannon';
-import { AntDesign } from "@expo/vector-icons";     // Google
-import { FontAwesome } from "@expo/vector-icons";   // Meta (Facebook)
-import { Ionicons } from "@expo/vector-icons";   
-import { SafeAreaView } from "react-native-safe-area-context";
-
+import ConfettiCannon from "react-native-confetti-cannon";
+import { AntDesign } from "@expo/vector-icons"; // Google
+import { FontAwesome } from "@expo/vector-icons"; // Meta (Facebook)
+import { Ionicons } from "@expo/vector-icons";
+import { useNeonFlicker } from "../Hooks/useNeonFlicker";
+import MusicToggleButton from "@/components/MusicToggleButton";
+import { MusicContext } from "../contexts/MusicContext";
 
 const { width, height } = Dimensions.get("window");
-const MESSAGE = "Happy Hour daily! ";
+const DEFAULT_BANNER_TEXT = "We Hate Dating Apps Too. Welcome to Dateish!";
 
 const withoutBg = {
   ...animationData,
   layers: animationData.layers.filter(
-    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+    (layer) => layer.ty !== 1 || layer.nm !== "Dark Blue Solid 1"
   ),
-}
+};
 
 const CLIPBOARD_IMG = require("../assets/images/clipboard.png");
 const { width: cbW, height: cbH } = Image.resolveAssetSource(CLIPBOARD_IMG);
 const CLIPBOARD_AR = cbW / cbH; // keeps art from stretching
 
-function mapFirebaseAuthError(err: any): { title: string; message: string; code?: string } {
+function mapFirebaseAuthError(err: any): {
+  title: string;
+  message: string;
+  code?: string;
+} {
   const code = err?.code || "";
   switch (code) {
     case "auth/invalid-email":
-      return { title: "Invalid Email", message: "That email looks invalid.", code };
+      return {
+        title: "Invalid Email",
+        message: "That email looks invalid.",
+        code,
+      };
     case "auth/missing-password":
-      return { title: "Missing Password", message: "Please enter your password.", code };
+      return {
+        title: "Missing Password",
+        message: "Please enter your password.",
+        code,
+      };
     case "auth/missing-email":
-      return { title: "Missing Email", message: "Please enter your email.", code };
+      return {
+        title: "Missing Email",
+        message: "Please enter your email.",
+        code,
+      };
     case "auth/user-not-found":
-      return { title: "Account Not Found", message: "No account found. Try signing up or check your email.", code };
+      return {
+        title: "Account Not Found",
+        message: "No account found. Try signing up or check your email.",
+        code,
+      };
     case "auth/wrong-password":
-      return { title: "Wrong Password", message: "That password didn’t match. Try again.", code };
+      return {
+        title: "Wrong Password",
+        message: "That password didn’t match. Try again.",
+        code,
+      };
     case "auth/email-already-in-use":
-      return { title: "Email Already Registered", message: "This email is already registered. Try signing in.", code };
+      return {
+        title: "Email Already Registered",
+        message: "This email is already registered. Try signing in.",
+        code,
+      };
     case "auth/too-many-requests":
-      return { title: "Too Many Attempts", message: "Please wait a bit and try again.", code };
+      return {
+        title: "Too Many Attempts",
+        message: "Please wait a bit and try again.",
+        code,
+      };
     case "auth/network-request-failed":
-      return { title: "Network Error", message: "Check your internet connection and try again.", code };
+      return {
+        title: "Network Error",
+        message: "Check your internet connection and try again.",
+        code,
+      };
     case "auth/operation-not-allowed":
-      return { title: "Sign-in Disabled", message: "This sign-in method is not enabled.", code };
+      return {
+        title: "Sign-in Disabled",
+        message: "This sign-in method is not enabled.",
+        code,
+      };
     case "auth/no-user-uid":
-      return { title: "Unexpected Error", message: "We couldn’t complete sign-in. Please try again.", code };
+      return {
+        title: "Unexpected Error",
+        message: "We couldn’t complete sign-in. Please try again.",
+        code,
+      };
     default:
-      return { title: "Authentication Failed", message: "Please try again.", code };
+      return {
+        title: "Authentication Failed",
+        message: "Please try again.",
+        code,
+      };
   }
 }
-
 
 // Open 5pm (17) to 5am (05), local device time
 const OPEN_HOUR = 17; // 5pm
@@ -85,13 +143,13 @@ const CLOSE_HOUR = 5; // 5am
 function isBarOpenNow(d = new Date()) {
   const h = d.getHours();
   // 17..23 or 0..4 => OPEN, exactly 05:00:00 and after => CLOSED
-  return (h >= OPEN_HOUR) || (h < CLOSE_HOUR);
+  return h >= OPEN_HOUR || h < CLOSE_HOUR;
 }
-
 
 export default function EntranceScreen() {
   const router = useRouter();
   const { firstTime, setFirstTime } = useContext(FirstTimeContext);
+  const { beginEntranceTransition } = useContext(MusicContext);
 
   const [showAuth, setShowAuth] = useState(false);
   const [playAnimation, setPlayAnimation] = useState(false);
@@ -101,11 +159,11 @@ export default function EntranceScreen() {
   const [password, setPassword] = useState("");
   const [loadingAuth, setLoadingAuth] = useState(false);
   const [authError, setAuthError] = useState(false);
-  const [authFlow, setAuthFlow] = useState<'normal' | 'vipGate'>('normal');
+  const [authFlow, setAuthFlow] = useState<"normal" | "vipGate">("normal");
   const [authErrorMsg, setAuthErrorMsg] = useState<string>("");
 
   const [textWidth, setTextWidth] = useState(0);
-  const scrollX = useRef(new Animated.Value(width)).current;
+  const scrollX = useRef(new RNAnimated.Value(width)).current;
   const videoRef = useRef<Video>(null);
   const hasStartedRef = useRef(false);
   const [isBarOpen, setIsBarOpen] = useState<boolean>(isBarOpenNow());
@@ -115,10 +173,11 @@ export default function EntranceScreen() {
   const [showVipCongrats, setShowVipCongrats] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
 
+  const neonFlicker = useNeonFlicker();
+
   const [notVipVisible, setNotVipVisible] = useState(false);
   const [vipTypedText, setVipTypedText] = useState("");
-  const vipRollAnim = useRef(new Animated.Value(500)).current; // slide-in from right
-
+  const vipRollAnim = useRef(new RNAnimated.Value(500)).current; // slide-in from right
 
   // Email code flow (dev/test OTP)
   const [email, setEmail] = useState("");
@@ -151,6 +210,118 @@ export default function EntranceScreen() {
   const IDENT = authMethod === "email" ? emailAddr.trim() : userHandle.trim(); // what we sign in/up with
   const termsUrl = "https://dateishoffice.wixsite.com/dateish";
 
+  const navOnceRef = useRef(false);
+
+  // LED Banner
+  const [bannerText, setBannerText] = useState("");
+  const [maskWidth, setMaskWidth] = useState(0);
+  const bannerVersionRef = useRef(0);
+  const [bannerVersion, setBannerVersion] = useState(0); // used to key the measurer
+  const MARQUEE_GAP = 20; // px, tweak if you want
+  const FORCE_BANNER_ERROR = true; // <-- flip this
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        // Test for failure to fetch text from Firebase
+        // if (FORCE_BANNER_ERROR) {
+        //   throw new Error("Forced banner fetch failure (test)");
+        // }
+        const ref = doc(firestore, "appConfig", "ui");
+        const snap = await getDoc(ref);
+
+        const raw = (snap.data()?.entranceBannerText ?? "").toString();
+        const flat = raw
+          .replace(/[\r\n\u2028\u2029]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (alive && flat) {
+          setBannerText(flat.endsWith(" ") ? flat : flat + " ");
+        }
+      } catch (e) {
+        // keep default on error
+        console.log("Failed to load entrance banner text, using default.", e);
+        setBannerText(DEFAULT_BANNER_TEXT);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Reset animation measurements when text changes
+  useEffect(() => {
+    bannerVersionRef.current += 1;
+    setBannerVersion(bannerVersionRef.current);
+
+    setTextWidth(0);
+    scrollX.stopAnimation();
+    scrollX.setValue(width);
+
+    console.log(bannerText);
+  }, [bannerText]);
+
+  // marquee loop
+  useEffect(() => {
+    if (!textWidth || !maskWidth) return;
+
+    console.log("textWidth", textWidth, "maskWidth", maskWidth);
+
+    let loop: RNAnimated.CompositeAnimation | null = null;
+
+    const timeoutId = setTimeout(() => {
+      scrollX.stopAnimation();
+      scrollX.setValue(maskWidth + MARQUEE_GAP);
+
+      loop = RNAnimated.loop(
+        RNAnimated.sequence([
+          RNAnimated.timing(scrollX, {
+            toValue: -(textWidth + MARQUEE_GAP),
+            duration: 8000,
+            easing: Easing.linear,
+            useNativeDriver: true,
+            isInteraction: false,
+          }),
+          RNAnimated.timing(scrollX, {
+            toValue: maskWidth + MARQUEE_GAP,
+            duration: 0,
+            useNativeDriver: true,
+            isInteraction: false,
+          }),
+        ])
+      );
+
+      loop.start();
+    }, 5500);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (loop) loop.stop();
+      scrollX.stopAnimation();
+    };
+  }, [textWidth, maskWidth, bannerText]);
+
+  useEffect(() => {
+    RNAnimated.timing(vipRollAnim, {
+      toValue: notVipVisible ? 0 : 500,
+      duration: notVipVisible ? 1000 : 0,
+      useNativeDriver: true,
+    }).start();
+  }, [notVipVisible]);
+
+  const goToEntranceAnim = () => {
+    if (navOnceRef.current) return;
+    navOnceRef.current = true;
+
+    beginEntranceTransition();
+
+    // optional tiny headstart (keeps UX instant but makes fade actually begin)
+    setTimeout(() => router.replace("/entranceAnimation"), 80);
+  };
+
   function resetClipboard() {
     setAuthStep(1);
     setAuthMethod(null);
@@ -169,27 +340,22 @@ export default function EntranceScreen() {
   function openClipboard() {
     resetClipboard();
     setShowAuth(true);
-}
-
+  }
 
   const signSrc = isBarOpen
-  ? require("../assets/images/open-sign.png")
-  : require("../assets/images/closed-sign.png");
+    ? require("../assets/images/open-sign.png")
+    : require("../assets/images/closed-sign.png");
 
   const VIP_SPEECH =
-  "You're not a VIP yet, just a regular old P.\nWanna become one?";
-
-
-  
+    "You're not a VIP yet, just a regular old P.\nWanna become one?";
 
   const [fontsLoaded] = useFonts({
     [FontNames.ArcadePixelRegular]: require("../assets/fonts/ArcadePixel-Regular.otf"),
-    [FontNames.MontserratBold]:     require("../assets/fonts/Montserrat-Bold.ttf"),
-    [FontNames.MontserratRegular]:  require("../assets/fonts/Montserrat-Regular.ttf"),
-    [FontNames.MontserratExtraLightItalic]: require("../assets/fonts/Montserrat-ExtraLightItalic.ttf"), 
+    [FontNames.MontserratBold]: require("../assets/fonts/Montserrat-Bold.ttf"),
+    [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
+    [FontNames.MontserratExtraLightItalic]: require("../assets/fonts/Montserrat-ExtraLightItalic.ttf"),
   });
 
-  
   const USERS_COLLECTION = "users";
 
   function ensureLegalOrWarn(action: () => void) {
@@ -200,10 +366,10 @@ export default function EntranceScreen() {
     setLegalError(false);
     action();
   }
-  
+
   const openLegalLink = () =>
     Linking.openURL("https://dateishoffice.wixsite.com/dateish");
-  
+
   // Dev/test OTP sender (no email backend yet)
   async function sendEmailCode() {
     if (!email.trim()) {
@@ -216,7 +382,7 @@ export default function EntranceScreen() {
       Alert.alert("Invalid email", "Please enter a valid email address.");
       return;
     }
-  
+
     setSendingCode(true);
     try {
       const code = String(Math.floor(100000 + Math.random() * 900000)); // 6 digits
@@ -229,15 +395,15 @@ export default function EntranceScreen() {
       setSendingCode(false);
     }
   }
-  
+
   async function verifyEmailCode() {
     if (!sentCode) return;
     setVerifyingCode(true);
     try {
       if (enteredCode.trim() === sentCode) {
         // Approved → Entrance Animation
-        setShowAuth(false);  
-        router.replace("/entranceAnimation");
+        setShowAuth(false);
+        goToEntranceAnim();
       } else {
         Alert.alert(
           "Authentication couldn’t finish successfully.",
@@ -248,21 +414,24 @@ export default function EntranceScreen() {
       setVerifyingCode(false);
     }
   }
-  
 
   useEffect(() => {
     let unsubUserDoc: (() => void) | undefined;
 
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       // clean up previous doc listener
-      if (unsubUserDoc) { unsubUserDoc(); unsubUserDoc = undefined; }
+      if (unsubUserDoc) {
+        unsubUserDoc();
+        unsubUserDoc = undefined;
+      }
 
       if (!user) {
         setIsVip(false);
         return;
       }
       const ref = doc(firestore, USERS_COLLECTION, user.uid);
-      unsubUserDoc = onSnapshot(ref,
+      unsubUserDoc = onSnapshot(
+        ref,
         (snap) => setIsVip(Boolean(snap.data()?.isVip)),
         () => setIsVip(false)
       );
@@ -274,46 +443,12 @@ export default function EntranceScreen() {
     };
   }, []);
 
-  
-
   useEffect(() => {
     const update = () => setIsBarOpen(isVip || isBarOpenNow());
     update(); // set immediately
     const id = setInterval(update, 60_000);
     return () => clearInterval(id);
   }, [isVip]);
-  
-
-  // marquee loop
-  useEffect(() => {
-    if (!textWidth) return;
-    scrollX.setValue(width);
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(scrollX, {
-          toValue: -textWidth,
-          duration: 8000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scrollX, {
-          toValue: width,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [textWidth]);
-
-  useEffect(() => {
-    Animated.timing(vipRollAnim, {
-      toValue: notVipVisible ? 0 : 500,
-      duration: notVipVisible ? 1000 : 0,
-      useNativeDriver: true,
-    }).start();
-  }, [notVipVisible]);
 
   useEffect(() => {
     let id: NodeJS.Timeout | undefined;
@@ -330,15 +465,12 @@ export default function EntranceScreen() {
     }
     return () => id && clearInterval(id);
   }, [notVipVisible]);
-  
-  
 
   const startVipAuth = () => {
-    setAuthFlow('vipGate');
-    setShowPopupRules(false);     
+    setAuthFlow("vipGate");
+    setShowPopupRules(false);
     setTimeout(() => setShowAuth(true), 0);
   };
-  
 
   const handleSignUpOrIn = async () => {
     setLoadingAuth(true);
@@ -351,163 +483,168 @@ export default function EntranceScreen() {
       if (!uname || !pwd) {
         setLoadingAuth(false);
         setAuthError(true);
-        const title = !uname && !pwd ? "Missing Email & Password"
-          : !uname ? "Missing Email/Username"
-          : "Missing Password";
-        const message = !uname && !pwd
-          ? "Please enter your email/username and password."
-          : !uname
-          ? "Please enter your email/username."
-          : "Please enter your password.";
+        const title =
+          !uname && !pwd
+            ? "Missing Email & Password"
+            : !uname
+            ? "Missing Email/Username"
+            : "Missing Password";
+        const message =
+          !uname && !pwd
+            ? "Please enter your email/username and password."
+            : !uname
+            ? "Please enter your email/username."
+            : "Please enter your password.";
         setAuthErrorMsg(message);
         Alert.alert(title, message);
         return;
       }
-  
+
       const res = firstTime
         ? await signUp(uname, pwd)
         : await login(uname, pwd);
-  
+
       // Support either UserCredential or User
       const firebaseUser =
-        (res && (res as any).user) ? (res as any).user : (res as any);
-  
+        res && (res as any).user ? (res as any).user : (res as any);
+
       const uid: string | undefined = firebaseUser?.uid;
       if (!uid) {
         // If your service returns void/null on failure, make it an explicit error
         throw { code: "auth/no-user-uid" };
       }
-  
+
       // Fetch VIP status
       const ref = doc(firestore, "users", uid);
       const snap = await getDoc(ref);
       const vipNow = Boolean(snap.data()?.isVip);
-  
+
       setShowAuth(false);
-  
+
       // Gate on bar open or VIP
       if (!isBarOpenNow() && !vipNow) {
         setNotVipVisible(true);
         return;
       }
-  
-      router.replace("/entranceAnimation");
+      goToEntranceAnim();
     } catch (err: any) {
       console.error("Auth error:", err?.code, err?.message || err);
       const { title, message, code } = mapFirebaseAuthError(err);
       setAuthError(true);
       setAuthErrorMsg(message);
 
-   // Helpful branching flows
-   if (code === "auth/email-already-in-use" && firstTime) {
-     Alert.alert(title, message, [
-       { text: "Cancel", style: "cancel" },
-       { text: "Switch to Sign In", onPress: () => setFirstTime(false) },
-     ]);
-   } else if (code === "auth/user-not-found" && !firstTime) {
-     Alert.alert(title, "No account with that email. Want to sign up?", [
-       { text: "Cancel", style: "cancel" },
-       { text: "Sign Up", onPress: () => setFirstTime(true) },
-    ]);
-   } else {
-     Alert.alert(title, message);
-   }
+      // Helpful branching flows
+      if (code === "auth/email-already-in-use" && firstTime) {
+        Alert.alert(title, message, [
+          { text: "Cancel", style: "cancel" },
+          { text: "Switch to Sign In", onPress: () => setFirstTime(false) },
+        ]);
+      } else if (code === "auth/user-not-found" && !firstTime) {
+        Alert.alert(title, "No account with that email. Want to sign up?", [
+          { text: "Cancel", style: "cancel" },
+          { text: "Sign Up", onPress: () => setFirstTime(true) },
+        ]);
+      } else {
+        Alert.alert(title, message);
+      }
     } finally {
       setLoadingAuth(false);
     }
-};
+  };
 
   async function handleReturningGoIn() {
     setLoadingAuth(true);
     setAuthError(false);
-      setAuthErrorMsg("");
-      try {
-        if (!IDENT || !pwd1) {
-          setAuthError(true);
-          setAuthErrorMsg("Please fill everything.");
-          return;
-      }
-        const res = await login(IDENT, pwd1);
-        const user = (res as any)?.user ?? res;
-        if (!user?.uid) throw { code: "auth/no-user-uid" };
-  
-        setShowAuth(false);
-        // keep your existing bar-open/VIP gating
-        if (!isBarOpenNow() && !isVip) {
-          setNotVipVisible(true);
-          return;
-        }
-        router.replace("/entranceAnimation");
-      } catch (err: any) {
-        const { title, message } = mapFirebaseAuthError(err);
+    setAuthErrorMsg("");
+    try {
+      if (!IDENT || !pwd1) {
         setAuthError(true);
-        setAuthErrorMsg(message);
-        Alert.alert(title, message);
-      } finally {
-        setLoadingAuth(false);
-      }
-    }
-  
-    async function handleNewGoIn() {
-      // step 4 gate
-      if (!agreeLegal || !agree21) {
-        setLegalError(true);
+        setAuthErrorMsg("Please fill everything.");
         return;
       }
-      setLegalError(false);
-  
-    setLoadingAuth(true);
-      setAuthError(false);
-      setAuthErrorMsg("");
-      try {
-        if (!IDENT || !pwd1) {
-          setAuthError(true);
-          setAuthErrorMsg("Please fill everything.");
-        return;
-      }
-        if (pwd1.length < 6) {
-          setAuthError(true);
-          setAuthErrorMsg("Password must be at least 6 characters.");
-          return;
-      }
-        if (pwd1 !== pwd2) {
-          setAuthError(true);
-          setAuthErrorMsg("Passwords do not match.");
-          return;
-        }
-        const res = await signUp(IDENT, pwd1);
-        const user = (res as any)?.user ?? res;
-        if (!user?.uid) throw { code: "auth/no-user-uid" };
-  
-        setShowAuth(false);
-        // keep your existing gating/animation
-        if (!isBarOpenNow() && !isVip) {
-          setNotVipVisible(true);
-          return;
-        }
-        router.replace("/entranceAnimation"); //entrance anim
-      } catch (err: any) {
-        const { title, message } = mapFirebaseAuthError(err);
-        setAuthError(true);
-        setAuthErrorMsg(message);
-        Alert.alert(title, message);
-      } finally {
-        setLoadingAuth(false);
-      }
-    }
+      const res = await login(IDENT, pwd1);
+      const user = (res as any)?.user ?? res;
+      if (!user?.uid) throw { code: "auth/no-user-uid" };
 
-    function chooseMethod(m: AuthMethod) {
-      setAuthMethod(m);
-      // Skip step 2 for socials (you’ll plug real OAuth later)
-      if (m === "google" || m === "meta" || m === "apple") {
-        // For now: just show a toast and stay on step 1 so you can implement later
-        Alert.alert("Coming soon", "Social sign-in is coming soon. Use Email or Username today.");
+      setShowAuth(false);
+      // keep your existing bar-open/VIP gating
+      if (!isBarOpenNow() && !isVip) {
+        setNotVipVisible(true);
         return;
-        // If you wire OAuth, you'd do: setAuthStep(newAccount ? 4 : 3);
       }
-      setAuthStep(2);
+      goToEntranceAnim();
+    } catch (err: any) {
+      const { title, message } = mapFirebaseAuthError(err);
+      setAuthError(true);
+      setAuthErrorMsg(message);
+      Alert.alert(title, message);
+    } finally {
+      setLoadingAuth(false);
     }
-    
+  }
+
+  async function handleNewGoIn() {
+    // step 4 gate
+    if (!agreeLegal || !agree21) {
+      setLegalError(true);
+      return;
+    }
+    setLegalError(false);
+
+    setLoadingAuth(true);
+    setAuthError(false);
+    setAuthErrorMsg("");
+    try {
+      if (!IDENT || !pwd1) {
+        setAuthError(true);
+        setAuthErrorMsg("Please fill everything.");
+        return;
+      }
+      if (pwd1.length < 6) {
+        setAuthError(true);
+        setAuthErrorMsg("Password must be at least 6 characters.");
+        return;
+      }
+      if (pwd1 !== pwd2) {
+        setAuthError(true);
+        setAuthErrorMsg("Passwords do not match.");
+        return;
+      }
+      const res = await signUp(IDENT, pwd1);
+      const user = (res as any)?.user ?? res;
+      if (!user?.uid) throw { code: "auth/no-user-uid" };
+
+      setShowAuth(false);
+      // keep your existing gating/animation
+      if (!isBarOpenNow() && !isVip) {
+        setNotVipVisible(true);
+        return;
+      }
+      goToEntranceAnim();
+    } catch (err: any) {
+      const { title, message } = mapFirebaseAuthError(err);
+      setAuthError(true);
+      setAuthErrorMsg(message);
+      Alert.alert(title, message);
+    } finally {
+      setLoadingAuth(false);
+    }
+  }
+
+  function chooseMethod(m: AuthMethod) {
+    setAuthMethod(m);
+    // Skip step 2 for socials (you’ll plug real OAuth later)
+    if (m === "google" || m === "meta" || m === "apple") {
+      // For now: just show a toast and stay on step 1 so you can implement later
+      Alert.alert(
+        "Coming soon",
+        "Social sign-in is coming soon. Use Email or Username today."
+      );
+      return;
+      // If you wire OAuth, you'd do: setAuthStep(newAccount ? 4 : 3);
+    }
+    setAuthStep(2);
+  }
 
   async function becomeVipNow() {
     const u = auth.currentUser;
@@ -517,7 +654,7 @@ export default function EntranceScreen() {
       return;
     }
     const ref = doc(firestore, "users", u.uid);
-  
+
     try {
       const snap = await getDoc(ref);
       if (snap.exists()) {
@@ -534,7 +671,7 @@ export default function EntranceScreen() {
           { merge: true }
         );
       }
-  
+
       // instant UI feedback (your onSnapshot will also update shortly)
       setIsVip(true);
       setShowNotVipPopup(false);
@@ -546,20 +683,19 @@ export default function EntranceScreen() {
       // optionally show an error popup
     }
   }
-  
+
   const closeCongratsAndEnter = () => {
     setShowVipCongrats(false);
     setShowConfetti(false);
-    router.replace('/entranceAnimation');
+    goToEntranceAnim();
   };
-  
-  
 
   const handleEntrancePress = () => {
     const user = auth.currentUser;
     if (isBarOpen) {
       if (user) {
-        router.replace("/entranceAnimation"); //entrance anim
+        goToEntranceAnim();
+        //entrance anim
       } else {
         setShowAuth(true);
       }
@@ -567,30 +703,28 @@ export default function EntranceScreen() {
       setShowPopupRules(true);
     }
   };
-  
 
   const onPlaybackStatusUpdate = (status: any) => {
     if (!hasStartedRef.current && status.positionMillis > 100) {
       hasStartedRef.current = true;
     }
     if (hasStartedRef.current && status.didJustFinish) {
-      router.replace("/entranceAnimation");
+      goToEntranceAnim();
     }
   };
 
   const BORDER_PX = 8;
-
 
   // WAIT FOR FONTS
   if (!fontsLoaded) {
     return (
       <View style={styles.loading}>
         <LottieView
-                source={withoutBg}
-                autoPlay
-                loop
-                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-               />
+          source={withoutBg}
+          autoPlay
+          loop
+          style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+        />
       </View>
     );
   }
@@ -607,9 +741,12 @@ export default function EntranceScreen() {
         style={styles.background}
         resizeMode="stretch"
       >
-        <Image
+        <View style={{ position: "absolute", top: 50, right: 20, zIndex: 999 }}>
+          <MusicToggleButton />
+        </View>
+        <Animated.Image
           source={require("../assets/images/entrance-sign.png")}
-          style={styles.entranceSign}
+          style={[styles.entranceSign, neonFlicker]}
           resizeMode="contain"
         />
 
@@ -619,20 +756,43 @@ export default function EntranceScreen() {
             style={styles.bannerBackground}
             resizeMode="stretch"
           >
-            <View style={[styles.bannerMask, {
-              left: BORDER_PX,
-              right: BORDER_PX,
-            }]}>
-             
-                <Animated.Text
-                  onLayout={e => setTextWidth(e.nativeEvent.layout.width)}
-                  style={[styles.bannerText, { transform: [{ translateX: scrollX }] }]}
+            <View
+              style={styles.bannerMask}
+              onLayout={(e) => setMaskWidth(e.nativeEvent.layout.width)}
+            >
+              {/* OFFSCREEN measurer (must not be constrained) */}
+              <View style={styles.measureWrap} pointerEvents="none">
+                <Text
+                  key={bannerVersion} // <-- forces a fresh native Text instance each bannerText change
+                  style={[styles.bannerText, styles.hiddenMeasure]}
                   numberOfLines={1}
+                  allowFontScaling={false}
+                  onLayout={(e) => {
+                    const w = Math.ceil(e.nativeEvent.layout.width);
+
+                    // only accept measurement for the CURRENT version
+                    if (bannerVersion !== bannerVersionRef.current) return;
+
+                    if (w > 0) setTextWidth(w);
+                  }}
                 >
-                  {MESSAGE}
-                </Animated.Text>
-          
-              
+                  {bannerText}
+                </Text>
+              </View>
+
+              {/* VISIBLE marquee (IMPORTANT: width = textWidth) */}
+              {!!textWidth && !!maskWidth && (
+                <RNAnimated.Text
+                  style={[
+                    styles.bannerText,
+                    { width: textWidth },
+                    { transform: [{ translateX: scrollX }] },
+                  ]}
+                  allowFontScaling={false}
+                >
+                  {bannerText}
+                </RNAnimated.Text>
+              )}
             </View>
           </ImageBackground>
         </View>
@@ -654,23 +814,22 @@ export default function EntranceScreen() {
           style={styles.pressable}
           activeOpacity={0.8}
         />
-
       </ImageBackground>
 
       {/* — Auth sheet on top, transparent so you can still see the entrance behind it — */}
-      <Modal 
-            visible={showAuth} 
-            transparent 
-            animationType="slide"
-            onDismiss={() => setPlayAnimation(true)}
-            onRequestClose={() => setPlayAnimation(true)}
+      <Modal
+        visible={showAuth}
+        transparent
+        animationType="slide"
+        onDismiss={() => setPlayAnimation(true)}
+        onRequestClose={() => setPlayAnimation(true)}
       >
         <View style={authStyles.modalOverlay}>
-        <ImageBackground
-          source={CLIPBOARD_IMG}
-          style={authStyles.clipboard}
-          resizeMode="contain"
-        >
+          <ImageBackground
+            source={CLIPBOARD_IMG}
+            style={authStyles.clipboard}
+            resizeMode="contain"
+          >
             {/* White paper bounds */}
             <View style={authStyles.paperBox}>
               {/* Close (X) pinned to sheet corner */}
@@ -683,7 +842,7 @@ export default function EntranceScreen() {
               </TouchableOpacity>
 
               {/* Scrollable sheet content (never spills outside white area) */}
-              <Animated.ScrollView
+              <RNAnimated.ScrollView
                 contentContainerStyle={authStyles.sheetContent}
                 keyboardShouldPersistTaps="handled"
                 bounces={false}
@@ -691,56 +850,106 @@ export default function EntranceScreen() {
               >
                 {/* ==== your existing content from <Text style={authStyles.title}> ... to the end of step 4 ==== */}
                 {/* Title switches by step */}
-                <Text 
+                <Text
                   style={authStyles.title}
                   numberOfLines={1}
-                  adjustsFontSizeToFit        // shrink to fit the width
-                  minimumFontScale={0.85}     // don’t shrink smaller than 85%
-                  allowFontScaling={false}    // ignore OS text scaling
-                  maxFontSizeMultiplier={1}   // belt & suspenders
+                  adjustsFontSizeToFit // shrink to fit the width
+                  minimumFontScale={0.85} // don’t shrink smaller than 85%
+                  allowFontScaling={false} // ignore OS text scaling
+                  maxFontSizeMultiplier={1} // belt & suspenders
                   ellipsizeMode="clip"
                 >
-                  {authStep === 1 && (newAccount ? "Create your account" : "Welcome back")}
-                  {authStep === 2 && (authMethod === "email" ? "Your Email" : "Your Username")}
-                  {authStep === 3 && (newAccount ? "Create a password" : "Enter your password")}
+                  {authStep === 1 &&
+                    (newAccount ? "Create your account" : "Welcome back")}
+                  {authStep === 2 &&
+                    (authMethod === "email" ? "Your Email" : "Your Username")}
+                  {authStep === 3 &&
+                    (newAccount ? "Create a password" : "Enter your password")}
                   {authStep === 4 && "One last thing…"}
                 </Text>
 
                 {/* STEP 1 — Choose path */}
                 {authStep === 1 && (
                   <>
-                    <Text style={authStyles.subtitle} maxFontSizeMultiplier={1.1}>Continue with socials</Text>
+                    <Text
+                      style={authStyles.subtitle}
+                      maxFontSizeMultiplier={1.1}
+                    >
+                      Continue with socials
+                    </Text>
                     <View style={authStyles.socialRow}>
-                      <TouchableOpacity style={authStyles.socialBtn} onPress={() => chooseMethod("google")}>
+                      <TouchableOpacity
+                        style={authStyles.socialBtn}
+                        onPress={() => chooseMethod("google")}
+                      >
                         <AntDesign name="google" size={28} color="#DB4437" />
                       </TouchableOpacity>
-                      <TouchableOpacity style={authStyles.socialBtn} onPress={() => chooseMethod("meta")}>
-                        <FontAwesome name="facebook-square" size={28} color="#1877F2" />
+                      <TouchableOpacity
+                        style={authStyles.socialBtn}
+                        onPress={() => chooseMethod("meta")}
+                      >
+                        <FontAwesome
+                          name="facebook-square"
+                          size={28}
+                          color="#1877F2"
+                        />
                       </TouchableOpacity>
-                      <TouchableOpacity style={authStyles.socialBtn} onPress={() => chooseMethod("apple")}>
+                      <TouchableOpacity
+                        style={authStyles.socialBtn}
+                        onPress={() => chooseMethod("apple")}
+                      >
                         <Ionicons name="logo-apple" size={30} color="#000" />
                       </TouchableOpacity>
                     </View>
 
-                    <Text style={authStyles.orText} maxFontSizeMultiplier={1.1}>or</Text>
+                    <Text style={authStyles.orText} maxFontSizeMultiplier={1.1}>
+                      or
+                    </Text>
 
-                    <View style={{ gap: 10, width: "100%", alignItems: "center" }}>
-                      <TouchableOpacity style={authStyles.primaryBtn} onPress={() => chooseMethod("email")}>
-                        <Text style={authStyles.primaryBtnText} maxFontSizeMultiplier={1.1}>Use Email</Text>
+                    <View
+                      style={{ gap: 10, width: "100%", alignItems: "center" }}
+                    >
+                      <TouchableOpacity
+                        style={authStyles.primaryBtn}
+                        onPress={() => chooseMethod("email")}
+                      >
+                        <Text
+                          style={authStyles.primaryBtnText}
+                          maxFontSizeMultiplier={1.1}
+                        >
+                          Use Email
+                        </Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={authStyles.secondaryBtn} onPress={() => chooseMethod("username")}>
-                        <Text style={authStyles.secondaryBtnText} maxFontSizeMultiplier={1.1}>Use Username</Text>
+                      <TouchableOpacity
+                        style={authStyles.secondaryBtn}
+                        onPress={() => chooseMethod("username")}
+                      >
+                        <Text
+                          style={authStyles.secondaryBtnText}
+                          maxFontSizeMultiplier={1.1}
+                        >
+                          Use Username
+                        </Text>
                       </TouchableOpacity>
                     </View>
 
                     <View style={authStyles.modeRow}>
-                      <Text style={authStyles.modeText} maxFontSizeMultiplier={1.1}>
+                      <Text
+                        style={authStyles.modeText}
+                        maxFontSizeMultiplier={1.1}
+                      >
                         {newAccount ? "Already have an account?" : "New here?"}
                       </Text>
                       <TouchableOpacity
-                        onPress={() => { setNewAccount(!newAccount); setFirstTime(!newAccount); }}
+                        onPress={() => {
+                          setNewAccount(!newAccount);
+                          setFirstTime(!newAccount);
+                        }}
                       >
-                        <Text style={authStyles.modeLink} maxFontSizeMultiplier={1.1}>
+                        <Text
+                          style={authStyles.modeLink}
+                          maxFontSizeMultiplier={1.1}
+                        >
                           {newAccount ? "Sign in" : "Create account"}
                         </Text>
                       </TouchableOpacity>
@@ -774,18 +983,38 @@ export default function EntranceScreen() {
                       />
                     )}
 
-                    {authError ? <Text style={authStyles.error} maxFontSizeMultiplier={1.1}>{authErrorMsg}</Text> : null}
+                    {authError ? (
+                      <Text
+                        style={authStyles.error}
+                        maxFontSizeMultiplier={1.1}
+                      >
+                        {authErrorMsg}
+                      </Text>
+                    ) : null}
 
                     <View style={authStyles.navRow}>
                       <TouchableOpacity onPress={() => setAuthStep(1)}>
-                        <Text style={authStyles.navLink} maxFontSizeMultiplier={1.1}>Back</Text>
+                        <Text
+                          style={authStyles.navLink}
+                          maxFontSizeMultiplier={1.1}
+                        >
+                          Back
+                        </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={[authStyles.primaryBtn, { opacity: IDENT ? 1 : 0.6 }]}
+                        style={[
+                          authStyles.primaryBtn,
+                          { opacity: IDENT ? 1 : 0.6 },
+                        ]}
                         disabled={!IDENT || loadingAuth}
                         onPress={() => setAuthStep(3)}
                       >
-                        <Text style={authStyles.primaryBtnText} maxFontSizeMultiplier={1.1}>Continue</Text>
+                        <Text
+                          style={authStyles.primaryBtnText}
+                          maxFontSizeMultiplier={1.1}
+                        >
+                          Continue
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </>
@@ -796,7 +1025,12 @@ export default function EntranceScreen() {
                   <>
                     {!!IDENT && (
                       <View style={authStyles.staticInput}>
-                        <Text style={authStyles.staticInputText} maxFontSizeMultiplier={1.1}>{IDENT}</Text>
+                        <Text
+                          style={authStyles.staticInputText}
+                          maxFontSizeMultiplier={1.1}
+                        >
+                          {IDENT}
+                        </Text>
                       </View>
                     )}
 
@@ -820,17 +1054,37 @@ export default function EntranceScreen() {
                           onChangeText={setPwd2}
                           editable={!loadingAuth}
                         />
-                        {authError ? <Text style={authStyles.error} maxFontSizeMultiplier={1.1}>{authErrorMsg}</Text> : null}
+                        {authError ? (
+                          <Text
+                            style={authStyles.error}
+                            maxFontSizeMultiplier={1.1}
+                          >
+                            {authErrorMsg}
+                          </Text>
+                        ) : null}
                         <View style={authStyles.navRow}>
                           <TouchableOpacity onPress={() => setAuthStep(2)}>
-                            <Text style={authStyles.navLink} maxFontSizeMultiplier={1.1}>Back</Text>
+                            <Text
+                              style={authStyles.navLink}
+                              maxFontSizeMultiplier={1.1}
+                            >
+                              Back
+                            </Text>
                           </TouchableOpacity>
                           <TouchableOpacity
-                            style={[authStyles.primaryBtn, { opacity: pwd1 && pwd2 ? 1 : 0.6 }]}
+                            style={[
+                              authStyles.primaryBtn,
+                              { opacity: pwd1 && pwd2 ? 1 : 0.6 },
+                            ]}
                             disabled={!pwd1 || !pwd2 || loadingAuth}
                             onPress={() => setAuthStep(4)}
                           >
-                            <Text style={authStyles.primaryBtnText} maxFontSizeMultiplier={1.1}>Continue</Text>
+                            <Text
+                              style={authStyles.primaryBtnText}
+                              maxFontSizeMultiplier={1.1}
+                            >
+                              Continue
+                            </Text>
                           </TouchableOpacity>
                         </View>
                       </>
@@ -845,20 +1099,49 @@ export default function EntranceScreen() {
                           onChangeText={setPwd1}
                           editable={!loadingAuth}
                         />
-                        {authError ? <Text style={authStyles.error} maxFontSizeMultiplier={1.1}>{authErrorMsg}</Text> : null}
+                        {authError ? (
+                          <Text
+                            style={authStyles.error}
+                            maxFontSizeMultiplier={1.1}
+                          >
+                            {authErrorMsg}
+                          </Text>
+                        ) : null}
                         <View style={authStyles.navRow}>
                           <TouchableOpacity onPress={() => setAuthStep(2)}>
-                            <Text style={authStyles.navLink} maxFontSizeMultiplier={1.1}>Back</Text>
+                            <Text
+                              style={authStyles.navLink}
+                              maxFontSizeMultiplier={1.1}
+                            >
+                              Back
+                            </Text>
                           </TouchableOpacity>
                           <TouchableOpacity
-                            style={[authStyles.primaryBtn, { opacity: pwd1 ? 1 : 0.6 }]}
+                            style={[
+                              authStyles.primaryBtn,
+                              { opacity: pwd1 ? 1 : 0.6 },
+                            ]}
                             disabled={!pwd1 || loadingAuth}
                             onPress={handleReturningGoIn}
                           >
                             {loadingAuth ? (
-                              <LottieView source={withoutBg} autoPlay loop style={{ width: 80, height: 80, backgroundColor: "transparent" }} />
+                              <LottieView
+                                source={withoutBg}
+                                autoPlay
+                                loop
+                                style={{
+                                  width: 80,
+                                  height: 80,
+                                  backgroundColor: "transparent",
+                                }}
+                              />
                             ) : (
-                              <Text style={authStyles.primaryBtnText} maxFontSizeMultiplier={1.1}>GO IN!</Text>
+                              <Text
+                                style={authStyles.primaryBtnText}
+                                maxFontSizeMultiplier={1.1}
+                              >
+                                GO IN!
+                              </Text>
                             )}
                           </TouchableOpacity>
                         </View>
@@ -872,37 +1155,83 @@ export default function EntranceScreen() {
                   <>
                     <View style={authStyles.checkboxRow}>
                       <TouchableOpacity
-                        style={[authStyles.checkbox, agreeLegal && authStyles.checkboxChecked]}
-                        onPress={() => setAgreeLegal(v => !v)}
+                        style={[
+                          authStyles.checkbox,
+                          agreeLegal && authStyles.checkboxChecked,
+                        ]}
+                        onPress={() => setAgreeLegal((v) => !v)}
                       >
-                        {agreeLegal ? <Text style={authStyles.checkmark}>✓</Text> : null}
+                        {agreeLegal ? (
+                          <Text style={authStyles.checkmark}>✓</Text>
+                        ) : null}
                       </TouchableOpacity>
-                      <Text style={authStyles.legalText} maxFontSizeMultiplier={1.1}>
+                      <Text
+                        style={authStyles.legalText}
+                        maxFontSizeMultiplier={1.1}
+                      >
                         I have read and agree to the{" "}
-                        <Text style={authStyles.link} onPress={() => Linking.openURL(termsUrl)}>Terms & Conditions</Text>
-                        {" "}and{" "}
-                        <Text style={authStyles.link} onPress={() => Linking.openURL(termsUrl)}>Privacy Policy</Text>.
+                        <Text
+                          style={authStyles.link}
+                          onPress={() => Linking.openURL(termsUrl)}
+                        >
+                          Terms & Conditions
+                        </Text>{" "}
+                        and{" "}
+                        <Text
+                          style={authStyles.link}
+                          onPress={() => Linking.openURL(termsUrl)}
+                        >
+                          Privacy Policy
+                        </Text>
+                        .
                       </Text>
                     </View>
 
                     <View style={authStyles.checkboxRow}>
                       <TouchableOpacity
-                        style={[authStyles.checkbox, agree21 && authStyles.checkboxChecked]}
-                        onPress={() => setAgree21(v => !v)}
+                        style={[
+                          authStyles.checkbox,
+                          agree21 && authStyles.checkboxChecked,
+                        ]}
+                        onPress={() => setAgree21((v) => !v)}
                       >
-                        {agree21 ? <Text style={authStyles.checkmark}>✓</Text> : null}
+                        {agree21 ? (
+                          <Text style={authStyles.checkmark}>✓</Text>
+                        ) : null}
                       </TouchableOpacity>
-                      <Text style={authStyles.legalText} maxFontSizeMultiplier={1.1}>I confirm that I am at least 21 years old.</Text>
+                      <Text
+                        style={authStyles.legalText}
+                        maxFontSizeMultiplier={1.1}
+                      >
+                        I confirm that I am at least 21 years old.
+                      </Text>
                     </View>
 
                     {legalError && (
-                      <Text style={authStyles.legalError} maxFontSizeMultiplier={1.1}>You have to agree to the legal stuff first.</Text>
+                      <Text
+                        style={authStyles.legalError}
+                        maxFontSizeMultiplier={1.1}
+                      >
+                        You have to agree to the legal stuff first.
+                      </Text>
                     )}
-                    {authError ? <Text style={authStyles.error} maxFontSizeMultiplier={1.1}>{authErrorMsg}</Text> : null}
+                    {authError ? (
+                      <Text
+                        style={authStyles.error}
+                        maxFontSizeMultiplier={1.1}
+                      >
+                        {authErrorMsg}
+                      </Text>
+                    ) : null}
 
                     <View style={authStyles.navRow}>
                       <TouchableOpacity onPress={() => setAuthStep(3)}>
-                        <Text style={authStyles.navLink} maxFontSizeMultiplier={1.1}>Back</Text>
+                        <Text
+                          style={authStyles.navLink}
+                          maxFontSizeMultiplier={1.1}
+                        >
+                          Back
+                        </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={authStyles.primaryBtn}
@@ -910,54 +1239,66 @@ export default function EntranceScreen() {
                         disabled={loadingAuth}
                       >
                         {loadingAuth ? (
-                          <LottieView source={withoutBg} autoPlay loop style={{ width: 80, height: 80, backgroundColor: "transparent" }} />
+                          <LottieView
+                            source={withoutBg}
+                            autoPlay
+                            loop
+                            style={{
+                              width: 80,
+                              height: 80,
+                              backgroundColor: "transparent",
+                            }}
+                          />
                         ) : (
-                          <Text style={authStyles.primaryBtnText} maxFontSizeMultiplier={1.1}>GO IN!</Text>
+                          <Text
+                            style={authStyles.primaryBtnText}
+                            maxFontSizeMultiplier={1.1}
+                          >
+                            GO IN!
+                          </Text>
                         )}
                       </TouchableOpacity>
                     </View>
                   </>
                 )}
                 {/* ==== end content ==== */}
-              </Animated.ScrollView>
+              </RNAnimated.ScrollView>
             </View>
           </ImageBackground>
-
         </View>
       </Modal>
-  {/* — Bar Rules popup when closed — */}
+      {/* — Bar Rules popup when closed — */}
       <PopUp
-          visible={showPopupRules}
-          title="Bar Rules"
-          onClose={() => setShowPopupRules(false)}
-        >
+        visible={showPopupRules}
+        title="Bar Rules"
+        onClose={() => setShowPopupRules(false)}
+      >
         <View style={styles.rulesContainer}>
           <View style={styles.hoursContainer}>
             <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
             <Text style={styles.hours}>17:00–05:00</Text>
           </View>
-      
+
           <View style={styles.hoursContainer}>
             <Text style={styles.hoursText}>Happy Hour:{"\n"}</Text>
             <Text style={styles.hours}>17:00–21:00</Text>
-          </View> 
-      
+          </View>
+
           <View style={styles.hoursContainer}>
             <View style={styles.vipContainer}>
-            <Text style={styles.vipText}>VIP</Text>
-            <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
+              <Text style={styles.vipText}>VIP</Text>
+              <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
             </View>
-           
+
             <Text style={styles.hours}>All Day Erry Day</Text>
           </View>
-      
+
           <Text style={styles.ruleText}>No Nude Pics</Text>
-          <Text style={[styles.hoursText, {marginBottom: 20}]}>No Links Allowed</Text>
+          <Text style={[styles.hoursText, { marginBottom: 20 }]}>
+            No Links Allowed
+          </Text>
           <Text style={styles.ruleText}>Age 21 and Up</Text>
-          <TouchableOpacity
-            style={styles.vipCta}
-            onPress={startVipAuth}   
-          >
+          <TouchableOpacity style={styles.vipCta} onPress={startVipAuth}>
             <Text style={styles.vipCtaText}>I'm a VIP, let me in</Text>
           </TouchableOpacity>
         </View>
@@ -966,18 +1307,17 @@ export default function EntranceScreen() {
       {/* Mr. Mingles VIP Upsell (bathroom-style) */}
       <Modal transparent visible={notVipVisible} animationType="fade">
         <View style={mmStyles.modalOverlay}>
-        <TouchableOpacity
-          style={mmStyles.closeButton}
-          onPress={() => setNotVipVisible(false)}
-          activeOpacity={0.8}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Image
-            source={require("../assets/images/x.png")}
-            style={mmStyles.closeIcon}
-          />
-        </TouchableOpacity>
-
+          <TouchableOpacity
+            style={mmStyles.closeButton}
+            onPress={() => setNotVipVisible(false)}
+            activeOpacity={0.8}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Image
+              source={require("../assets/images/x.png")}
+              style={mmStyles.closeIcon}
+            />
+          </TouchableOpacity>
 
           <View style={mmStyles.modalContainer}>
             {/* Mingles speech (typewriter) */}
@@ -990,41 +1330,44 @@ export default function EntranceScreen() {
             </View>
 
             {/* Animated Mr. Mingles */}
-            <Animated.Image
+            <RNAnimated.Image
               source={require("../assets/images/mr-mingles.png")}
-              style={[mmStyles.mrMingles, { transform: [{ translateX: vipRollAnim }] }]}
+              style={[
+                mmStyles.mrMingles,
+                { transform: [{ translateX: vipRollAnim }] },
+              ]}
               resizeMode="contain"
             />
 
             {/* Actions */}
             <View style={mmStyles.ctaRow}>
-            <TouchableOpacity
-              style={mmStyles.vipBtn}
-              onPress={async () => {
-                try {
-                  const u = auth.currentUser;
-                  if (!u) {
+              <TouchableOpacity
+                style={mmStyles.vipBtn}
+                onPress={async () => {
+                  try {
+                    const u = auth.currentUser;
+                    if (!u) {
+                      setNotVipVisible(false);
+                      setShowAuth(true);
+                      return;
+                    }
+
+                    await updateDoc(doc(firestore, USERS_COLLECTION, u.uid), {
+                      isVip: true,
+                    });
+
+                    // Close the upsell, then show confetti + congrats modal
                     setNotVipVisible(false);
-                    setShowAuth(true);
-                    return;
+                    setShowConfetti(true);
+                    setShowVipCongrats(true); // we'll use this to show a Mingles-style congrats modal
+                    setIsVip(true);
+                  } catch (e) {
+                    console.error("VIP upgrade failed:", e);
                   }
-
-                  await updateDoc(doc(firestore, USERS_COLLECTION, u.uid), {
-                    isVip: true,
-                  });
-
-                  // Close the upsell, then show confetti + congrats modal
-                  setNotVipVisible(false);
-                  setShowConfetti(true);
-                  setShowVipCongrats(true);    // we'll use this to show a Mingles-style congrats modal
-                  setIsVip(true);
-                } catch (e) {
-                  console.error("VIP upgrade failed:", e);
-                }
-              }}
-            >
-              <Text style={mmStyles.vipBtnText}>Become a VIP</Text>
-            </TouchableOpacity>
+                }}
+              >
+                <Text style={mmStyles.vipBtnText}>Become a VIP</Text>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={mmStyles.laterBtn}
@@ -1063,11 +1406,14 @@ export default function EntranceScreen() {
 
             {/* Big Enter button */}
             <TouchableOpacity
-              style={[mmStyles.vipBtn, { position: "absolute", bottom: 16, alignSelf: "center" }]}
+              style={[
+                mmStyles.vipBtn,
+                { position: "absolute", bottom: 16, alignSelf: "center" },
+              ]}
               onPress={() => {
                 setShowVipCongrats(false);
                 setShowConfetti(false);
-                router.replace("/entranceAnimation");
+                goToEntranceAnim();
               }}
             >
               <Text style={mmStyles.vipBtnText}>Enter</Text>
@@ -1077,39 +1423,114 @@ export default function EntranceScreen() {
       </Modal>
 
       {showConfetti && (
-      <ConfettiCannon
-        count={150}
-        origin={{ x: width / 2, y: -10 }}
-        fadeOut
-        onAnimationEnd={() => setShowConfetti(false)}
-      />
-    )}
-
+        <ConfettiCannon
+          count={150}
+          origin={{ x: width / 2, y: -10 }}
+          fadeOut
+          onAnimationEnd={() => setShowConfetti(false)}
+        />
+      )}
     </View>
-
-    );
+  );
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1 },
-  loading:      { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", justifyContent: "center", alignItems: "center" },
-  background:   { width, height: "100%", alignItems: "center" },
-  entranceSign: { position: "absolute", top: "-8%", width: width * 0.55, height: height * 0.55 },
-  bannerContainer:  { position: "absolute", top: height * 0.30, width: width * 0.9, height: height * 0.07 },
+  container: { flex: 1 },
+  measureWrap: {
+    position: "absolute",
+    left: -9999,
+    top: -9999,
+  },
+  hiddenMeasure: {
+    position: "absolute",
+    opacity: 0,
+    left: 0,
+    top: 0,
+  },
+  measureText: {
+    fontFamily: FontNames.ArcadePixelRegular,
+    fontSize: 32,
+    lineHeight: 32,
+    // width: "100%",
+  },
+
+  bannerTextMeasure: {
+    fontFamily: FontNames.ArcadePixelRegular,
+    fontSize: 32,
+    lineHeight: 32,
+    // IMPORTANT: no position:absolute here
+  },
+
+  bannerTextMarquee: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    fontFamily: FontNames.ArcadePixelRegular,
+    fontSize: 32,
+    lineHeight: 32,
+    color: "red",
+  },
+
+  loading: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  background: { width, height: "100%", alignItems: "center" },
+  entranceSign: {
+    position: "absolute",
+    top: "-16%",
+    width: width * 0.7,
+    height: height * 0.7,
+  },
+  bannerContainer: {
+    position: "absolute",
+    top: height * 0.32,
+    width: width * 0.9,
+    height: height * 0.07,
+  },
   bannerBackground: { flex: 1, justifyContent: "center" },
-  bannerMask:       { position: "absolute", top: height * 0.012, bottom: 0, overflow: "hidden" },
-  bannerText:       { fontFamily: FontNames.ArcadePixelRegular, fontSize: 32, lineHeight: 32, color: "red" },
-  doorTouchable:    { position: "absolute", top: "50%", width: width * 0.9, height: height * 0.2, alignSelf: "center" },
-  doorSign:         { width: "100%", height: "100%" },
-  pressable: { height: height * 0.69, width: width * 0.7, position: "absolute", top: height * 0.31},
+  bannerMask: {
+    position: "absolute",
+    top: height * 0.012,
+    bottom: 0,
+    left: 5,
+    right: 5,
+    overflow: "hidden", // visible window; longer text will scroll through
+  },
+  bannerText: {
+    position: "absolute",
+    left: 0,
+    fontFamily: FontNames.ArcadePixelRegular,
+    fontSize: 32,
+    lineHeight: 32,
+    color: "red",
+    flexWrap: "nowrap",
+    // force single line; no wrapping
+  },
+  doorTouchable: {
+    position: "absolute",
+    top: "50%",
+    width: width * 0.9,
+    height: height * 0.2,
+    alignSelf: "center",
+  },
+  doorSign: { width: "100%", height: "100%" },
+  pressable: {
+    height: height * 0.69,
+    width: width * 0.7,
+    position: "absolute",
+    top: height * 0.31,
+  },
   closeIcon: {
     width: 24,
     height: 24,
-    tintColor: 'black',
+    tintColor: "black",
   },
   rulesContainer: {
     marginTop: 8,
-   alignSelf: "center"
+    alignSelf: "center",
   },
   hoursContainer: {
     alignItems: "center",
@@ -1120,14 +1541,14 @@ const styles = StyleSheet.create({
     color: "#d8bfd8",
     fontFamily: FontNames.MontserratRegular,
     textAlign: "center",
-    marginBottom: -35
+    marginBottom: -35,
   },
   hours: {
     fontSize: 26,
     color: "#ffe3d0",
     fontFamily: FontNames.MontserratExtraLightItalic,
     textAlign: "center",
-    marginBottom: 20
+    marginBottom: 20,
   },
   vipContainer: {
     display: "flex",
@@ -1136,68 +1557,68 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   vipText: {
-    color: "red",          // highlight VIP in red
+    color: "red", // highlight VIP in red
     fontSize: 26,
     fontFamily: FontNames.MontserratBold,
     marginRight: 6,
-    marginBottom: 5
+    marginBottom: 5,
   },
   ruleText: {
     fontSize: 26,
     color: "#e78bbb",
     textAlign: "center",
-    marginBottom: 10
+    marginBottom: 10,
   },
   vipButton: {
     marginTop: 30,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 18,
-    backgroundColor: '#e2a350',
+    backgroundColor: "#e2a350",
     alignSelf: "center",
     width: 140,
-    boxShadow: "5px 9px 0px rgba(0,0,0,.3)", 
+    boxShadow: "5px 9px 0px rgba(0,0,0,.3)",
   },
   vipButtonText: {
     fontSize: 16,
-    color: '#460b2a',
+    color: "#460b2a",
     fontFamily: FontNames.MontserratBold,
-    textAlign: "center"
+    textAlign: "center",
   },
   minglesBody: {
     fontSize: 18,
-    color: '#ffe3d0',
-    textAlign: 'center',
+    color: "#ffe3d0",
+    textAlign: "center",
     fontFamily: FontNames.MontserratRegular,
     marginHorizontal: 10,
   },
   vipCtaButton: {
-    backgroundColor: '#ffcf33',
+    backgroundColor: "#ffcf33",
     borderRadius: 22,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
   vipCtaButtonText: {
     fontSize: 16,
-    color: '#460b2a',
+    color: "#460b2a",
     fontFamily: FontNames.MontserratBold,
-    textAlign: "center"
+    textAlign: "center",
   },
   closeLink: {
-    color: '#d8bfd8',
-    textDecorationLine: 'underline',
+    color: "#d8bfd8",
+    textDecorationLine: "underline",
     fontSize: 14,
   },
   congratsBody: {
     fontSize: 18,
-    color: '#ffe3d0',
-    textAlign: 'center',
+    color: "#ffe3d0",
+    textAlign: "center",
     fontFamily: FontNames.MontserratRegular,
   },
   congratsBodySmall: {
     fontSize: 14,
-    color: '#d8bfd8',
-    textAlign: 'center',
+    color: "#d8bfd8",
+    textAlign: "center",
     fontFamily: FontNames.MontserratRegular,
   },
   vipCta: {
@@ -1205,7 +1626,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 18,
-    backgroundColor: '#e2a350',
+    backgroundColor: "#e2a350",
     alignSelf: "center",
     width: 140,
     boxShadow: "5px 9px 0px rgba(0,0,0,.3)",
@@ -1220,29 +1641,33 @@ const styles = StyleSheet.create({
 
 const CLOSE_ICON_PX = Math.max(18, Math.min(30, Math.round(width * 0.05)));
 const authStyles = StyleSheet.create({
-  
-  modalOverlay:   { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.2)", justifyContent: "center", alignItems: "center", height },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    height,
+  },
   // dynamic size for the X icon
-
 
   clipboard: {
     width: Math.min(width * 0.9, 420),
-    aspectRatio: CLIPBOARD_AR,   // <-- gives it a proper height
+    aspectRatio: CLIPBOARD_AR, // <-- gives it a proper height
     // height: undefined,        // (implicit with aspectRatio)
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
   },
-  
-paperBox: {
-  position: "absolute",
-  left: "12%",
-  right: "12%",
-  top: "18%",
-  bottom: "2%",
-  borderRadius: 10,
-  overflow: "hidden",
-},
+
+  paperBox: {
+    position: "absolute",
+    left: "12%",
+    right: "12%",
+    top: "18%",
+    bottom: "2%",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
   sheet: {
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -1251,19 +1676,18 @@ paperBox: {
   sheetContent: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    flexGrow: 1,              // <-- key: fills available height then scrolls if needed
+    flexGrow: 1, // <-- key: fills available height then scrolls if needed
     alignItems: "center",
   },
-  
-  
+
   title: {
     fontFamily: FontNames.MontserratBold,
-    fontSize: 25,          // starting size (will shrink if needed)
-    lineHeight: 30,        // keep steady vertical rhythm
+    fontSize: 25, // starting size (will shrink if needed)
+    lineHeight: 30, // keep steady vertical rhythm
     includeFontPadding: false, // Android consistency
     textAlign: "center",
     alignSelf: "stretch",
-    marginTop: "5%"
+    marginTop: "5%",
   },
   input: {
     width: "100%",
@@ -1274,13 +1698,48 @@ paperBox: {
     padding: 5,
     color: "#000",
   },
-  button:         { width: 200, height: 60, backgroundColor: "#610e14", borderWidth: 5, borderColor: "#4a0a0f", borderRadius: 30, alignItems: "center", justifyContent: "center", marginTop: 10 },
-  buttonText:     { fontSize: 32, color: "#fff", fontFamily: FontNames.MontserratRegular },
-  bottomRow:      { flexDirection: "row", alignItems: "center", marginTop: 15 },
-  checkbox:       { width: 25, height: 25, borderWidth: 3, borderColor: "#000", justifyContent: "center", alignItems: "center", marginRight: 8 },
-  checkmark:      { fontSize: 20, color: "#000", fontFamily: FontNames.MontserratBold },
-  checkboxLabel:  { fontSize: 16, fontFamily: FontNames.MontserratRegular, color: "#000" },
-  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+  button: {
+    width: 200,
+    height: 60,
+    backgroundColor: "#610e14",
+    borderWidth: 5,
+    borderColor: "#4a0a0f",
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+  buttonText: {
+    fontSize: 32,
+    color: "#fff",
+    fontFamily: FontNames.MontserratRegular,
+  },
+  bottomRow: { flexDirection: "row", alignItems: "center", marginTop: 15 },
+  checkbox: {
+    width: 25,
+    height: 25,
+    borderWidth: 3,
+    borderColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 8,
+  },
+  checkmark: {
+    fontSize: 20,
+    color: "#000",
+    fontFamily: FontNames.MontserratBold,
+  },
+  checkboxLabel: {
+    fontSize: 16,
+    fontFamily: FontNames.MontserratRegular,
+    color: "#000",
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   closeButton: {
     position: "absolute",
     top: -10,
@@ -1291,7 +1750,7 @@ paperBox: {
     alignItems: "center",
     zIndex: 10,
   },
-  
+
   closeIcon: {
     width: CLOSE_ICON_PX,
     height: CLOSE_ICON_PX,
@@ -1299,7 +1758,12 @@ paperBox: {
   },
   legalWrap: { width: "100%", marginTop: 4, marginBottom: 6 },
   legalRow: { flexDirection: "row", alignItems: "center" },
-  legalText: { flex: 1, color: "#000", fontFamily: FontNames.MontserratRegular, fontSize: 14 },
+  legalText: {
+    flex: 1,
+    color: "#000",
+    fontFamily: FontNames.MontserratRegular,
+    fontSize: 14,
+  },
   link: { color: "#2563eb", textDecorationLine: "underline" },
   legalError: {
     marginTop: 6,
@@ -1308,34 +1772,133 @@ paperBox: {
     fontSize: 14,
   },
   socialWrap: { width: "100%", marginTop: 10, gap: 8 },
-  socialText: { color: "#000", fontFamily: FontNames.MontserratBold, fontSize: 14 },
+  socialText: {
+    color: "#000",
+    fontFamily: FontNames.MontserratBold,
+    fontSize: 14,
+  },
   google: {},
   meta: {},
   apple: {},
 
-  dividerRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+  },
   divider: { flex: 1, height: 1, backgroundColor: "#000" },
-  dividerText: { color: "#000", fontFamily: FontNames.MontserratRegular, fontSize: 12, marginTop: -2 },
+  dividerText: {
+    color: "#000",
+    fontFamily: FontNames.MontserratRegular,
+    fontSize: 12,
+    marginTop: -2,
+  },
 
-  sectionTitle: { color: "#000", fontFamily: FontNames.MontserratBold, fontSize: 16, marginTop: 4 },
+  sectionTitle: {
+    color: "#000",
+    fontFamily: FontNames.MontserratBold,
+    fontSize: 16,
+    marginTop: 4,
+  },
   checkboxChecked: { backgroundColor: "#d1fae5" },
-  subtitle:       { fontSize: 16, color: "#333", marginTop: 2, marginBottom: 10, fontFamily: FontNames.MontserratRegular },
-  socialRow:      { flexDirection: "row", gap: 12, marginBottom: 8 },
-  socialBtn:      { width: 54, height: 54, borderRadius: 27, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#000" },
-  orText:         { marginVertical: 8, color: "#444", fontFamily: FontNames.MontserratRegular },
-  primaryBtn:     { minWidth: width * 0.4, height: 48, backgroundColor: "#610e14", borderWidth: 4, borderColor: "#4a0a0f", borderRadius: 24, alignItems: "center", justifyContent: "center" },
-  primaryBtnText: { color: "#fff", fontSize: 16, fontFamily: FontNames.MontserratBold },
-  secondaryBtn:   { minWidth: 200, height: 48, borderWidth: 2, borderColor: "#000", borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.85)" },
-  secondaryBtnText:{ color: "#000", fontSize: 16, fontFamily: FontNames.MontserratRegular },
-  modeRow:        { flexDirection: "row", gap: 6, marginTop: 12, alignItems: "center" },
-  modeText:       { color: "#000", fontFamily: FontNames.MontserratRegular },
-  modeLink:       { color: "#610e14", fontFamily: FontNames.MontserratBold, textDecorationLine: "underline" },
-  staticInput:    { width: width * 0.6, paddingVertical: 10, borderBottomWidth: 1, borderColor: "#000", marginBottom: 6 },
-  staticInputText:{ fontSize: 16, color: "#000", fontFamily: FontNames.MontserratRegular },
-  error:          { color: "red", marginTop: 5 },
-  navRow:         { width: "100%", marginTop: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  navLink:        { color: "#610e14", fontFamily: FontNames.MontserratBold, textDecorationLine: "underline" },
-  checkboxRow:    { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 10, paddingHorizontal: 4 },
+  subtitle: {
+    fontSize: 16,
+    color: "#333",
+    marginTop: 2,
+    marginBottom: 10,
+    fontFamily: FontNames.MontserratRegular,
+  },
+  socialRow: { flexDirection: "row", gap: 12, marginBottom: 8 },
+  socialBtn: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#000",
+  },
+  orText: {
+    marginVertical: 8,
+    color: "#444",
+    fontFamily: FontNames.MontserratRegular,
+  },
+  primaryBtn: {
+    minWidth: width * 0.4,
+    height: 48,
+    backgroundColor: "#610e14",
+    borderWidth: 4,
+    borderColor: "#4a0a0f",
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: FontNames.MontserratBold,
+  },
+  secondaryBtn: {
+    minWidth: 200,
+    height: 48,
+    borderWidth: 2,
+    borderColor: "#000",
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.85)",
+  },
+  secondaryBtnText: {
+    color: "#000",
+    fontSize: 16,
+    fontFamily: FontNames.MontserratRegular,
+  },
+  modeRow: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  modeText: { color: "#000", fontFamily: FontNames.MontserratRegular },
+  modeLink: {
+    color: "#610e14",
+    fontFamily: FontNames.MontserratBold,
+    textDecorationLine: "underline",
+  },
+  staticInput: {
+    width: width * 0.6,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderColor: "#000",
+    marginBottom: 6,
+  },
+  staticInputText: {
+    fontSize: 16,
+    color: "#000",
+    fontFamily: FontNames.MontserratRegular,
+  },
+  error: { color: "red", marginTop: 5 },
+  navRow: {
+    width: "100%",
+    marginTop: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  navLink: {
+    color: "#610e14",
+    fontFamily: FontNames.MontserratBold,
+    textDecorationLine: "underline",
+  },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 10,
+    paddingHorizontal: 4,
+  },
 });
 
 const mmStyles = StyleSheet.create({
@@ -1360,8 +1923,7 @@ const mmStyles = StyleSheet.create({
     height: 24,
     tintColor: "#fff",
   },
-  
-  
+
   modalContainer: {
     width: "90%",
     height: height * 0.45,
@@ -1463,4 +2025,3 @@ const mmStyles = StyleSheet.create({
     fontFamily: FontNames.MontserratRegular,
   },
 });
-

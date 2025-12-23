@@ -1,5 +1,11 @@
 // bar-2.tsx
-import React, { useState, useEffect, useRef, useContext } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useContext,
+  useCallback,
+} from "react";
 
 import {
   View,
@@ -22,17 +28,35 @@ import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
 import { firestore, auth } from "../firebase";
-import { getDatabase, ref as rtdbRef, onValue, update as rtdbUpdate } from "firebase/database";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import {
+  getDatabase,
+  ref as rtdbRef,
+  onValue,
+  update as rtdbUpdate,
+} from "firebase/database";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { scale, ScaledSheet } from "react-native-size-matters";
 import { ChatType, SavedChat } from "./ChitChats";
-import closeIcon from '../assets/images/x.png';
-import LottieView from 'lottie-react-native';
-import animationData from '../assets/videos/mm-dancing.json';
-import { Video } from 'expo-av';
+import closeIcon from "../assets/images/x.png";
+import LottieView from "lottie-react-native";
+import animationData from "../assets/videos/mm-dancing.json";
+import { Video } from "expo-av";
 import {
-  doc, setDoc, updateDoc, collection, addDoc, getDocs, getDoc, query, limit, serverTimestamp, arrayUnion, arrayRemove, onSnapshot, orderBy
+  doc,
+  setDoc,
+  updateDoc,
+  collection,
+  addDoc,
+  getDocs,
+  getDoc,
+  query,
+  limit,
+  serverTimestamp,
+  arrayUnion,
+  arrayRemove,
+  onSnapshot,
+  orderBy,
 } from "firebase/firestore";
 import { ProfileContext } from "../contexts/ProfileContext";
 import { useIsFocused } from "@react-navigation/native";
@@ -45,9 +69,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // top of file
 import * as NavigationBar from "expo-navigation-bar";
-
-
-
+import { MusicContext } from "../contexts/MusicContext";
 
 // NEW
 import * as MailComposer from "expo-mail-composer";
@@ -55,6 +77,7 @@ import MMAnimated from "@/services/MMAnimated";
 import { Linking, useWindowDimensions, Platform, Keyboard, TouchableWithoutFeedback } from "react-native";
 import { NavbarContext } from "../contexts/NavbarContext";
 
+import SpeechBubblePop from "@/services/SpeechBubblePop";
 
 const BG_IMG = require("../assets/images/bar-back.png");
 const FRONT_IMG = require("../assets/images/bar-front.png");
@@ -62,22 +85,20 @@ const FRONT_IMG = require("../assets/images/bar-front.png");
 // Use the art’s intrinsic aspect so we can “cover” precisely
 const { width: BGW, height: BGH } = Image.resolveAssetSource(BG_IMG);
 
-const steamboat = require('../assets/videos/steamboatwillie.mp4');
+const steamboat = require("../assets/videos/steamboatwillie.mp4");
 
 const { width, height } = Dimensions.get("window");
-const BUBBLE_HEIGHT = height * 0.18;           // height for the speech bubble
+const BUBBLE_HEIGHT = height * 0.18; // height for the speech bubble
 const START_OFFSET_RATIO = 0.085;
-const SPACING_RATIO      = 0.2;
-const AVATAR_SIZE        = 100;
+const SPACING_RATIO = 0.2;
+const AVATAR_SIZE = 100;
 
 const withoutBg = {
   ...animationData,
   layers: animationData.layers.filter(
-    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+    (layer) => layer.ty !== 1 || layer.nm !== "Dark Blue Solid 1"
   ),
 };
-
-
 
 // Mapping of drink types to icons
 const drinkMapping: Record<string, any> = {
@@ -109,32 +130,50 @@ const WELCOME_MESSAGES = [
   "Hello! I’m Mr. Mingles, how you doin?",
   "Welcome to Dateish!",
   "We're not like other dating apps.",
-  "We don't have a fancy algorithm to match you with your \"perfect match\".",
+  'We don\'t have a fancy algorithm to match you with your "perfect match".',
   "Here you have to talk to people to actually know if you're a good match.",
   "Kinda old school… Go to a bar, talk to several people",
   "And if you like someone, ask for their number!",
   "Remember that shit??",
   "Who will you see? Whoever is in the bar right now! Like REAL life.",
-  "Alright, enough chit chat! Go to the bathroom and make yourself a profile."
+  "Alright, enough chit chat! Go to the bathroom and make yourself a profile.",
+];
+
+const BAR_MM_SPEEACH_BUBBLE = [
+  "Have fun, flirt freely, drink responsibly.",
+  "Talk to some humans! I'm sure they're not all assholes...",
+  "I'm not like all the other bots on dating apps... I promise. :)",
 ];
 
 const LAST_WELCOME_INDEX = WELCOME_MESSAGES.length - 1;
 
 
 export default function Bar2Screen() {
+  // Inside music starts after entrance animation ends
+  const { setBar2Visible } = useContext(MusicContext);
+
+  useFocusEffect(
+    useCallback(() => {
+      setBar2Visible(true);
+      return () => setBar2Visible(false);
+    }, [setBar2Visible])
+  );
+
   const router = useRouter();
-  const params = useLocalSearchParams<{ cameFromEntrance?: string; fromBathroomFirst?: string }>();
-  
+  const params = useLocalSearchParams<{
+    cameFromEntrance?: string;
+    fromBathroomFirst?: string;
+  }>();
+
   const cameFromEntrance =
     params.cameFromEntrance === "true" ||
     params.cameFromEntrance === "1" ||
     params.cameFromEntrance === true;
-  
+
   const fromBathroomFirst =
     params.fromBathroomFirst === "true" ||
     params.fromBathroomFirst === "1" ||
     params.fromBathroomFirst === true;
-  
 
   const { profileComplete } = useContext(ProfileContext);
   
@@ -149,57 +188,50 @@ export default function Bar2Screen() {
   const { width: sw, height: sh } = useWindowDimensions();
   const shortSide = Math.min(sw, sh);
 
-// Small screens: reduce front height fraction
-const FRONT_HEIGHT_FRAC =
-  shortSide < 360 ? 0.54 :   // very small (your 4.65")
-  shortSide < 400 ? 0.58 :   // small/compact
-  0.64;                      // normal/tall
+  // Small screens: reduce front height fraction
+  const FRONT_HEIGHT_FRAC =
+    shortSide < 360
+      ? 0.54 // very small (your 4.65")
+      : shortSide < 400
+      ? 0.58 // small/compact
+      : 0.64; // normal/tall
 
   //const [stageH, setStageH] = useState<number | null>(null); // exact visible height above navbar
   const containerW = sw;
-  
+
   //const visibleH   = stageH ?? (sh - 72); // fallback until we measure navbar
   const [navHeight, setNavHeight] = useState(0);
   const insets = useSafeAreaInsets();
-// Safe, device-correct visible area above the navbar (or full height if no navbar)
-const [topNavH, setTopNavH] = useState(0); // fixed navbar height
-
-const [stageH, setStageH] = useState<number | null>(null);
-const hasBottomBar = !!profileComplete;
-const baseStageH = Math.max(0, sh - topNavH);
-const visibleH = baseStageH + (hasBottomBar ? 0 : insets.bottom);
-
-const effectiveH = stageH ?? Math.max(0, sh - topNavH - (profileComplete ? navHeight : 0));
+  // Safe, device-correct visible area above the navbar (or full height if no navbar)
+  const [topNavH, setTopNavH] = useState(0); // fixed navbar height
 
 const { setShowWcButton } = useContext(NavbarContext);
 
 
+  const [stageH, setStageH] = useState<number | null>(null);
+  const hasBottomBar = !!profileComplete;
+  const baseStageH = Math.max(0, sh - topNavH);
+  const visibleH = baseStageH + (hasBottomBar ? 0 : insets.bottom);
 
-
-  
+  const effectiveH =
+    stageH ?? Math.max(0, sh - topNavH - (profileComplete ? navHeight : 0));
 
   // COVER the available area with bg art
   const scaleArt = containerW / BGW;
   const dispW = containerW;
   const dispH = BGH * scaleArt;
-  
-  const offsetX = 0;    // no side gaps
-  const offsetY = 0; 
 
+  const offsetX = 0; // no side gaps
+  const offsetY = 0;
 
+  const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
 
-
-const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
-
-
-
-// --- Avatars row placement (relative to FRONT image) ---
-  
+  // --- Avatars row placement (relative to FRONT image) ---
 
   // ---- Start button geometry (relative to FRONT image) ----
-  const BTN_W_FRAC = 0.90;           // 90% of visible art width
-  const BTN_H_FRAC = 0.085;          // ~8.5% of visible art height
-  const desiredBottomGap = (hasBottomBar ? insets.bottom + 16 : 24);
+  const BTN_W_FRAC = 0.9; // 90% of visible art width
+  const BTN_H_FRAC = 0.085; // ~8.5% of visible art height
+  const desiredBottomGap = hasBottomBar ? insets.bottom + 16 : 24;
 
   const btnW = Math.round(dispW * BTN_W_FRAC);
   const btnH = Math.round(Math.max(56, Math.min(76, dispH * BTN_H_FRAC))); // clamp for tiny/huge screens
@@ -212,90 +244,111 @@ const START_BUTTON_EXTRA_RAISE = 0; // tweak to taste
   );
 
   const MINGLES_IMG = require("../assets/images/mr-mingles.png");
-  const { width: MINGLES_W, height: MINGLES_H } = Image.resolveAssetSource(MINGLES_IMG);
+  const { width: MINGLES_W, height: MINGLES_H } =
+    Image.resolveAssetSource(MINGLES_IMG);
   const MINGLES_AR = MINGLES_W / MINGLES_H;
 
-// Get FRONT aspect ratio
-const { width: FRONT_W, height: FRONT_H } = Image.resolveAssetSource(FRONT_IMG);
-const FRONT_AR = FRONT_W / FRONT_H;
+  // Get FRONT aspect ratio
+  const { width: FRONT_W, height: FRONT_H } =
+    Image.resolveAssetSource(FRONT_IMG);
+  const FRONT_AR = FRONT_W / FRONT_H;
 
-// Use the actual stage height once measured; fall back to computed visible area
-const stageAvailH = (stageH ?? effectiveH);
+  // Use the actual stage height once measured; fall back to computed visible area
+  const stageAvailH = stageH ?? effectiveH;
 
-// Allow the bar to be bigger (so it feels “taller”) on mainstream tall phones
-const MAX_FRONT_FRAC =
-  shortSide < 380 ? 0.56 :   // tiniest phones: still visible but not huge
-  shortSide < 400 ? 0.62 :   // compact phones
-                      0.70;  // normal/tall phones → taller bar
+  // Allow the bar to be bigger (so it feels “taller”) on mainstream tall phones
+  const MAX_FRONT_FRAC =
+    shortSide < 380
+      ? 0.56 // tiniest phones: still visible but not huge
+      : shortSide < 400
+      ? 0.62 // compact phones
+      : 0.7; // normal/tall phones → taller bar
 
-// Also enforce a floor so it's never “invisible” on very small screens
-const MIN_FRONT_FRAC =
-  shortSide < 360 ? 0.32 :   // tiny phones: guarantee presence
-  shortSide < 400 ? 0.30 :
-                      0.28;
+  // Also enforce a floor so it's never “invisible” on very small screens
+  const MIN_FRONT_FRAC =
+    shortSide < 360
+      ? 0.32 // tiny phones: guarantee presence
+      : shortSide < 400
+      ? 0.3
+      : 0.28;
 
-// First try: make it full-width so it touches left/right edges
-const baseFrontWidth  = dispW;
-const baseFrontHeight = baseFrontWidth / FRONT_AR;
+  // First try: make it full-width so it touches left/right edges
+  const baseFrontWidth = dispW;
+  const baseFrontHeight = baseFrontWidth / FRONT_AR;
 
-// Clamp height between min and max fractions of the stage (not the bg art)
-const frontMaxH = stageAvailH * MAX_FRONT_FRAC;
-const frontMinH = stageAvailH * MIN_FRONT_FRAC;
-const clampedHeight = Math.max(frontMinH, Math.min(baseFrontHeight, frontMaxH));
+  // Clamp height between min and max fractions of the stage (not the bg art)
+  const frontMaxH = stageAvailH * MAX_FRONT_FRAC;
+  const frontMinH = stageAvailH * MIN_FRONT_FRAC;
+  const clampedHeight = Math.max(
+    frontMinH,
+    Math.min(baseFrontHeight, frontMaxH)
+  );
 
-// If clamped down, width must preserve aspect
-const frontWidth  = dispW;              // edge-to-edge
-const frontHeight = dispW / FRONT_AR;   // preserve aspect
+  // If clamped down, width must preserve aspect
+  const frontWidth = dispW; // edge-to-edge
+  const frontHeight = dispW / FRONT_AR; // preserve aspect
 
-// If we didn’t clamp, width==dispW and we hit both edges.
-// If we did clamp (on tiny phones), width < dispW; center it.
-const frontLeft = offsetX
+  // If we didn’t clamp, width==dispW and we hit both edges.
+  // If we did clamp (on tiny phones), width < dispW; center it.
+  const frontLeft = offsetX;
 
-// Anchor to the **bottom of the stage**, not the bottom of the bg art,
-// so it never “floats” off-screen on short devices.
-const FRONT_Y_NUDGE_PX = 120;
-const frontTop = (stageAvailH - frontHeight) + FRONT_Y_NUDGE_PX;
+  // Anchor to the **bottom of the stage**, not the bottom of the bg art,
+  // so it never “floats” off-screen on short devices.
+  const FRONT_Y_NUDGE_PX = 120;
+  const frontTop = stageAvailH - frontHeight + FRONT_Y_NUDGE_PX;
 
-const STOOLS_ROW_Y_FRAC = 0.45; 
-  const STOOLS_ROW_NUDGE_PX = 16;   
+  const STOOLS_ROW_Y_FRAC = 0.45;
+  const STOOLS_ROW_NUDGE_PX = 16;
 
-  const AVATAR_SIZE_PCT_OF_FRONT = 0.18;   
-  const AVATAR_GAP_FRAC_OF_WIDTH = 0.12;   
+  const AVATAR_SIZE_PCT_OF_FRONT = 0.18;
+  const AVATAR_GAP_FRAC_OF_WIDTH = 0.12;
 
   const AVATAR_SIZE_PX = Math.round(frontHeight * AVATAR_SIZE_PCT_OF_FRONT);
-  const AVATAR_GAP_PX  = dispW * AVATAR_GAP_FRAC_OF_WIDTH;
+  const AVATAR_GAP_PX = dispW * AVATAR_GAP_FRAC_OF_WIDTH;
 
   // helpers in art space
   const rect = (x: number, y: number, w: number, h: number, extra?: any) => ({
     position: "absolute" as const,
-    left:  offsetX + x * dispW,
-    top:   offsetY + y * dispH,
+    left: offsetX + x * dispW,
+    top: offsetY + y * dispH,
     width: w * dispW,
-    height:h * dispH,
+    height: h * dispH,
     ...(extra || {}),
   });
 
-  
-
   // --- “TV” box (fractions from your original code)
   const TV = {
-    x: 0.525, y: 0.163, w: 0.28, h: 0.11
+    x: 0.525,
+    y: 0.163,
+    w: 0.28,
+    h: 0.11,
   };
 
   // --- onboarding / welcome state
   const [welcomeIndex, setWelcomeIndex] = useState(0);
   const [welcomeDisplayed, setWelcomeDisplayed] = useState("");
   const [welcomeTyping, setWelcomeTyping] = useState(true);
-  const [pointerTarget, setPointerTarget] = useState<'mingles'|'bathroom'|null>(null);
-  const [minglesFrame, setMinglesFrame] = useState<{x:number,y:number,width:number,height:number} | null>(null);
-  const [minglesBox, setMinglesBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
-  
+  const [pointerTarget, setPointerTarget] = useState<
+    "mingles" | "bathroom" | null
+  >(null);
+  const [minglesFrame, setMinglesFrame] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [minglesBox, setMinglesBox] = useState({
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+  });
 
   // pre-start bubble (blank) visibility
-  const [bubbleVisible, setBubbleVisible] = useState(false);
+  const [bubbleVisible, setBubbleVisible] = useState(true);
 
   // slide-in for the avatars row
-  const avatarsX = useRef(new Animated.Value(width)).current;   // start off-screen right
+  const avatarsX = useRef(new Animated.Value(width)).current; // start off-screen right
   const avatarsOpacity = useRef(new Animated.Value(0)).current; // fade in
 
   const isFocused = useIsFocused();
@@ -303,85 +356,95 @@ const STOOLS_ROW_Y_FRAC = 0.45;
   const { triggerSpend } = useContext(MoneysContext);
 
   const aspect = sh / sw;
-  const M_W = shortSide < 380 ? 0.50 : shortSide < 400 ? 0.50 : 0.52;
-  const M_H = shortSide < 380 ? 0.50 : shortSide < 400 ? 0.63 : 0.66;
-  
-  
+  const M_W = shortSide < 380 ? 0.5 : shortSide < 400 ? 0.5 : 0.52;
+  const M_H = shortSide < 380 ? 0.5 : shortSide < 400 ? 0.63 : 0.66;
+
   // lower him a bit everywhere
   const minglesY =
-    shortSide < 380 ? 0.12 : shortSide < 400 ? 0.2 :
-    aspect > 2.05 ?   0.225 :
-                      0.215;
-  
+    shortSide < 380
+      ? 0.12
+      : shortSide < 400
+      ? 0.2
+      : aspect > 2.05
+      ? 0.225
+      : 0.215;
+
   const MINGLES_PRE = { x: 0.23, y: minglesY, w: M_W, h: M_H };
 
   const pointerNudgeY = (() => {
     // Move pointer UP a bit on smaller device
-    if (shortSide < 380) return -104;              // very small
-    if (shortSide < 400) return -14;              // small/compact
-    return 0;                                     // normal/tall → no change
+    if (shortSide < 380) return -104; // very small
+    if (shortSide < 400) return -14; // small/compact
+    return 0; // normal/tall → no change
   })();
 
-// choose a safe bubble height
-const bubbleH = Math.min(Math.round(dispH * 0.18), 140); // max ~140px
+  // choose a safe bubble height
+  const bubbleH = Math.min(Math.round(dispH * 0.18), 140); // max ~140px
 
-// Build rects *inside* the FRONT image (x,y,w,h are 0..1 in FRONT coords)
-const rectInFront = (
-  x: number, y: number, w: number, h: number, extra?: any
-) => ({
-  position: "absolute" as const,
-  left:  frontLeft + x * frontWidth,
-  top:   frontTop  + y * frontHeight,
-  width: w * frontWidth,
-  height:h * frontHeight,
-  ...(extra || {}),
-});
+  // Build rects *inside* the FRONT image (x,y,w,h are 0..1 in FRONT coords)
+  const rectInFront = (
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    extra?: any
+  ) => ({
+    position: "absolute" as const,
+    left: frontLeft + x * frontWidth,
+    top: frontTop + y * frontHeight,
+    width: w * frontWidth,
+    height: h * frontHeight,
+    ...(extra || {}),
+  });
 
-// FRONT-anchored placement for Mr. Mingles
-// Slightly lower on *very* small devices so he doesn't clip
-const minglesFrontY =
-  shortSide < 380 ? 0.06 :   // very small
-  shortSide < 400 ? -0.00 :   // compact
-                     -0.02;   // normal/tall
+  // FRONT-anchored placement for Mr. Mingles
+  // Slightly lower on *very* small devices so he doesn't clip
+  const minglesFrontY =
+    shortSide < 380
+      ? 0.06 // very small
+      : shortSide < 400
+      ? -0.0 // compact
+      : -0.02; // normal/tall
 
-// Width/height as a fraction of FRONT; tweak to taste
-const MINGLES_F = { x: 0.18, y: minglesFrontY, w: 0.68, h: 0.95 };
+  // Width/height as a fraction of FRONT; tweak to taste
+  const MINGLES_F = { x: 0.18, y: minglesFrontY, w: 0.68, h: 0.95 };
 
-// Hit area independent of the image (same FRONT-anchored logic).
-// Tweak these if you want the tappable box tighter/looser than the art.
-const MINGLES_TAP = {
-  x: MINGLES_F.x + 0.02,
-  y: MINGLES_F.y + 0.06,
-  w: MINGLES_F.w * 0.96,
-  h: MINGLES_F.h * 0.72,
-};
+  // Hit area independent of the image (same FRONT-anchored logic).
+  // Tweak these if you want the tappable box tighter/looser than the art.
+  const MINGLES_TAP = {
+    x: MINGLES_F.x + 0.02,
+    y: MINGLES_F.y + 0.06,
+    w: MINGLES_F.w * 0.96,
+    h: MINGLES_F.h * 0.72,
+  };
 
-// Handy pixel helpers for pointer placement derived from FRONT coords
-const toPxLeft = (xf: number) => frontLeft + xf * frontWidth;
-const toPxTop  = (yf: number) => frontTop  + yf * frontHeight;
+  // Handy pixel helpers for pointer placement derived from FRONT coords
+  const toPxLeft = (xf: number) => frontLeft + xf * frontWidth;
+  const toPxTop = (yf: number) => frontTop + yf * frontHeight;
 
-// How much to raise the background art (in px; tweak to taste)
-const BAR_BACK_SHIFT = 60;
+  // How much to raise the background art (in px; tweak to taste)
+  const BAR_BACK_SHIFT = 60;
 
-const rectOnBack = (
-  x: number, y: number, w: number, h: number, extra?: any
-) => ({
-  position: "absolute" as const,
-  left:  offsetX + x * dispW,
-  top:   (offsetY - BAR_BACK_SHIFT) + y * dispH, // 👈 match the raised BG
-  width: w * dispW,
-  height:h * dispH,
-  ...(extra || {}),
-});
+  const rectOnBack = (
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    extra?: any
+  ) => ({
+    position: "absolute" as const,
+    left: offsetX + x * dispW,
+    top: offsetY - BAR_BACK_SHIFT + y * dispH, // 👈 match the raised BG
+    width: w * dispW,
+    height: h * dispH,
+    ...(extra || {}),
+  });
 
+  const skipOpacity = useRef(new Animated.Value(0)).current;
+  const pointerOpacity = useRef(new Animated.Value(0)).current;
 
-
-
-
-
-// toast for “message sent / Chit Chat Sent”
-const [toastText, setToastText] = useState<string | null>(null);
-
+  // toast for “message sent / Chit Chat Sent”
+  const [toastText, setToastText] = useState<string | null>(null);
 
 
   // “don’t be a creep” popup
@@ -424,6 +487,8 @@ const [toastText, setToastText] = useState<string | null>(null);
   return () => setShowWcButton(false);
 }, [profileComplete, cameFromEntrance, welcomeIndex, welcomeTyping, setShowWcButton]);
 
+  //MM speech bubble texts
+  const [mmBubbleIndex, setMmBubbleIndex] = useState(0);
 
   // Automatically mark user "in the bar" when they come from the Entrance
   useEffect(() => {
@@ -443,11 +508,10 @@ const [toastText, setToastText] = useState<string | null>(null);
     }
   }, [cameFromEntrance, auth.currentUser?.uid]);
 
-
   useEffect(() => {
     if (!auth.currentUser) return;
     const myRef = doc(firestore, "users", auth.currentUser.uid);
-    const unsub = onSnapshot(myRef, async snap => {
+    const unsub = onSnapshot(myRef, async (snap) => {
       const data: any = snap.data() || {};
       const ids: string[] = Array.isArray(data.blocked) ? data.blocked : [];
       setBlockedIds(ids);
@@ -473,15 +537,26 @@ const [toastText, setToastText] = useState<string | null>(null);
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 700,
+          useNativeDriver: true,
+        }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, [pointerTarget]);
 
-  const pointerScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
+  const pointerScale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.15],
+  });
 
   // welcome pointer logic
   useEffect(() => {
@@ -489,9 +564,9 @@ const [toastText, setToastText] = useState<string | null>(null);
     if (welcomeTyping) return;
 
     if (welcomeIndex === 0) {
-      setPointerTarget('mingles');
+      setPointerTarget("mingles");
     } else if (welcomeIndex === LAST_WELCOME_INDEX) {
-      setPointerTarget('bathroom');
+      setPointerTarget("bathroom");
     } else {
       setPointerTarget(null);
     }
@@ -563,10 +638,7 @@ const [toastText, setToastText] = useState<string | null>(null);
     };
   }, [isFocused, cameFromEntrance, fromBathroomFirst]);
 
-
-
-
-    useEffect(() => {
+  useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
       if (!u) {
         await AsyncStorage.removeItem("bar2HasEverStarted");
@@ -577,8 +649,6 @@ const [toastText, setToastText] = useState<string | null>(null);
     });
     return () => unsub();
   }, []);
-
-  
 
   // welcome typing effect
   useEffect(() => {
@@ -612,8 +682,32 @@ const [toastText, setToastText] = useState<string | null>(null);
     setWelcomeIndex(LAST_WELCOME_INDEX);
     setWelcomeTyping(false);
     setWelcomeDisplayed(finalMsg);
-    setPointerTarget('bathroom');
+    setPointerTarget("bathroom");
   };
+
+  // skip button fade-in
+  useEffect(() => {
+    if (!profileComplete && cameFromEntrance) {
+      Animated.timing(skipOpacity, {
+        toValue: 1,
+        duration: 600, // fade-in duration
+        delay: 2000, // wait 2 seconds
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [profileComplete, cameFromEntrance]);
+
+  // skip button fade-in
+  useEffect(() => {
+    if (!profileComplete && cameFromEntrance) {
+      Animated.timing(pointerOpacity, {
+        toValue: 1,
+        duration: 600, // fade-in duration
+        delay: 1200, // wait 2 seconds
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [profileComplete, cameFromEntrance]);
 
   // Existing chat bar state
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -621,8 +715,6 @@ const [toastText, setToastText] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
-
-
 
   // start state
   const [started, setStarted] = useState(false);
@@ -634,26 +726,38 @@ const [toastText, setToastText] = useState<string | null>(null);
   const [showDrinkSpeech, setShowDrinkSpeech] = useState(false);
 
   // new chats
-  const [firstMessageModalVisible, setFirstMessageModalVisible] = useState(false);
+  const [firstMessageModalVisible, setFirstMessageModalVisible] =
+    useState(false);
   const [firstMessageText, setFirstMessageText] = useState("");
   const [sendingFirstMessage, setSendingFirstMessage] = useState(false);
 
   // chitchats modal
   const [chitChatModalVisible, setChitChatModalVisible] = useState(false);
-  const [ccStep, setCcStep] = useState<'choose'|'show'>('choose');
-  const [selectedCc, setSelectedCc] = useState<SavedChat|null>(null);
-  const [replyText, setReplyText] = useState('');
+  const [ccStep, setCcStep] = useState<"choose" | "show">("choose");
+  const [selectedCc, setSelectedCc] = useState<SavedChat | null>(null);
+  const [replyText, setReplyText] = useState("");
 
   const videoRef = useRef<Video>(null);
   const [tvOn, setTvOn] = useState(false);
 
-  const [deletionFlag, setDeletionFlag] = useState<'you'|'them'|null>(null); // who deleted
+  const [deletionFlag, setDeletionFlag] = useState<"you" | "them" | null>(null); // who deleted
   const [checkingDeletion, setCheckingDeletion] = useState(false);
   const [hasIncomingOnly, setHasIncomingOnly] = useState(false);
   const [hasTwoWayHistory, setHasTwoWayHistory] = useState(false);
 
 
   const [introPlayed, setIntroPlayed] = useState<boolean>(false);
+
+  //MM bar speech bubble_reset
+  useEffect(() => {
+    if (showStartOverlay) {
+      setMmBubbleIndex(0);
+    }
+  }, [showStartOverlay]);
+
+  const handleMinglesBubbleAdvance = () => {
+    setMmBubbleIndex((prev) => (prev + 1) % BAR_MM_SPEEACH_BUBBLE.length);
+  };
 
   // presence
 
@@ -662,22 +766,24 @@ const [toastText, setToastText] = useState<string | null>(null);
 
     const q = collection(firestore, "users");
 
-    const unsub = onSnapshot(q, (snap) => {
-      const all = snap.docs
-        .filter(d => d.id !== auth.currentUser!.uid)
-        .map(d => ({ id: d.id, ...(d.data() as any) }));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const all = snap.docs
+          .filter((d) => d.id !== auth.currentUser!.uid)
+          .map((d) => ({ id: d.id, ...(d.data() as any) }));
 
-      setProfiles(all);
-      setLoading(false);
-    }, (err) => {
-      console.error(err);
-      setLoading(false);
-    });
+        setProfiles(all);
+        setLoading(false);
+      },
+      (err) => {
+        console.error(err);
+        setLoading(false);
+      }
+    );
 
     return () => unsub();
   }, [auth.currentUser?.uid]);
-
-
 
   useEffect(() => {
     let alive = true;
@@ -692,34 +798,36 @@ const [toastText, setToastText] = useState<string | null>(null);
         if (!played) await AsyncStorage.setItem("bar2IntroPlayed", "true");
       } catch {}
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
     if (!videoRef.current) return;
-    if (started && tvOn) {
-      videoRef.current.playAsync().catch(() => {});
-    } else {
-      videoRef.current.pauseAsync().catch(() => {});
-    }
-  }, [tvOn, started]);
+    // if (started && tvOn) {
+    videoRef.current.playAsync().catch(() => {});
+    // } else {
+    //   videoRef.current.pauseAsync().catch(() => {});
+    // }
+  }, []);
 
-  const toggleTV = () => setTvOn(prev => !prev);
+  const toggleTV = () => setTvOn((prev) => !prev);
 
   useEffect(() => {
     if (started && videoRef.current) {
-      videoRef.current.playAsync().catch(console.warn)
+      videoRef.current.playAsync().catch(console.warn);
     }
-  }, [started])
+  }, [started]);
 
   // mapping ChatType → human label
   const chatLabelMap: Record<ChatType, string> = {
-    'what-happened':     'What Happened Next?',
-    'if-you-were-me':    'If You Were Me',
-    'complete-poem':     'Complete a Poem',
-    'unpopular-opinion': 'Unpopular Opinion',
-    'dont-usually-ask':  'I Don’t Usually Ask That',
-    'emoji-story':       'Emoji To Story',
+    "what-happened": "What Happened Next?",
+    "if-you-were-me": "If You Were Me",
+    "complete-poem": "Complete a Poem",
+    "unpopular-opinion": "Unpopular Opinion",
+    "dont-usually-ask": "I Don’t Usually Ask That",
+    "emoji-story": "Emoji To Story",
   };
 
   // 1) fetch all other users
@@ -728,8 +836,8 @@ const [toastText, setToastText] = useState<string | null>(null);
       try {
         const snap = await getDocs(collection(firestore, "users"));
         const all = snap.docs
-          .filter(d => auth.currentUser && d.id !== auth.currentUser.uid)
-          .map(d => ({ id: d.id, ...(d.data() as any) }));
+          .filter((d) => auth.currentUser && d.id !== auth.currentUser.uid)
+          .map((d) => ({ id: d.id, ...(d.data() as any) }));
         setProfiles(all);
       } catch (e) {
         console.error(e);
@@ -800,7 +908,6 @@ const [toastText, setToastText] = useState<string | null>(null);
     return () => unsub.forEach((u) => u());
   }, [profiles]);
 
-
   // When the profile modal opens, figure out deletion + whether they already messaged you
   useEffect(() => {
     let alive = true;
@@ -823,17 +930,19 @@ const [toastText, setToastText] = useState<string | null>(null);
         const chatRef = doc(firestore, "chats", chatId);
         const snap = await getDoc(chatRef);
 
-        let localDeletion: 'you' | 'them' | null = null;
+        let localDeletion: "you" | "them" | null = null;
         let incomingOnly = false;
 
         if (snap.exists()) {
           const data: any = snap.data();
-          const vf: string[] = Array.isArray(data?.visibleFor) ? data.visibleFor : [];
+          const vf: string[] = Array.isArray(data?.visibleFor)
+            ? data.visibleFor
+            : [];
 
           if (!vf.includes(partnerId)) {
-            localDeletion = 'them';
+            localDeletion = "them";
           } else if (!vf.includes(currentUid)) {
-            localDeletion = 'you';
+            localDeletion = "you";
           }
 
           // Only bother checking messages if the chat exists
@@ -872,7 +981,7 @@ const [toastText, setToastText] = useState<string | null>(null);
 
         setDeletionFlag(localDeletion);
         // If they deleted the chat, we want the “deleted” UX to win, not “incoming”
-        setHasIncomingOnly(incomingOnly && localDeletion !== 'them');
+        setHasIncomingOnly(incomingOnly && localDeletion !== "them");
       } catch (e: any) {
         if (e?.code === "permission-denied") {
           if (alive) {
@@ -923,15 +1032,17 @@ const [toastText, setToastText] = useState<string | null>(null);
   const messagingBlocked = deletedByYou;
 
   // If this profile goes offline while their card is open
-  const isSelectedOffline =
-  !!(selectedProfile && onlineStatus[selectedProfile.id] === false);
-
+  const isSelectedOffline = !!(
+    selectedProfile && onlineStatus[selectedProfile.id] === false
+  );
 
   const myUid = auth.currentUser?.uid;
-  const filtered = profiles.filter(p => {
-    const theyBlockedMe = Array.isArray(p.blocked) && myUid ? p.blocked.includes(myUid) : false;
-    const iBlockedThem  = blockedIds.includes(p.id);
-    const isReady = p.profileComplete === true || (!!p.name && p.name.length > 0);
+  const filtered = profiles.filter((p) => {
+    const theyBlockedMe =
+      Array.isArray(p.blocked) && myUid ? p.blocked.includes(myUid) : false;
+    const iBlockedThem = blockedIds.includes(p.id);
+    const isReady =
+      p.profileComplete === true || (!!p.name && p.name.length > 0);
 
     return onlineStatus[p.id] && !theyBlockedMe && !iBlockedThem && isReady;
   });
@@ -972,9 +1083,10 @@ const [toastText, setToastText] = useState<string | null>(null);
   }, [shouldAnimateAvatars, width]);
 
   // Prepare drink data for selected profile
-  const profileDrink = typeof selectedProfile?.drink === "string"
-    ? selectedProfile.drink.toLowerCase()
-    : "water";
+  const profileDrink =
+    typeof selectedProfile?.drink === "string"
+      ? selectedProfile.drink.toLowerCase()
+      : "water";
   const drinkIcon = drinkMapping[profileDrink] || drinkMapping["water"];
   const isWater = profileDrink === "water";
   const drinkWidth = isWater ? scale(35) : scale(50);
@@ -985,14 +1097,12 @@ const [toastText, setToastText] = useState<string | null>(null);
   //const buttonBottomGap = navHeightGuess + 90; // ~20px above navbar
   useEffect(() => {
     if (Platform.OS !== "android") return;
-  
+
     // Let content extend under the nav and match its color to the scene
     NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => {});
     NavigationBar.setBackgroundColorAsync("#592540").catch(() => {});
     NavigationBar.setButtonStyleAsync("light").catch(() => {});
   }, [profileComplete]);
-  
-
 
   const startOffsetPx = width * START_OFFSET_RATIO;
 
@@ -1005,21 +1115,20 @@ const [toastText, setToastText] = useState<string | null>(null);
 
   const buttonContainerStyle = [
     styles.bottomButtons,
-    (showChatButton !== showChitChatButton)
+    showChatButton !== showChitChatButton
       ? { justifyContent: "center" }
       : { justifyContent: "space-around" },
   ];
 
- const openFirstMessageModal = () => {
-  // Keep the profile modal visible behind
-  setFirstMessageModalVisible(true);
-};
-
+  const openFirstMessageModal = () => {
+    // Keep the profile modal visible behind
+    setFirstMessageModalVisible(true);
+  };
 
   const openChitChatModal = () => {
-    setCcStep('choose');
+    setCcStep("choose");
     setSelectedCc(null);
-    setReplyText('');
+    setReplyText("");
     setModalVisible(false);
     setTimeout(() => setChitChatModalVisible(true), 50);
   };
@@ -1027,31 +1136,27 @@ const [toastText, setToastText] = useState<string | null>(null);
   async function blockUser(uidToBlock: string) {
     if (!auth.currentUser) return;
 
-    Alert.alert(
-      "Block user?",
-      "They will be hidden and cannot contact you.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Block",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await updateDoc(doc(firestore, "users", auth.currentUser.uid), {
-                blocked: arrayUnion(uidToBlock),
-              });
-              setModalVisible(false);
-              setSafetyOpen(false);
-              Alert.alert("Done", "User is now blocked and hidden.");
-              setProfiles(prev => prev.filter(p => p.id !== uidToBlock));
-            } catch (e) {
-              console.error(e);
-              Alert.alert("Error", "Could not block user. Try again.");
-            }
+    Alert.alert("Block user?", "They will be hidden and cannot contact you.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Block",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await updateDoc(doc(firestore, "users", auth.currentUser.uid), {
+              blocked: arrayUnion(uidToBlock),
+            });
+            setModalVisible(false);
+            setSafetyOpen(false);
+            Alert.alert("Done", "User is now blocked and hidden.");
+            setProfiles((prev) => prev.filter((p) => p.id !== uidToBlock));
+          } catch (e) {
+            console.error(e);
+            Alert.alert("Error", "Could not block user. Try again.");
           }
-        }
-      ]
-    );
+        },
+      },
+    ]);
   }
 
   async function unblockUser(uidToUnblock: string) {
@@ -1060,8 +1165,8 @@ const [toastText, setToastText] = useState<string | null>(null);
       await updateDoc(doc(firestore, "users", auth.currentUser.uid), {
         blocked: arrayRemove(uidToUnblock),
       });
-      setBlockedIds(b => b.filter(id => id !== uidToUnblock));
-      setBlockedUsers(u => u.filter(u2 => u2.id !== uidToUnblock));
+      setBlockedIds((b) => b.filter((id) => id !== uidToUnblock));
+      setBlockedUsers((u) => u.filter((u2) => u2.id !== uidToUnblock));
     } catch (e) {
       console.error(e);
       Alert.alert("Error", "Could not unblock. Try again.");
@@ -1184,7 +1289,9 @@ const [toastText, setToastText] = useState<string | null>(null);
   async function sendReportEmail() {
     try {
       setSendingReport(true);
-      const subject = `Dateish report — ${reportReason || "No reason selected"}`;
+      const subject = `Dateish report — ${
+        reportReason || "No reason selected"
+      }`;
       const body = buildReportEmailBody();
 
       const can = await MailComposer.isAvailableAsync();
@@ -1195,7 +1302,9 @@ const [toastText, setToastText] = useState<string | null>(null);
           body,
         });
       } else {
-        const mailto = `mailto:dateish.office@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        const mailto = `mailto:dateish.office@gmail.com?subject=${encodeURIComponent(
+          subject
+        )}&body=${encodeURIComponent(body)}`;
         Linking.openURL(mailto);
       }
 
@@ -1204,20 +1313,18 @@ const [toastText, setToastText] = useState<string | null>(null);
       setReportReason(null);
       setReportNotes("");
 
-      Alert.alert(
-        "Thank you for helping to make Dateish safer!",
-        "",
-        [
-          {
-            text: "Email us more details",
-            onPress: () =>
-              Linking.openURL(
-                `mailto:dateish.office@gmail.com?subject=${encodeURIComponent("Dateish report follow-up")}`
-              ),
-          },
-          { text: "Close" },
-        ]
-      );
+      Alert.alert("Thank you for helping to make Dateish safer!", "", [
+        {
+          text: "Email us more details",
+          onPress: () =>
+            Linking.openURL(
+              `mailto:dateish.office@gmail.com?subject=${encodeURIComponent(
+                "Dateish report follow-up"
+              )}`
+            ),
+        },
+        { text: "Close" },
+      ]);
     } finally {
       setSendingReport(false);
     }
@@ -1347,14 +1454,11 @@ const [toastText, setToastText] = useState<string | null>(null);
         });
       }
 
-      await addDoc(
-        collection(firestore, "chats", chatId, "messages"),
-        {
-          text: firstMessageText,
-          sender: currentUserId,
-          createdAt: serverTimestamp(),
-        }
-      );
+      await addDoc(collection(firestore, "chats", chatId, "messages"), {
+        text: firstMessageText,
+        sender: currentUserId,
+        createdAt: serverTimestamp(),
+      });
 
       // Stay in browse – just close modal and show toast
       setFirstMessageText("");
@@ -1371,9 +1475,10 @@ const [toastText, setToastText] = useState<string | null>(null);
     }
   };
 
-    const sendChitChatReply = async (cc: SavedChat) => {
+  const sendChitChatReply = async (cc: SavedChat) => {
     const trimmed = replyText.trim();
-    if (!trimmed || messagingBlocked || !auth.currentUser || !selectedProfile) return;
+    if (!trimmed || messagingBlocked || !auth.currentUser || !selectedProfile)
+      return;
 
     try {
       const currentUserId = auth.currentUser.uid;
@@ -1406,24 +1511,21 @@ const [toastText, setToastText] = useState<string | null>(null);
         });
       }
 
-      await addDoc(
-        collection(firestore, "chats", chatId, "messages"),
-        {
-          text: combined,
-          sender: currentUserId,
-          createdAt: serverTimestamp(),
-          chitChat: {
-            type: cc.type,
-            prompt: cc.content,
-            response: trimmed,
-          },
-        }
-      );
+      await addDoc(collection(firestore, "chats", chatId, "messages"), {
+        text: combined,
+        sender: currentUserId,
+        createdAt: serverTimestamp(),
+        chitChat: {
+          type: cc.type,
+          prompt: cc.content,
+          response: trimmed,
+        },
+      });
 
       // Reset UI, stay in the bar, show toast
-      setReplyText('');
+      setReplyText("");
       setChitChatModalVisible(false);
-      setCcStep('choose');
+      setCcStep("choose");
       setSelectedCc(null);
       setToastText("Chit Chat Sent");
       setTimeout(() => setToastText(null), 2000);
@@ -1432,10 +1534,6 @@ const [toastText, setToastText] = useState<string | null>(null);
       Alert.alert("Error", "Could not send Chit Chat. Please try again.");
     }
   };
-
-
-
-  
 
   // ─────────────────────────── RENDER ───────────────────────────
   return (
@@ -1451,12 +1549,12 @@ const [toastText, setToastText] = useState<string | null>(null);
 
 
       {/* ==== STAGE (locks all layers to the same art space) ==== */}
-      <View 
+      <View
         style={{
           position: "absolute",
           left: 0,
           right: 0,
-          top: topNavH,                         // sits right under Navbar
+          top: topNavH, // sits right under Navbar
           bottom: profileComplete ? navHeight : 0, // when no bottom bar, go to screen bottom
           backgroundColor: "#592540",
           overflow: "hidden",
@@ -1475,30 +1573,44 @@ const [toastText, setToastText] = useState<string | null>(null);
           }}
           resizeMode="stretch"
         />
+
+        {profileComplete && (showStartOverlay || leaving) && (
+          <View
+            style={rectInFront(
+              MINGLES_F.x,
+              MINGLES_F.y,
+              MINGLES_F.w,
+              MINGLES_F.h,
+              { zIndex: 29 }
+            )}
+            onLayout={(e) => setMinglesBox(e.nativeEvent.layout)}
+          >
+            <MMAnimated
+              showBackground={false}
+              showBarFront={false}
+              showControls={false}
+              enterOnMount
+              leaving={leaving}
+              minglesOffsetY={5}
+              onLeaveComplete={() => {
+                setLeaving(false);
+                setShowStartOverlay(false); // ✅ Hide overlay after animation
+
+                setStarted(true);
+              }}
+              onPress={() => {
+                handleMinglesBubbleAdvance();
+              }}
+              style={StyleSheet.absoluteFill}
+            ></MMAnimated>
+          </View>
+        )}
+
         {profileComplete && showStartOverlay && (
-        <>
-          {/* Blank bubble above the stage (same position as onboarding bubble) */}
-          {bubbleVisible && (
-            <View  style={{
-              position: "absolute",
-              left: offsetX + dispW * 0.05,
-              top: 2,                 // 2px under stage top (= under Navbar)
-              width: dispW * 0.90,
-              height: bubbleH,        // ✅ capped height
-              zIndex: 30,
-            }}>
-              <ImageBackground
-                source={require("../assets/images/speech-bubble.png")}
-                style={{ flex: 1 }}
-                resizeMode="stretch"
-              />
-            </View>
-          )}
-          {/* Start Chatting button pinned ~20px above navbar */}
-          <TouchableOpacity
-            style={[
-              styles.startButton,
-              {
+          <>
+            {/* Bubble overlay */}
+            <View
+              style={{
                 position: "absolute",
                 left: btnLeft,
                 top: btnTop - 50,
@@ -1536,106 +1648,210 @@ const [toastText, setToastText] = useState<string | null>(null);
               minimumFontScale={0.6}   // shrink instead of truncating
               ellipsizeMode="clip"     // just in case, don’t show "…"
             >
-              Start Chatting
-            </Text>
-          </TouchableOpacity>
+              <SpeechBubblePop
+                source={require("../assets/images/speech-bubble.png")}
+                visible={bubbleVisible}
+                width={dispW * 0.9}
+                height={dispW * 0.45}
+                delayTime={800}
+                anchor={{ x: 0.5, y: 0 }}
+                onHidden={() => {
+                  setShowStartOverlay(false);
+                }}
+              >
+                <View
+                  style={{
+                    flex: 1,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    paddingHorizontal: 20,
+                  }}
+                >
+                  <Text style={styles.bubbleText}>
+                    {BAR_MM_SPEEACH_BUBBLE[mmBubbleIndex]}
+                  </Text>
+                </View>
+              </SpeechBubblePop>
+            </View>
 
-        </>
-      )}
+            {/* Start Chatting button */}
+            <TouchableOpacity
+              style={[
+                styles.startButton,
+                {
+                  position: "absolute",
+                  left: btnLeft,
+                  top: btnTop - 20,
+                  width: btnW,
+                  height: btnH,
+                  zIndex: 40,
+                },
+              ]}
+              onPress={async () => {
+                // 👇 this is where you trigger the pop-out
+                setBubbleVisible(false);
 
+                setLeaving(true);
+                // setShowStartOverlay(false); // ⬅ if you want to SEE the exit animation,
+                // move this into onHidden instead.
+                try {
+                  const db = getDatabase();
+                  const statusRef = rtdbRef(
+                    db,
+                    `status/${auth.currentUser!.uid}`
+                  );
+                  rtdbUpdate(statusRef, {
+                    online: true,
+                    bar: true,
+                    lastActive: Date.now(),
+                  }).catch(() => {});
+                  await AsyncStorage.setItem("bar2ShowPrompt", "false");
+                } catch {}
+              }}
+            >
+              <Text
+                style={styles.startButtonText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.6}
+                ellipsizeMode="clip"
+              >
+                Start Chatting
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* (WELCOME) Mr. Mingles image (static) + typed bubble only during onboarding */}
         {!profileComplete && cameFromEntrance && (
           <>
             {/* Mr. Mingles (FRONT-anchored) */}
             <View
-              pointerEvents="none"
-              style={rectInFront(MINGLES_F.x, MINGLES_F.y, MINGLES_F.w, MINGLES_F.h, { zIndex: 9 })}
-              onLayout={e => setMinglesBox(e.nativeEvent.layout)}  // ← capture absolute rect for pointers/hitboxes
+              style={rectInFront(
+                MINGLES_F.x,
+                MINGLES_F.y,
+                MINGLES_F.w,
+                MINGLES_F.h,
+                { zIndex: 9 }
+              )}
+              onLayout={(e) => setMinglesBox(e.nativeEvent.layout)} // ← capture absolute rect for pointers/hitboxes
             >
               <MMAnimated
                 showBackground={false}
                 showBarFront={false}
                 showControls={false}
                 enterOnMount
-                leaving={leaving}
-                onLeaveComplete={() => {
-                  setLeaving(false);
-                  setStarted(true);
+                style={StyleSheet.absoluteFillObject}
+                minglesOffsetY={15}
+                onPress={() => {
+                  // 👈 this runs AFTER the internal wiggle is triggered
+                  if (welcomeTyping) {
+                    setWelcomeDisplayed(WELCOME_MESSAGES[welcomeIndex]);
+                    setWelcomeTyping(false);
+                  } else {
+                    setPointerTarget(null);
+                    handleWelcomeAdvance();
+                  }
                 }}
-                style={StyleSheet.absoluteFill}
               />
             </View>
-
-
 
             {/* Speech bubble (typed) */}
             <View
               pointerEvents="none"
               style={{
                 position: "absolute",
-                left: offsetX + dispW * 0.05,        // keep same side margins relative to art width
-                top: 2,                               // 👈 2px under the stage top (stage already sits under Navbar)
-                width: dispW * 0.90,
+                left: offsetX + dispW * 0.05, // keep same side margins relative to art width
+                top: 15, // 👈 2px under the stage top (stage already sits under Navbar)
+                width: dispW * 0.9,
                 height: BUBBLE_HEIGHT,
                 zIndex: 30,
               }}
             >
-              <ImageBackground
+              {/* <ImageBackground
                 source={require("../assets/images/speech-bubble.png")}
                 style={{ flex: 1 }}
                 resizeMode="stretch"
+              > */}
+              <SpeechBubblePop
+                source={require("../assets/images/speech-bubble.png")}
+                visible={true}
+                width={dispW * 0.9}
+                height={dispW * 0.45}
+                delayTime={800}
+                anchor={{ x: 0.5, y: 0 }}
               >
-                <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
+                <View
+                  style={{
+                    flex: 1,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    paddingHorizontal: 20,
+                  }}
+                >
                   <Text style={styles.bubbleText}>{welcomeDisplayed}</Text>
                 </View>
-              </ImageBackground>
+              </SpeechBubblePop>
+              {/* </ImageBackground> */}
             </View>
-
-  
           </>
         )}
-        {!profileComplete && cameFromEntrance && pointerTarget === 'mingles' && (
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              // near face/hand inside the tap box
-              left: toPxLeft(MINGLES_TAP.x + MINGLES_TAP.w * 0.78) - 150,
-              top:  toPxTop (MINGLES_TAP.y + MINGLES_TAP.h * 0.22) + 28,
-              zIndex: 2000,
-              transform: [{ scale: pointerScale }, { rotate: '85deg' }],
-            }}
-          >
-            <MaterialIcons name="pan-tool-alt" size={56} color="#ffe3d0" />
-          </Animated.View>
-        )}
+        {!profileComplete &&
+          cameFromEntrance &&
+          pointerTarget === "mingles" && (
+            <Animated.View
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                // near face/hand inside the tap box
+                left: toPxLeft(MINGLES_TAP.x + MINGLES_TAP.w * 0.78) - 150,
+                top: toPxTop(MINGLES_TAP.y + MINGLES_TAP.h * 0.22) - 30,
+                zIndex: 2000,
+                transform: [{ scale: pointerScale }, { rotate: "85deg" }],
+                opacity: pointerOpacity,
+              }}
+            >
+              <MaterialIcons name="pan-tool-alt" size={56} color="#ffe3d0" />
+            </Animated.View>
+          )}
 
-        {!profileComplete && cameFromEntrance && pointerTarget === 'bathroom' && (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.pointerBase,
-              styles.pointerBathroom,
-              { transform: [{ scale: pointerScale }, { rotate: '10deg' }], zIndex: 999 },
-            ]}
-          >
-            <MaterialIcons name="pan-tool-alt" size={56} color="#ffe3d0" />
-          </Animated.View>
-        )}
+        {!profileComplete &&
+          cameFromEntrance &&
+          pointerTarget === "bathroom" && (
+            <View style={{ flex: 1, zIndex: 998 }}>
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.pointerBase,
+                  styles.pointerBathroom,
+                  {
+                    transform: [{ scale: pointerScale }, { rotate: "10deg" }],
+                    zIndex: 999,
+                  },
+                ]}
+              >
+                <MaterialIcons name="pan-tool-alt" size={56} color="#ffe3d0" />
+              </Animated.View>
+            </View>
+          )}
 
         {/* TV */}
-        {profileComplete && started && (
+        {profileComplete && (
           <Pressable
             onPress={toggleTV}
-            style={[{zIndex: 1000}, rectOnBack(TV.x, TV.y, TV.w, TV.h, { top: (offsetY - 48) + TV.y * dispH })]}
+            style={[
+              { zIndex: 28 }, // behind speech
+              rectOnBack(TV.x, TV.y, TV.w, TV.h, {
+                top: offsetY - 48 + TV.y * dispH,
+              }),
+            ]}
             accessibilityRole="button"
             accessibilityLabel={tvOn ? "Turn TV off" : "Turn TV on"}
           >
             <Video
               ref={videoRef}
               source={steamboat}
-              style={StyleSheet.absoluteFill}
+              style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
               resizeMode="cover"
               isLooping
               shouldPlay={started && tvOn}
@@ -1643,13 +1859,27 @@ const [toastText, setToastText] = useState<string | null>(null);
               isMuted
             />
             {!tvOn && (
-              <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: "black", justifyContent: "center", alignItems: "center" }}>
-                <Text style={{ color: "#ffe3d0", fontFamily: FontNames.MontserratRegular }}>—</Text>
+              <View
+                style={{
+                  ...StyleSheet.absoluteFillObject,
+                  backgroundColor: "rgba(16, 16, 16, 1)",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  borderRadius: 12,
+                }}
+              >
+                {/* <Text
+                  style={{
+                    color: "#ffe3d0",
+                    fontFamily: FontNames.MontserratRegular,
+                  }}
+                >
+                  —
+                </Text> */}
               </View>
             )}
           </Pressable>
         )}
-
 
         {/* ONLINE ROW — anchored over stools */}
         {profileComplete && started && onlineProfiles.length > 0 && (
@@ -1660,22 +1890,28 @@ const [toastText, setToastText] = useState<string | null>(null);
                 left: offsetX - 8.2,
                 width: dispW,
                 // Y is: top of FRONT + fraction of FRONT height, plus tiny pixel nudge
-                top: frontTop + frontHeight * STOOLS_ROW_Y_FRAC + STOOLS_ROW_NUDGE_PX,
-                zIndex: 25,
-                height: AVATAR_SIZE_PX,     // keeps touch targets tidy
+                top:
+                  frontTop +
+                  frontHeight * STOOLS_ROW_Y_FRAC +
+                  STOOLS_ROW_NUDGE_PX,
+                zIndex: 31,
+                height: AVATAR_SIZE_PX, // keeps touch targets tidy
                 justifyContent: "center",
               },
-              { transform: [{ translateX: avatarsX }], opacity: avatarsOpacity },
+              {
+                transform: [{ translateX: avatarsX }],
+                opacity: avatarsOpacity,
+              },
             ]}
           >
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{
-                paddingLeft: dispW * 0.085,    // tie padding to art width so it scales
+                paddingLeft: dispW * 0.085, // tie padding to art width so it scales
                 paddingRight: dispW * 0.085,
                 alignItems: "center",
-                columnGap: AVATAR_GAP_PX,      // consistent spacing across screens
+                columnGap: AVATAR_GAP_PX, // consistent spacing across screens
               }}
             >
               {onlineProfiles.map((p) => (
@@ -1688,59 +1924,45 @@ const [toastText, setToastText] = useState<string | null>(null);
                     overflow: "hidden",
                     borderWidth: 2,
                     borderColor: "white",
-                    marginRight: "8%"
+                    marginRight: "8%",
                   }}
                   onPress={() => openProfileModal(p)}
                 >
-                  <Image source={{ uri: p.photoUri }} style={{ width: "100%", height: "100%" }} />
+                  <Image
+                    source={{ uri: p.photoUri }}
+                    style={{ width: "100%", height: "100%" }}
+                  />
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </Animated.View>
         )}
 
-        {profileComplete && showStartOverlay && (
-
-          <View
-            pointerEvents="none"
-            style={rectInFront(MINGLES_F.x, MINGLES_F.y, MINGLES_F.w, MINGLES_F.h, { zIndex: 9 })}
-            onLayout={e => setMinglesBox(e.nativeEvent.layout)}  // ← capture absolute rect for pointers/hitboxes
-          >
-            <MMAnimated
-              showBackground={false}
-              showBarFront={false}
-              showControls={false}
-              enterOnMount
-              leaving={leaving}
-              onLeaveComplete={() => {
-                setLeaving(false);
-                setStarted(true);
-              }}
-              style={StyleSheet.absoluteFill}
-            />
-          </View>
-
-        )}
-
-
-
-
         {/* Front layer (glass/bar) — fully visible on all devices */}
-        <Image
-          source={FRONT_IMG}
+        <View
+          pointerEvents="none"
           style={{
             position: "absolute",
-            left:  frontLeft,
-            top:   frontTop,
+            left: frontLeft,
+            top: frontTop,
             width: frontWidth,
             height: frontHeight + 15,
-            zIndex: 10,
+            zIndex: 30,
           }}
-          resizeMode="contain"   // show the whole asset without distortion
-          pointerEvents="none"
-        />
+        >
+          <Image
+            source={FRONT_IMG}
+            style={
+              profileComplete
+                ? { width: "100%", height: "100%", bottom: "5%" }
+                : { width: "100%", height: "100%", bottom: "12%" }
+            }
+            resizeMode="contain" // show the whole asset without distortion
+          />
+        </View>
+
         {/* FRONT-anchored tap area for Mingles (debug color shown) */}
-        {!profileComplete && (
+        {/* {!profileComplete && (
           <Pressable
             onPress={() => {
               if (welcomeTyping) {
@@ -1757,46 +1979,44 @@ const [toastText, setToastText] = useState<string | null>(null);
               MINGLES_TAP.w,
               MINGLES_TAP.h,
               {
-                zIndex: 50,           // > bar-front zIndex(10) so it's definitely above
-                
-               
+                zIndex: 50, // > bar-front zIndex(10) so it's definitely above
               }
             )}
             // Optional: keep layout for future diagnostics
             onLayout={(e) => setMinglesBox(e.nativeEvent.layout)}
           />
-        )}
-
-
+        )} */}
       </View>
 
-     {/* Skip (always above stage so it can't be covered) */}
-      {!profileComplete && cameFromEntrance && (
-        <TouchableOpacity
-          onPress={skipWelcome}
+      {/* Skip (always above stage so it can't be covered) */}
+      {!profileComplete && cameFromEntrance && pointerTarget !== "bathroom" && (
+        <Animated.View
           style={{
+            opacity: skipOpacity,
             position: "absolute",
-            // align to the same visual spot: ~22% down from navbar, ~6% from right edge
             top: topNavH + sh * 0.22,
-            right: sw * 0.40,
-            backgroundColor: "#6e1944",
-            borderWidth: 4,
-            borderColor: "#460b2a",
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderRadius: 12,
+            right: sw * 0.4,
             zIndex: 3000,
             elevation: 3000,
-            width: 70,
           }}
         >
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={skipWelcome}
+            style={{
+              backgroundColor: "#6e1944",
+              borderWidth: 4,
+              borderColor: "#460b2a",
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 12,
+              width: 70,
+            }}
+          >
+            <Text style={styles.skipText}>Skip</Text>
+          </TouchableOpacity>
+        </Animated.View>
       )}
 
-      
-
-     
       {/* ─── PROFILE DETAIL OVERLAY (non-blocking) ──────────────────── */}
       {modalVisible && (
         <View
@@ -1814,7 +2034,9 @@ const [toastText, setToastText] = useState<string | null>(null);
               {deletionFlag && (
                 <View style={styles.deletionBanner}>
                   <Text style={styles.deletionBannerText}>
-                    {deletionFlag === 'you' ? 'You deleted this chat' : 'They deleted this chat'}
+                    {deletionFlag === "you"
+                      ? "You deleted this chat"
+                      : "They deleted this chat"}
                   </Text>
                 </View>
               )} */}
@@ -1848,11 +2070,17 @@ const [toastText, setToastText] = useState<string | null>(null);
                   >
                     <Image
                       source={drinkIcon}
-                      style={{ width: "100%", height: "100%", position: "relative" }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        position: "relative",
+                      }}
                     />
                     {showDrinkSpeech && (
                       <View style={styles.drinkSpeechBubble}>
-                        <Text style={styles.drinkSpeechBubbleText}>{drinkText}</Text>
+                        <Text style={styles.drinkSpeechBubbleText}>
+                          {drinkText}
+                        </Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -1938,7 +2166,9 @@ const [toastText, setToastText] = useState<string | null>(null);
                           style={styles.modalChatButton}
                           onPress={goToChatFromProfile}
                         >
-                          <Text style={styles.modalChatButtonText}>Go To Chat</Text>
+                          <Text style={styles.modalChatButtonText}>
+                            Go To Chat
+                          </Text>
                         </TouchableOpacity>
                       </View>
                     </>
@@ -2027,117 +2257,126 @@ const [toastText, setToastText] = useState<string | null>(null);
                   {(selectedProfile?.name || "They")} left the bar
                 </Text>
                 </View>
-              </View>
-            )}
+              )}
             </View>
-            
           </View>
         </View>
       )}
 
-
       {selectedProfile && chitChatModalVisible && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <TouchableWithoutFeedback
+            onPress={Keyboard.dismiss}
+            accessible={false}
+          >
             <View style={styles.overlay} pointerEvents="box-none">
               <View style={styles.ccContainer} pointerEvents="auto">
-              {profileChats.length === 0 ? (
-                <View style={styles.noChatsContainer}>
-                  <Text style={styles.noChatsText}>No Chit Chats found</Text>
-                </View>
-              ) : profileChats.length > 1 && ccStep === 'choose' ? (
-                profileChats.map((cc, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    style={styles.listItem}
-                    onPress={() => {
-                      setSelectedCc(cc);
-                      setCcStep('show');
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.listText,
-                        idx % 2 === 1 ? styles.pinkText : styles.whiteText,
-                      ]}
+                {profileChats.length === 0 ? (
+                  <View style={styles.noChatsContainer}>
+                    <Text style={styles.noChatsText}>No Chit Chats found</Text>
+                  </View>
+                ) : profileChats.length > 1 && ccStep === "choose" ? (
+                  profileChats.map((cc, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={styles.listItem}
+                      onPress={() => {
+                        setSelectedCc(cc);
+                        setCcStep("show");
+                      }}
                     >
-                      {chatLabelMap[cc.type]}
-                    </Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View>
-                  {(() => {
-                    const cc = profileChats.length === 1 ? profileChats[0] : selectedCc!;
-                    return (
-                      <>
-                        <Text style={styles.ccLabel}>
-                          {chatLabelMap[cc.type]}
-                        </Text>
-                        <Text style={styles.ccContent}>{cc.content}</Text>
-                        <TextInput
-                          style={styles.replyInput}
-                          value={replyText}
-                          onChangeText={(t) => stripLinksAndWarn(t, setReplyText)}
-                          placeholder="Write your reply…"
-                          placeholderTextColor="#7A4C6E"
-                          multiline
-                          blurOnSubmit
-                          returnKeyType="done"
-                          onSubmitEditing={Keyboard.dismiss}
-                        />
+                      <Text
+                        style={[
+                          styles.listText,
+                          idx % 2 === 1 ? styles.pinkText : styles.whiteText,
+                        ]}
+                      >
+                        {chatLabelMap[cc.type]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View>
+                    {(() => {
+                      const cc =
+                        profileChats.length === 1
+                          ? profileChats[0]
+                          : selectedCc!;
+                      return (
+                        <>
+                          <Text style={styles.ccLabel}>
+                            {chatLabelMap[cc.type]}
+                          </Text>
+                          <Text style={styles.ccContent}>{cc.content}</Text>
+                          <TextInput
+                            style={styles.replyInput}
+                            value={replyText}
+                            onChangeText={(t) =>
+                              stripLinksAndWarn(t, setReplyText)
+                            }
+                            placeholder="Write your reply…"
+                            placeholderTextColor="#7A4C6E"
+                            multiline
+                            blurOnSubmit
+                            returnKeyType="done"
+                            onSubmitEditing={Keyboard.dismiss}
+                          />
 
-                        <TouchableOpacity
-                          style={styles.replyButton}
-                          onPress={() => sendChitChatReply(cc)}
-                        >
-                          <Text style={styles.replyButtonText}>Send</Text>
-                        </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.replyButton}
+                            onPress={() => sendChitChatReply(cc)}
+                          >
+                            <Text style={styles.replyButtonText}>Send</Text>
+                          </TouchableOpacity>
+                        </>
+                      );
+                    })()}
+                  </View>
+                )}
 
-                      </>
-                    );
-                  })()}
-                </View>
-              )}
+                <TouchableOpacity
+                  style={styles.ccCloseButton}
+                  onPress={() => {
+                    // If we're on the "show" screen and there are multiple Chit Chats,
+                    // go back to the list first.
+                    if (ccStep === "show" && profileChats.length > 1) {
+                      setCcStep("choose");
+                      setSelectedCc(null);
+                      setReplyText("");
+                      return;
+                    }
 
-              <TouchableOpacity
-                style={styles.ccCloseButton}
-                onPress={() => {
-                // If we're on the "show" screen and there are multiple Chit Chats,
-                // go back to the list first.
-                if (ccStep === 'show' && profileChats.length > 1) {
-                  setCcStep('choose');
-                  setSelectedCc(null);
-                  setReplyText('');
-                  return;
-                }
-
-                // Otherwise, fully close Chit Chat and bring the profile card back
-                setChitChatModalVisible(false);
-                setCcStep('choose');
-                setSelectedCc(null);
-                setReplyText('');
-                setModalVisible(true);   // 👈 re-open profile modal
-              }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Image source={closeIcon} style={styles.closeIcon} />
-              </TouchableOpacity>
+                    // Otherwise, fully close Chit Chat and bring the profile card back
+                    setChitChatModalVisible(false);
+                    setCcStep("choose");
+                    setSelectedCc(null);
+                    setReplyText("");
+                    setModalVisible(true); // 👈 re-open profile modal
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Image source={closeIcon} style={styles.closeIcon} />
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
           </TouchableWithoutFeedback>
         </View>
       )}
 
-
       {firstMessageModalVisible && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <TouchableWithoutFeedback
+            onPress={Keyboard.dismiss}
+            accessible={false}
+          >
             <View style={styles.modalOverlay} pointerEvents="box-none">
               <View
                 style={[
                   styles.modalContent,
-                  { maxHeight: Math.round(sh * 0.78), paddingBottom: 20 + insets.bottom },
+                  {
+                    maxHeight: Math.round(sh * 0.78),
+                    paddingBottom: 20 + insets.bottom,
+                  },
                 ]}
                 pointerEvents="auto"
               >{/*}
@@ -2192,28 +2431,72 @@ const [toastText, setToastText] = useState<string | null>(null);
                       onSubmitEditing={Keyboard.dismiss}
                     />
 
-                  </ScrollView>
+                <TouchableOpacity
+                  onPress={() => setFirstMessageModalVisible(false)}
+                  style={styles.closeButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Image
+                    style={{ width: 20, height: 20 }}
+                    source={require("../assets/images/x.png")}
+                  />
+                </TouchableOpacity>
 
-                  <View
-                    style={[
-                      styles.modalFooter,
-                      { justifyContent: "center" },
-                    ]}
-                  >
-                    <TouchableOpacity
-                      style={styles.modalChatButton}
-                      onPress={sendFirstMessage}
-                      disabled={sendingFirstMessage || messagingBlocked}
+                {selectedProfile && (
+                  <>
+                    <ScrollView
+                      contentContainerStyle={[
+                        styles.modalBody,
+                        { paddingBottom: 28 + insets.bottom },
+                      ]}
+                      showsVerticalScrollIndicator={false}
                     >
-                      <Text style={styles.modalChatButtonText}>
-                        {sendingFirstMessage ? "Sending..." : "Send"}
+                      <Text
+                        style={[
+                          styles.modalLocation,
+                          {
+                            marginTop: 12,
+                            marginBottom: 4,
+                            fontSize: 18,
+                            textAlign: "center",
+                            margin: "auto",
+                          },
+                        ]}
+                      >
+                        Your first message
                       </Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
+                      <TextInput
+                        style={styles.replyInput}
+                        value={firstMessageText}
+                        onChangeText={(t) =>
+                          stripLinksAndWarn(t, setFirstMessageText)
+                        }
+                        placeholder="Say something nice…"
+                        placeholderTextColor="#7A4C6E"
+                        multiline
+                        blurOnSubmit
+                        returnKeyType="done"
+                        onSubmitEditing={Keyboard.dismiss}
+                      />
+                    </ScrollView>
+
+                    <View
+                      style={[styles.modalFooter, { justifyContent: "center" }]}
+                    >
+                      <TouchableOpacity
+                        style={styles.modalChatButton}
+                        onPress={sendFirstMessage}
+                        disabled={sendingFirstMessage || messagingBlocked}
+                      >
+                        <Text style={styles.modalChatButtonText}>
+                          {sendingFirstMessage ? "Sending..." : "Send"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </View>
             </View>
-          </View>
           </TouchableWithoutFeedback>
         </View>
       )}
@@ -2222,8 +2505,12 @@ const [toastText, setToastText] = useState<string | null>(null);
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
           <View style={styles.modalOverlay} pointerEvents="box-none">
             <View style={styles.ccContainer} pointerEvents="auto">
-              <Text style={[styles.ccLabel, { marginBottom: 8 }]}>Mr. Mingles</Text>
-              <Text style={{ color: "#F5E1C4", textAlign: "center", fontSize: 18 }}>
+              <Text style={[styles.ccLabel, { marginBottom: 8 }]}>
+                Mr. Mingles
+              </Text>
+              <Text
+                style={{ color: "#F5E1C4", textAlign: "center", fontSize: 18 }}
+              >
                 No links allowed here, take it outside!
               </Text>
               <TouchableOpacity
@@ -2237,9 +2524,6 @@ const [toastText, setToastText] = useState<string | null>(null);
         </View>
       )}
 
-
-
-     
       {/* “Don’t be a creep” popup */}
       {creepVisible && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
@@ -2250,7 +2534,7 @@ const [toastText, setToastText] = useState<string | null>(null);
                 onPress={() => setCreepVisible(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={creepStyles.mingModalCloseButtonText}>X</Text>
+                <Image source={closeIcon} style={styles.closeIcon} />{" "}
               </TouchableOpacity>
 
               <Text style={creepStyles.mingModalText}>{creepTyped}</Text>
@@ -2277,8 +2561,6 @@ const [toastText, setToastText] = useState<string | null>(null);
         </View>
       )}
 
-
-      
       {/* 2s toast for “Message sent / Chit Chat Sent” */}
       {toastText && (
         <View style={styles.toast}>
@@ -2286,24 +2568,23 @@ const [toastText, setToastText] = useState<string | null>(null);
         </View>
       )}
 
-
-{profileComplete && (
-  <View
-    style={[styles.bottomNavbarContainer, { paddingBottom: insets.bottom }]} // 👈 include inset in height
-    onLayout={(e) => {
-      const h = e.nativeEvent.layout.height;
-      if (h !== navHeight) setNavHeight(h);
-    }}
-    collapsable={false}
-  >
-    <BottomNavbar selectedTab="bar-2" />
-  </View>
-)}
-{(!fontsLoaded || loading) && (
+      {profileComplete && (
         <View
-          style={StyleSheet.absoluteFillObject}
-          pointerEvents="none"
+          style={[
+            styles.bottomNavbarContainer,
+            { paddingBottom: insets.bottom },
+          ]} // 👈 include inset in height
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            if (h !== navHeight) setNavHeight(h);
+          }}
+          collapsable={false}
         >
+          <BottomNavbar selectedTab="bar-2" />
+        </View>
+      )}
+      {(!fontsLoaded || loading) && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
           <ImageBackground
             source={BG_IMG}
             style={styles.background}
@@ -2326,7 +2607,6 @@ const [toastText, setToastText] = useState<string | null>(null);
           </ImageBackground>
         </View>
       )}
-
     </View>
   );
 }
@@ -2334,13 +2614,16 @@ const [toastText, setToastText] = useState<string | null>(null);
 const styles = StyleSheet.create({
   centerInStage: {
     position: "absolute",
-    left: 0, right: 0, top: 0, bottom: 0,
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     justifyContent: "center",
     alignItems: "center",
   },
   background: {
     width: width,
-    aspectRatio: 1125 / 2436
+    aspectRatio: 1125 / 2436,
   },
 
   // ─── BUBBLE text ─────────────────────────────
@@ -2354,8 +2637,11 @@ const styles = StyleSheet.create({
   },
 
   touchShield: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 2,
   },
 
@@ -2371,7 +2657,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     zIndex: 500,
-    width: 70
+    width: 70,
   },
   skipText: {
     color: "#ffe3d0",
@@ -2387,7 +2673,7 @@ const styles = StyleSheet.create({
   },
 
   pointerBathroom: {
-    top: height * -.01,
+    top: height * -0.01,
     left: width * 0.06,
   },
 
@@ -2401,9 +2687,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  
+
   startButtonText: {
-    fontSize: 36,                 // starting size; will auto-shrink if needed
+    fontSize: 36, // starting size; will auto-shrink if needed
     lineHeight: 38,
     fontFamily: FontNames.MontSerratSemiBold,
     textTransform: "uppercase",
@@ -2411,7 +2697,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     includeFontPadding: false,
   },
-  
+
   // ─── NAVBAR ──────────────────────────────────
   bottomNavbarContainer: {
     position: "absolute",
@@ -2448,7 +2734,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
     marginBottom: 8,
-    position: "relative",      // ⬅️ anchor for absolute drink icon
+    position: "relative", // ⬅️ anchor for absolute drink icon
   },
   modalImage: {
     width: "58%",
@@ -2461,16 +2747,18 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 12,
     right: 12,
-    width: 36,              
+    width: 36,
     height: 36,
     justifyContent: "center",
     alignItems: "center",
   },
 
   closeIcon: {
-    width: 20,
-    height: 18,
-    tintColor: '#F5E1C4',
+    width: 24,
+    height: 24,
+    tintColor: "#F5E1C4",
+    top: 5,
+    right: 5,
   },
   drinkIcon: {
     position: "absolute",
@@ -2484,13 +2772,13 @@ const styles = StyleSheet.create({
   modalText: {
     marginTop: 25,
     alignSelf: "stretch",
-    marginBottom: 30
+    marginBottom: 30,
   },
 
   // footer pinned at bottom of card
   modalFooter: {
     alignSelf: "stretch",
-    marginTop: 18,                 // ⬅️ extra gap above the buttons
+    marginTop: 18, // ⬅️ extra gap above the buttons
     paddingTop: 14,
     borderTopWidth: 2,
     borderTopColor: "rgba(70,11,42,0.35)",
@@ -2548,44 +2836,44 @@ const styles = StyleSheet.create({
 
   overlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   ccContainer: {
-    width: '90%',
-    backgroundColor: '#592540',
+    width: "90%",
+    backgroundColor: "#592540",
     borderRadius: 20,
     padding: 20,
-    position: 'relative',
+    position: "relative",
     borderColor: "#460b2a",
     borderWidth: 6,
   },
   listItem: {
     paddingVertical: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   listText: {
     fontSize: 24,
-    fontWeight: '500',
+    fontWeight: "500",
     fontFamily: FontNames.MontserratRegular,
   },
   whiteText: {
-    color: '#d8bfd8',
+    color: "#d8bfd8",
   },
   pinkText: {
-    color: '#e78bbb',
+    color: "#e78bbb",
   },
   ccLabel: {
     fontSize: 22,
-    fontWeight: '700',
-    color: '#E6B8C7',
-    textAlign: 'center',
+    fontWeight: "700",
+    color: "#E6B8C7",
+    textAlign: "center",
     marginBottom: 12,
-    marginTop: 12
+    marginTop: 12,
   },
   ccContent: {
     fontSize: 16,
-    color: '#F5E1C4',
+    color: "#F5E1C4",
     textAlign: "center",
     marginBottom: 20,
   },
@@ -2634,27 +2922,27 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   ccCloseButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 12,
     right: 12,
-    width: 36,              // same invisible square tap area
+    width: 36, // same invisible square tap area
     height: 36,
     justifyContent: "center",
     alignItems: "center",
   },
 
   closeText: {
-    color: '#F5E1C4',
+    color: "#F5E1C4",
     fontSize: 24,
   },
   noChatsContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 40,
   },
   noChatsText: {
-    color: '#F5E1C4',
+    color: "#F5E1C4",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 
   // ─── DRINK ICON + SPEECH BUBBLE ─────────────
@@ -2746,7 +3034,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 10,
   },
-
 });
 
 const creepStyles = ScaledSheet.create({
@@ -2775,7 +3062,7 @@ const creepStyles = ScaledSheet.create({
     top: "2%",
     right: "5%",
     zIndex: 100,
-    width: "44@ms",          
+    width: "44@ms",
     height: "44@ms",
     justifyContent: "center",
     alignItems: "center",

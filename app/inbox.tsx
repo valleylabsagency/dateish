@@ -28,16 +28,15 @@ import ConversationPreview from "../components/ConversationPreview";
 import { MaterialIcons } from "@expo/vector-icons";
 import ChatScreen from "./chat";
 import { FontNames } from "../constants/fonts";
-import LottieView from 'lottie-react-native';
-import animationData from '../assets/videos/mm-dancing.json';
-
+import LottieView from "lottie-react-native";
+import animationData from "../assets/videos/mm-dancing.json";
 
 const withoutBg = {
   ...animationData,
   layers: animationData.layers.filter(
-    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+    (layer) => layer.ty !== 1 || layer.nm !== "Dark Blue Solid 1"
   ),
-}
+};
 
 export default function InboxScreen() {
   const router = useRouter();
@@ -49,9 +48,13 @@ export default function InboxScreen() {
   // List mode state
   const [conversations, setConversations] = useState<any[]>([]);
   const [loadingConvs, setLoadingConvs] = useState(true);
-  const [partnerStatus, setPartnerStatus] = useState<Record<string, boolean>>({});
+  const [partnerStatus, setPartnerStatus] = useState<Record<string, boolean>>(
+    {}
+  );
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [pendingDeleteChatId, setPendingDeleteChatId] = useState<string | null>(null);
+  const [pendingDeleteChatId, setPendingDeleteChatId] = useState<string | null>(
+    null
+  );
 
   // Load custom font
   const [fontsLoaded] = useFonts({
@@ -74,7 +77,7 @@ export default function InboxScreen() {
       q,
       (snap) => {
         const convs: any[] = [];
-        snap.forEach(docSnap => {
+        snap.forEach((docSnap) => {
           convs.push({ id: docSnap.id, ...docSnap.data() });
         });
         setConversations(convs);
@@ -93,19 +96,19 @@ export default function InboxScreen() {
     if (isChatMode || !currentUserId || conversations.length === 0) return;
     const db = getDatabase();
     const unsubFns: (() => void)[] = [];
-    conversations.forEach(conv => {
+    conversations.forEach((conv) => {
       const partnerUid = conv.users.find((u: string) => u !== currentUserId);
       if (!partnerUid) return;
       const statusRef = ref(db, `status/${partnerUid}`);
-      const unsub = onValue(statusRef, snap => {
-        setPartnerStatus(prev => ({
+      const unsub = onValue(statusRef, (snap) => {
+        setPartnerStatus((prev) => ({
           ...prev,
           [partnerUid]: snap.val()?.online ?? false,
         }));
       });
       unsubFns.push(unsub);
     });
-    return () => unsubFns.forEach(fn => fn());
+    return () => unsubFns.forEach((fn) => fn());
   }, [isChatMode, currentUserId, conversations]);
 
   // Deletion handlers
@@ -135,11 +138,11 @@ export default function InboxScreen() {
     return (
       <View style={modalStyles.loadingContainer}>
         <LottieView
-                source={withoutBg}
-                autoPlay
-                loop
-                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-               />
+          source={withoutBg}
+          autoPlay
+          loop
+          style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+        />
       </View>
     );
   }
@@ -154,8 +157,10 @@ export default function InboxScreen() {
         <ChatScreen partner={partner!} />
       ) : (
         <ScrollView contentContainerStyle={listStyles.scrollContent}>
-          {conversations.map(conv => {
-            const partnerUid = conv.users.find((u: string) => u !== currentUserId)!;
+          {conversations.map((conv) => {
+            const partnerUid = conv.users.find(
+              (u: string) => u !== currentUserId
+            )!;
             const online = partnerStatus[partnerUid];
             const partnerRemoved = !(conv.visibleFor || []).includes(partnerUid); // partner deleted on their side
 
@@ -185,7 +190,9 @@ export default function InboxScreen() {
                 )}
 
                 <TouchableOpacity
-                  style={online ? listStyles.trashOnline : listStyles.trashOffline}
+                  style={
+                    online ? listStyles.trashOnline : listStyles.trashOffline
+                  }
                   onPress={() => handleTrashPress(conv.id)}
                 >
                   <MaterialIcons name="delete" size={32} color="red" />
@@ -210,10 +217,16 @@ export default function InboxScreen() {
               Are you sure you want to delete this chat?
             </Text>
             <View style={modalStyles.modalButtonRow}>
-              <TouchableOpacity style={modalStyles.modalButton} onPress={confirmDelete}>
+              <TouchableOpacity
+                style={modalStyles.modalButton}
+                onPress={confirmDelete}
+              >
                 <Text style={modalStyles.modalButtonText}>YES</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={modalStyles.modalButton} onPress={cancelDelete}>
+              <TouchableOpacity
+                style={modalStyles.modalButton}
+                onPress={cancelDelete}
+              >
                 <Text style={modalStyles.modalButtonText}>NO</Text>
               </TouchableOpacity>
             </View>
@@ -284,8 +297,6 @@ const listStyles = StyleSheet.create({
     fontSize: 14,
     fontFamily: FontNames.MontserratRegular,
   },
-
-    
 });
 
 const modalStyles = StyleSheet.create({

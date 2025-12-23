@@ -25,13 +25,14 @@ import {
 const PROJECT_ID = "91d81c7f-935a-4bb4-8f75-062721f369ba";
 
 Notifications.setNotificationHandler({
-  handleNotification: async (): Promise<Notifications.NotificationBehavior> => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification:
+    async (): Promise<Notifications.NotificationBehavior> => ({
+      shouldShowAlert: true, // shows alert-style UI in foreground
+      shouldPlaySound: false, // no sound in foreground
+      shouldSetBadge: false, // don’t change app badge
+      shouldShowBanner: true, // iOS foreground banner
+      shouldShowList: true, // show in Android/iOS notification list
+    }),
 });
 
 interface NotificationContextType {

@@ -14,15 +14,15 @@ import {
   Animated,
   Keyboard,
   Dimensions,
-  Alert
+  Alert,
 } from "react-native";
 import {
   getDatabase,
   ref,
   onValue,
-  off, 
+  off,
   set,
-  DatabaseReference
+  DatabaseReference,
 } from "firebase/database";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
@@ -33,10 +33,10 @@ import BottomNavbar from "../components/BottomNavbar";
 import ProfileNavbar from "../components/ProfileNavbar";
 import { auth, firestore } from "../firebase";
 import { NotificationContext } from "../contexts/NotificationContext";
+import { NewMessageContext } from "../contexts/NewMessageContext";
 import { useIsFocused } from "@react-navigation/native";
-import LottieView from 'lottie-react-native';
-import animationData from '../assets/videos/mm-dancing.json';
-
+import LottieView from "lottie-react-native";
+import animationData from "../assets/videos/mm-dancing.json";
 
 import {
   collection,
@@ -65,9 +65,9 @@ const { width, height } = Dimensions.get("window");
 const withoutBg = {
   ...animationData,
   layers: animationData.layers.filter(
-    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+    (layer) => layer.ty !== 1 || layer.nm !== "Dark Blue Solid 1"
   ),
-}
+};
 
 export default function ChatScreen() {
   const router = useRouter();
@@ -75,7 +75,7 @@ export default function ChatScreen() {
     partner: string;
     initial?: string;
   }>();
-  
+
   const partnerId = partner;
   const currentUserId = auth.currentUser?.uid;
   const isFocused = useIsFocused();
@@ -84,7 +84,6 @@ export default function ChatScreen() {
 
   const typingRef = useRef<DatabaseReference | null>(null);
   const [partnerTyping, setPartnerTyping] = useState(false);
-  
 
   const [messages, setMessages] = useState<any[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -92,7 +91,8 @@ export default function ChatScreen() {
   const [typingModalVisible, setTypingModalVisible] = useState(false);
   const [showPartnerModal, setShowPartnerModal] = useState(false);
   const [showModalDrinkSpeech, setShowModalDrinkSpeech] = useState(false);
-  const [showCurrentUserDrinkSpeech, setShowCurrentUserDrinkSpeech] = useState(false);
+  const [showCurrentUserDrinkSpeech, setShowCurrentUserDrinkSpeech] =
+    useState(false);
   const [showPartnerDrinkSpeech, setShowPartnerDrinkSpeech] = useState(false);
   const [partnerProfile, setPartnerProfile] = useState<any>(null);
   const rollAnim = useRef(new Animated.Value(500)).current;
@@ -110,13 +110,17 @@ export default function ChatScreen() {
 
   const { profile } = useContext(ProfileContext);
   const { setCurrentChatId } = useContext(NotificationContext);
+  const { markConversationAsOpened } = useContext(NewMessageContext);
 
   const setTypingFlag = async (val: boolean) => {
     if (!typingRef.current) return;
-    try { await set(typingRef.current, val); }
-    catch (e) { console.warn("set(typing) failed:", e); }
+    try {
+      await set(typingRef.current, val);
+    } catch (e) {
+      console.warn("set(typing) failed:", e);
+    }
   };
-  
+
   const openTyping = () => {
   if (inputDisabled) return;
   setTypingFlag(true);
@@ -163,52 +167,63 @@ useEffect(() => {
     return;
   }
 
-  (async () => {
-    const chatRef = doc(firestore, "chats", chatId);
-    const snap    = await getDoc(chatRef);
-
-    // combine into one string (or format however you like)
-    const combined = `${prompt}\n\n ${response}`;
-
-    // update (or create) the chat doc
-    const base = {
-      users:            [currentUserId, partnerId],
-      visibleFor:       [currentUserId, partnerId],
-      updatedAt:        serverTimestamp(),
-      lastMessage:      combined,
-      lastMessageSender: currentUserId,
-      partnerName:      partnerProfile?.name || "",
-      partnerPhotoUri:  partnerProfile?.drink
-        ? drinkMapping[partnerProfile.drink.toLowerCase()]
-        : drinkMapping["water"],
-    };
-    if (!snap.exists()) {
-      await setDoc(chatRef, base);
-    } else {
-      await updateDoc(chatRef, {
-        ...base,
-        visibleFor: arrayUnion(currentUserId, partnerId),
+    let prompt: string, response: string;
+    try {
+      ({ prompt, response } = JSON.parse(decodeURIComponent(initial)) as {
+        prompt: string;
+        response: string;
       });
+    } catch (e) {
+      console.warn("Bad initial payload:", e);
+      setHasSentInitial(true);
+      return;
     }
 
-    // write a single “question+answer” message
-    const msgsRef = collection(firestore, "chats", chatId, "messages");
-    await addDoc(msgsRef, {
-      text:      combined,
-      sender:    currentUserId,
-      createdAt: serverTimestamp(),
-    });
-  })()
-    .catch(console.error)
-    .finally(() => {
-      setHasSentInitial(true);
-      // strip `initial` out of the URL so it won’t rerun on reload
-      router.replace({ pathname: "/chat", query: { partner } });
-    });
-}, [initial, hasSentInitial, chatId]);
+    (async () => {
+      const chatRef = doc(firestore, "chats", chatId);
+      const snap = await getDoc(chatRef);
 
-// ────────────────────────────────────────────────────────────────────
+      // combine into one string (or format however you like)
+      const combined = `${prompt}\n\n ${response}`;
 
+      // update (or create) the chat doc
+      const base = {
+        users: [currentUserId, partnerId],
+        visibleFor: [currentUserId, partnerId],
+        updatedAt: serverTimestamp(),
+        lastMessage: combined,
+        lastMessageSender: currentUserId,
+        partnerName: partnerProfile?.name || "",
+        partnerPhotoUri: partnerProfile?.drink
+          ? drinkMapping[partnerProfile.drink.toLowerCase()]
+          : drinkMapping["water"],
+      };
+      if (!snap.exists()) {
+        await setDoc(chatRef, base);
+      } else {
+        await updateDoc(chatRef, {
+          ...base,
+          visibleFor: arrayUnion(currentUserId, partnerId),
+        });
+      }
+
+      // write a single “question+answer” message
+      const msgsRef = collection(firestore, "chats", chatId, "messages");
+      await addDoc(msgsRef, {
+        text: combined,
+        sender: currentUserId,
+        createdAt: serverTimestamp(),
+      });
+    })()
+      .catch(console.error)
+      .finally(() => {
+        setHasSentInitial(true);
+        // strip `initial` out of the URL so it won’t rerun on reload
+        router.replace({ pathname: "/chat", query: { partner } });
+      });
+  }, [initial, hasSentInitial, chatId]);
+
+  // ────────────────────────────────────────────────────────────────────
 
   // Fetch partner profile
   useEffect(() => {
@@ -259,6 +274,13 @@ useEffect(() => {
       setCurrentChatId(null);
     }
   }, [isFocused, chatId]);
+
+  // Mark conversation as opened when entering chat
+  useEffect(() => {
+    if (partnerId && isFocused) {
+      markConversationAsOpened(partnerId);
+    }
+  }, [partnerId, isFocused]);
 
   // Mingle modal animation
   useEffect(() => {
@@ -344,14 +366,19 @@ const onInputBlurOrSend = () => {
 };
 
 
+  // 2a) initialize the RTDB ref once you know chatId:
+  useEffect(() => {
+    if (!chatId) return;
+    typingRef.current = ref(db, `/typing/${chatId}/${currentUserId}`);
+    return () => {
+      if (typingRef.current) set(typingRef.current, false);
+    };
+  }, [chatId, currentUserId]);
 
-// 2c) subscribe to partner’s typing:
-useEffect(() => {
-  if (!chatId || !partnerId) return;
-  const partnerTypingRef = ref(db, `/typing/${chatId}/${partnerId}`);
-  const cb = (snap: any) => {
-    const v = !!snap.val();
-    setPartnerTyping(v);
+  // 2b) write your own typing state:
+  const onInputFocus = () => {
+    setTypingModalVisible(true);
+    if (typingRef.current) set(typingRef.current, true);
   };
   onValue(partnerTypingRef, cb);
   return () => off(partnerTypingRef, "value", cb);
@@ -373,14 +400,31 @@ useEffect(() => {
 
 
 
+  // subscribe to their online/offline status:
+  useEffect(() => {
+    if (!partnerId) return;
+    const statusRef = ref(db, `/status/${partnerId}/online`);
+    const cb = (snap: any) => {
+      const online = !!snap.val();
+      if (!online && isFocused) {
+        Alert.alert(`${partnerProfile?.name || "They"} disconnected.`, "", [
+          { text: "OK", onPress: () => router.replace("/inbox") },
+        ]);
+      }
+    };
 
-// 2d) render indicator just above your ScrollView:
-{ partnerTyping && (
-  <View style={styles.typingIndicator}>
-    <Text style={styles.typingText}>{partnerProfile?.name} is typing…</Text>
-  </View>
-)}
+    onValue(statusRef, cb);
+    return () => off(statusRef, "value", cb);
+  }, [db, partnerId, isFocused, partnerProfile]);
 
+  // 2d) render indicator just above your ScrollView:
+  {
+    partnerTyping && (
+      <View style={styles.typingIndicator}>
+        <Text style={styles.typingText}>{partnerProfile?.name} is typing…</Text>
+      </View>
+    );
+  }
 
   const sendMessage = async () => {
     if (inputDisabled) return;
@@ -389,7 +433,9 @@ useEffect(() => {
     Keyboard.dismiss();
     setInputMessage("");
 
-    const partnerHasResponded = messages.some((msg) => msg.sender !== currentUserId);
+    const partnerHasResponded = messages.some(
+      (msg) => msg.sender !== currentUserId
+    );
 
     if (!partnerHasResponded && messages.length >= 1) {
       setMingModalVisible(true);
@@ -414,11 +460,10 @@ useEffect(() => {
         await addDoc(collection(firestore, "chats", chatId, "messages"), {
           text: inputMessage,
           sender: currentUserId,
-          senderName: profile?.name ?? "",   
-          chatId,                             
+          senderName: profile?.name ?? "",
+          chatId,
           createdAt: serverTimestamp(),
         });
-        
       } else {
         await updateDoc(chatDocRef, {
           updatedAt: serverTimestamp(),
@@ -444,7 +489,9 @@ useEffect(() => {
   const currentUserDrink = profile?.drink ? profile.drink : "water";
   const currentUserDrinkIcon = drinkMapping[currentUserDrink.toLowerCase()];
   const smallDrinkNames = ["tequila", "vodka"];
-  const isCurrentUserSmallDrink = smallDrinkNames.includes(currentUserDrink.toLowerCase());
+  const isCurrentUserSmallDrink = smallDrinkNames.includes(
+    currentUserDrink.toLowerCase()
+  );
   const userHasWater = currentUserDrink.toLowerCase() === "water";
   const currentUserDrinkWidth = userHasWater
     ? moderateScale(30)
@@ -460,7 +507,9 @@ useEffect(() => {
   // Drink icon setup for partner
   const partnerDrink = partnerProfile?.drink ? partnerProfile.drink : "water";
   const partnerDrinkIcon = drinkMapping[partnerDrink.toLowerCase()];
-  const isPartnerSmallDrink = smallDrinkNames.includes(partnerDrink.toLowerCase());
+  const isPartnerSmallDrink = smallDrinkNames.includes(
+    partnerDrink.toLowerCase()
+  );
   const partnerHasWater = partnerDrink.toLowerCase() === "water";
   const partnerDrinkWidth = partnerHasWater
     ? moderateScale(30)
@@ -494,11 +543,11 @@ useEffect(() => {
     return (
       <View style={styles.loadingContainer}>
         <LottieView
-                source={withoutBg}
-                autoPlay
-                loop
-                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-               />
+          source={withoutBg}
+          autoPlay
+          loop
+          style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+        />
       </View>
     );
   }
@@ -533,10 +582,21 @@ useEffect(() => {
             style={styles.chatContainer}
             contentContainerStyle={styles.chatContent}
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+            onContentSizeChange={() =>
+              scrollViewRef.current?.scrollToEnd({ animated: true })
+            }
           >
             {loadingMessages ? (
-              <LottieView source={withoutBg} autoPlay loop style={{ width: 600, height: 600, backgroundColor: "transparent" }} />
+              <LottieView
+                source={withoutBg}
+                autoPlay
+                loop
+                style={{
+                  width: 600,
+                  height: 600,
+                  backgroundColor: "transparent",
+                }}
+              />
             ) : (
               <>
                 {messages.map((msg, index) => (
@@ -544,22 +604,35 @@ useEffect(() => {
                     key={index}
                     style={[
                       styles.chatBubble,
-                      msg.sender === currentUserId ? styles.userBubble : styles.partnerBubble,
+                      msg.sender === currentUserId
+                        ? styles.userBubble
+                        : styles.partnerBubble,
                     ]}
                   >
                     <Text style={styles.chatText}>{msg.text}</Text>
                     {msg.createdAt?.seconds && (
                       <Text style={styles.timestamp}>
-                        {new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {new Date(
+                          msg.createdAt.seconds * 1000
+                        ).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </Text>
                     )}
                   </View>
                 ))}
 
                 {partnerTyping ? (
-                  <View style={[styles.chatBubble, styles.partnerBubble, { opacity: 0.8 }]}>
+                  <View
+                    style={[
+                      styles.chatBubble,
+                      styles.partnerBubble,
+                      { opacity: 0.8 },
+                    ]}
+                  >
                     <Text style={styles.chatText}>
-                      {(partnerProfile?.name || "They")} is typing…
+                      {partnerProfile?.name || "They"} is typing…
                     </Text>
                   </View>
                 ) : null}
@@ -595,7 +668,12 @@ useEffect(() => {
       </KeyboardAvoidingView>
 
       {/* Typing Modal */}
-      <Modal visible={typingModalVisible} animationType="fade" transparent onRequestClose={() => closeTyping(false)}>
+      <Modal
+        visible={typingModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => closeTyping(false)}
+      >
         <View style={typingModalStyles.container}>
           <View style={typingModalStyles.inputBox}>
             <TextInput
@@ -674,9 +752,7 @@ useEffect(() => {
                 top: isPartnerSmallDrink ? moderateScale(25) : 0,
               },
             ]}
-            onPress={() =>
-              setShowPartnerDrinkSpeech(!showPartnerDrinkSpeech)
-            }
+            onPress={() => setShowPartnerDrinkSpeech(!showPartnerDrinkSpeech)}
             hitSlop={{ top: 15, bottom: 60, left: 20, right: 20 }}
           >
             <Image
@@ -738,13 +814,17 @@ useEffect(() => {
                       height: partnerDrinkHeight,
                     },
                   ]}
-                  onPress={() =>
-                    setShowModalDrinkSpeech(!showModalDrinkSpeech)
-                  }
+                  onPress={() => setShowModalDrinkSpeech(!showModalDrinkSpeech)}
                 >
                   <Image
                     source={partnerDrinkIcon}
-                    style={{ width: "100%", height: "100%", position: "absolute", top: height * 0.25, left: width * 0.55 }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      position: "absolute",
+                      top: height * 0.25,
+                      left: width * 0.55,
+                    }}
                   />
                   {showModalDrinkSpeech && (
                     <View style={styles.drinkSpeechBubble}>
@@ -781,16 +861,16 @@ useEffect(() => {
       >
         <View style={styles.mingModalOverlay}>
           <View style={styles.mingModalContainer}>
-          <TouchableOpacity
-            style={styles.mingModalCloseButton}
-            onPress={() => setMingModalVisible(false)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Image
-              source={require("../assets/images/x.png")}
-              style={styles.closeIcon}
-            />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.mingModalCloseButton}
+              onPress={() => setMingModalVisible(false)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Image
+                source={require("../assets/images/x.png")}
+                style={styles.closeIcon}
+              />
+            </TouchableOpacity>
 
             <Text style={styles.mingModalText}>{mingDisplayedText}</Text>
             <View style={styles.mingTriangleContainer}>
@@ -799,7 +879,10 @@ useEffect(() => {
             </View>
             <Animated.Image
               source={require("../assets/images/mr-mingles.png")}
-              style={[styles.mingMrMingles, { transform: [{ translateX: rollAnim }] }]}
+              style={[
+                styles.mingMrMingles,
+                { transform: [{ translateX: rollAnim }] },
+              ]}
               resizeMode="contain"
             />
           </View>
@@ -877,7 +960,6 @@ const typingModalStyles = ScaledSheet.create({
   doneButtonText: {
     color: "#fff",
     fontSize: "18@ms",
-  
   },
 });
 
@@ -899,7 +981,7 @@ const styles = ScaledSheet.create({
     color: "#fff",
     fontSize: 14,
   },
-  
+
   partnerIconContainer: {
     width: "110@ms",
     height: "110@ms",
@@ -927,7 +1009,7 @@ const styles = ScaledSheet.create({
     flexGrow: 1,
     justifyContent: "flex-end",
     paddingHorizontal: "10@ms",
-    paddingBottom: "3%",   
+    paddingBottom: "3%",
   },
   chatBubble: {
     maxWidth: "70%",
@@ -1076,7 +1158,7 @@ const styles = ScaledSheet.create({
     position: "absolute",
     top: "12@ms",
     right: "12@ms",
-    width: "40@ms",          
+    width: "40@ms",
     height: "40@ms",
     justifyContent: "center",
     alignItems: "center",
@@ -1132,7 +1214,7 @@ const styles = ScaledSheet.create({
     fontSize: "16@ms",
     alignSelf: "flex-start",
   },
- 
+
   /* Mingles Modal Styles */
   mingModalOverlay: {
     flex: 1,
@@ -1158,7 +1240,7 @@ const styles = ScaledSheet.create({
     position: "absolute",
     top: "2%",
     right: "5%",
-    width: "40@ms",          
+    width: "40@ms",
     height: "40@ms",
     justifyContent: "center",
     alignItems: "center",

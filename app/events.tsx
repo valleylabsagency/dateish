@@ -7,11 +7,13 @@ import {
   ImageBackground,
   StyleSheet,
   TouchableOpacity,
+  Share,
+  Alert,
+  Platform,
 } from "react-native";
 import { useFonts } from "expo-font";
 import { FontNames } from "../constants/fonts";
 import BottomNavbar from "../components/BottomNavbar";
-
 
 // require the background once at module scope
 const bgImage = require("../assets/images/events-full.png");
@@ -22,12 +24,35 @@ const ASPECT_RATIO = imgW / imgH;
 export default function EventsScreen() {
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
-    [FontNames.MontserratBold]:    require("../assets/fonts/Montserrat-Bold.ttf"),
+    [FontNames.MontserratBold]: require("../assets/fonts/Montserrat-Bold.ttf"),
   });
 
-  if (!fontsLoaded) {
-    return null;
-  }
+  const onShare = async () => {
+    try {
+      const message =
+        "I found this cool app called Dateish, kinda weird but cool! 🎉\n\nHere's a link to download:";
+      const url = "https://dateish.app"; // TODO: replace with your real app store / website link
+
+      // iOS prefers url separately; Android is fine with message containing url
+      const content =
+        Platform.OS === "ios"
+          ? { message, url }
+          : { message: `${message}\n${url}` };
+
+      const result = await Share.share(content, {
+        dialogTitle: "Share Dateish", // Android only
+      });
+
+      // Optional: handle user action
+      if (result.action === Share.dismissedAction) {
+        // user dismissed
+      }
+    } catch (e: any) {
+      Alert.alert("Share failed", e?.message ?? "Something went wrong.");
+    }
+  };
+
+  if (!fontsLoaded) return null;
 
   return (
     <View style={styles.container}>
@@ -39,17 +64,13 @@ export default function EventsScreen() {
         {/* Centered overlay content */}
         <View style={styles.contentContainer}>
           <Text style={styles.description}>
-            <Text style={styles.bold}>Dateish</Text> is new so there aren’t many
-            people here yet……
+            <Text style={styles.bold}>
+              Dateish is new so there aren’t many people here yet……
+            </Text>
           </Text>
           <Text style={styles.callToAction}>Help us find more people!</Text>
 
-          <TouchableOpacity
-            style={styles.shareButton}
-            onPress={() => {
-              /* TODO: hook up share sheet */
-            }}
-          >
+          <TouchableOpacity style={styles.shareButton} onPress={onShare}>
             <Text style={styles.shareButtonText}>Sharing Options</Text>
           </TouchableOpacity>
         </View>
@@ -66,13 +87,13 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",            // center the ImageBackground
-    backgroundColor: "#000",         // fallback while loading
+    alignItems: "center",
+    backgroundColor: "#000",
   },
 
   background: {
     width: "100%",
-    aspectRatio: ASPECT_RATIO,       // enforce the image’s natural ratio
+    aspectRatio: ASPECT_RATIO,
   },
 
   contentContainer: {

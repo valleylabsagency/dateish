@@ -1,22 +1,45 @@
 // app/lyd.tsx
-import React from "react";
-import { View, Pressable, Text, Alert } from "react-native";
+import React, { useContext, useEffect, useRef } from "react";
+import { View, Pressable, Text } from "react-native";
 import { useRouter } from "expo-router";
 import LittleYellowDude from "../games/LYD/LittleYellowDude";
+import { ProfileContext } from "@/contexts/ProfileContext";
+import { submitLeaderboardEntry } from "@/services/highscores";
 
 export default function LydScreen() {
   const router = useRouter();
+  const { profile } = useContext(ProfileContext);
+
+  // prevent double submit per run
+  const submittedRef = useRef(false);
+
+  // reset guard when screen mounts (new session)
+  useEffect(() => {
+    submittedRef.current = false;
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
       <LittleYellowDude
-        onFinish={(seconds, formatted, result) => {
-          // optional: show summary and return to games list
-          Alert.alert(
-            result === "win" ? "You got married! 🎉" : "Game over 💀",
-            `Time: ${formatted}`,
-            [{ text: "OK", onPress: () => router.back() }]
-          );
+        onFinish={async (seconds, formatted, result) => {
+          if (result !== "win") return; // only count wins
+          if (submittedRef.current) return;
+          submittedRef.current = true;
+
+          try {
+            await submitLeaderboardEntry(
+              "lyd",
+              seconds,
+              {
+                name: profile?.name,
+                photoUri: profile?.photoUri,
+              },
+              formatted
+            );
+          } catch (e) {
+            console.error("Failed to submit LYD leaderboard entry:", e);
+            // optional: set submittedRef.current = false; if you want to retry on failure
+          }
         }}
       />
 
