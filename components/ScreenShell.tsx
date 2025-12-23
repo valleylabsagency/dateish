@@ -87,6 +87,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 14,
     marginBottom: 18,
-    transform: [{ translateY: -60 }],
   },
 });

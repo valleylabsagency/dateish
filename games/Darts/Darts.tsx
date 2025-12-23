@@ -61,7 +61,7 @@ const HAND_L3_TOP = require("./assets/alienHandTop.png");
 
 const L3_HAND_OFFSET = { x: -20, y: -60 }; // tweak freely
 
-const SHOW_DEBUG = true; // ← Change to true to show debug overlay
+const SHOW_DEBUG = false; // ← Change to true to show debug overlay
 
 /* ================================ SHARED ================================ */
 type DartRef = {

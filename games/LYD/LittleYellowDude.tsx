@@ -36,7 +36,7 @@ import {
   useImage,
 } from "@shopify/react-native-skia";
 
-import { ScreenShell } from "../../components/screenShell"; // <-- adjust path if needed
+import { ScreenShell } from "../../components/ScreenShell"; // <-- adjust path if needed
 
 /** Left half (mirrored per row). Row 9 fix kept (last '0' removed). */
 export const LEFT_HALF_ROWS_RAW: string[] = [
@@ -1127,7 +1127,7 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
       }
       bottom={
         // lift D-pad up
-        <View style={{ transform: [{ translateY: -60 }] }}>
+        <View style={{ transform: [{ translateY: -45 }] }}>
           <View style={styles.pad}>
             <View style={styles.padRow}>
               <Pad
