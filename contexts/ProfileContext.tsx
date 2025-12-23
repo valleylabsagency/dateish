@@ -1,9 +1,14 @@
 // contexts/ProfileContext.tsx
-import React, { createContext, useState, useEffect } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { firestore } from "../firebase"; 
-import { auth } from "../firebase";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+
+import React, { createContext, useState, useEffect, useRef } from "react";
+import { firestore, auth } from "../firebase";
+import {
+  doc,
+  onSnapshot,
+  setDoc,
+  Unsubscribe,
+} from "firebase/firestore";
+import { onAuthStateChanged, User } from "firebase/auth";
 
 interface Profile {
   name?: string;
@@ -12,6 +17,9 @@ interface Profile {
   about?: string;
   photoUri?: string;
   drink?: string;
+  isVip?: boolean;
+  moneys?: number;
+  vipSince?: any;
 }
 
 interface ProfileContextType {
@@ -33,59 +41,105 @@ export const ProfileContext = createContext<ProfileContextType>({
 export const ProfileProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileComplete, setProfileComplete] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(auth.currentUser);
 
-  // Utility: determine if profile is complete (all required fields exist)
-  const isProfileComplete = (profile: Profile): boolean => {
-    return Boolean(profile.name && profile.age && profile.location && profile.about && profile.photoUri);
+  // Use a ref to track the previously logged-in user.
+  const previousUser = useRef<User | null>(auth.currentUser);
+
+  // Utility: determine if a profile is complete
+  const isProfileComplete = (prof: Profile): boolean => {
+    return Boolean(
+      prof.name &&
+      prof.age &&
+      prof.location &&
+      prof.about &&
+      prof.photoUri
+    );
   };
+  
 
-  // If the user is logged in, subscribe to their profile document in Firestore.
+  // 1) Track user changes via onAuthStateChanged.
+  //    When a user logs in, update their document to online:true.
+  //    When a user logs out, update the previous user's doc to online:false.
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
-    if (auth.currentUser) {
-      const profileDocRef = doc(firestore, "users", auth.currentUser.uid);
-      unsubscribe = onSnapshot(profileDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data() as Profile;
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (!user && previousUser.current) {
+        try {
+          const ref = doc(firestore, "users", previousUser.current.uid);
+          await setDoc(ref, { online: false }, { merge: true });
+        } catch (err) {
+          console.error("Error setting offline:", err);
+        }
+        previousUser.current = null;
+        setCurrentUser(null);
+        setProfile(null);
+        setProfileComplete(false);
+      } else if (user) {
+        previousUser.current = user;
+        setCurrentUser(user);
+        try {
+          const ref = doc(firestore, "users", user.uid);
+          await setDoc(ref, { online: true }, { merge: true });
+        } catch (err) {
+          console.error("Error setting online:", err);
+        }
+      }
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
+  // 2) Subscribe to the Firestore doc for the *currentUser*
+  useEffect(() => {
+    let unsubscribeDoc: Unsubscribe | null = null;
+    if (currentUser) {
+      const ref = doc(firestore, "users", currentUser.uid);
+      unsubscribeDoc = onSnapshot(ref, (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as Profile;
           setProfile(data);
           setProfileComplete(isProfileComplete(data));
-          // Update local storage (optional)
-          AsyncStorage.setItem("userProfile", JSON.stringify(data));
+        } else {
+          setProfile({});
+          setProfileComplete(false);
         }
       });
     } else {
-      // Fallback: load from AsyncStorage if no user is logged in.
-      (async () => {
-        try {
-          const storedProfile = await AsyncStorage.getItem("userProfile");
-          if (storedProfile) {
-            const parsedProfile = JSON.parse(storedProfile);
-            setProfile(parsedProfile);
-            setProfileComplete(isProfileComplete(parsedProfile));
-          }
-        } catch (error) {
-          console.error("Error loading profile:", error);
-        }
-      })();
+      setProfile(null);
+      setProfileComplete(false);
     }
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (unsubscribeDoc) unsubscribeDoc();
     };
-  }, []);
+  }, [currentUser]);
 
+  // 3) Save the updated profile data to Firestore.
+  // 3) Save the updated profile data to Firestore.
   const saveProfile = async (profileData: Partial<Profile>) => {
     try {
-      const newProfile = { ...(profile || {}), ...profileData };
+      if (!currentUser) return;
+
+      // 🔒 Never let the client write server-controlled fields
+      const { moneys: _dropMoneys, isVip: _dropVip, vipSince: _dropVipSince, ...clientSafe } =
+        profileData;
+
+      // 1. Merge existing profile with new changes to see the "final" state
+      const newProfile = { ...(profile || {}), ...clientSafe };
+      
+      // 2. Calculate if this new state counts as "Complete"
+      const isComplete = isProfileComplete(newProfile);
+
+      // 3. Update local state
       setProfile(newProfile);
-      setProfileComplete(isProfileComplete(newProfile));
-      // Save to Firestore if the user is logged in.
-      if (auth.currentUser) {
-        const profileDocRef = doc(firestore, "users", auth.currentUser.uid);
-        await setDoc(profileDocRef, newProfile, { merge: true });
-      }
-      // Also update local storage.
-      await AsyncStorage.setItem("userProfile", JSON.stringify(newProfile));
-      console.log("Profile saved:", newProfile);
+      setProfileComplete(isComplete);
+
+      // 4. Save to Firestore AND include the profileComplete flag
+      const ref = doc(firestore, "users", currentUser.uid);
+      await setDoc(ref, { 
+        ...clientSafe, 
+        online: true,
+        profileComplete: isComplete 
+      }, { merge: true });
+
     } catch (error) {
       console.error("Error saving profile:", error);
     }
@@ -93,9 +147,17 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
 
   return (
     <ProfileContext.Provider
-      value={{ profile, setProfile, profileComplete, setProfileComplete, saveProfile }}
+      value={{
+        profile,
+        setProfile,
+        profileComplete,
+        setProfileComplete,
+        saveProfile,
+      }}
     >
       {children}
     </ProfileContext.Provider>
   );
 };
+
+export default ProfileProvider;

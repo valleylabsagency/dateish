@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "482953150124",
+    "firebase_url": "https://dateish-4edf2-default-rtdb.firebaseio.com",
+    "project_id": "dateish-4edf2",
+    "storage_bucket": "dateish-4edf2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:482953150124:android:c877e0da851d0e5b1c2909",
+        "android_client_info": {
+          "package_name": "com.tylerjvalley.Dateish"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjIZIet3OjhHkCWcD2cz7BsjZR7XB7FK8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

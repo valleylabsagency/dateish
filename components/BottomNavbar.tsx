@@ -1,51 +1,93 @@
-// BottomNavbar.tsx
-import React from 'react';
-import { View, TouchableOpacity, Image, StyleSheet, Text } from 'react-native';
-import { useRouter, usePathname } from 'expo-router';
+import React, { useContext } from "react";
+import { View, TouchableOpacity, Image, StyleSheet, Text } from "react-native";
+import { useRouter, usePathname } from "expo-router";
+import { NewMessageContext } from "../contexts/NewMessageContext";
 
 const tabs = [
-  { label: 'Bar', icon: require('../assets/images/icons/bar-tab-icon.png'), route: '/bar' },
-  { label: 'Browse', icon: require('../assets/images/icons/browse-tab-icon.png'), route: '/browse' },
-  { label: 'Chats', icon: require('../assets/images/icons/chats-icon.png'), route: '/chats' },
-  { label: 'Stage', icon: require('../assets/images/icons/stage-tab-icon.png'), route: '/stage' },
+  {
+    label: "Games",
+    icon: require("../assets/images/icons/games-icon.png"),
+    route: "/games",
+  },
+  {
+    label: "Inbox",
+    icon: require("../assets/images/icons/chats-icon.png"),
+    route: "/inbox",
+  },
+  {
+    label: "Bar",
+    icon: require("../assets/images/icons/beers-icon.png"),
+    route: "/bar-2",
+  },
+  {
+    label: "Mr. Mingles",
+    icon: require("../assets/images/icons/mm-icon.png"),
+    route: "/mingles",
+  },
+  {
+    label: "Events",
+    icon: require("../assets/images/icons/stage-tab-icon.png"),
+    route: "/events",
+  },
 ];
 
 export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
   const router = useRouter();
   const currentPath = usePathname();
+  const { newUserMessageCount } = useContext(NewMessageContext);
 
   const handleTabPress = (route: string) => {
-    if (route !== currentPath) {
-      router.push(route);
-    }
+    if (route !== currentPath) router.push(route as any);
   };
 
   return (
     <View style={styles.navbar}>
       {tabs.map((tab) => {
-        // Conditionally add additional styles for "Browse" and "Stage"
-        let labelAdditionalStyle = {};
-        let iconAdditionalStyle = {};
-        if (tab.label === "Browse") {
-          labelAdditionalStyle = styles.browseLabel;
-          iconAdditionalStyle = styles.browseIcon;
-        } else if (tab.label === "Stage") {
-          labelAdditionalStyle = styles.stageLabel;
-          iconAdditionalStyle = styles.stageIcon;
-        }
-        const isSelected = tab.label === selectedTab;
+        const isSelected = currentPath === tab.route;
+        const isBar = tab.label === "Bar";
+        const isStage = tab.label === "Events";
+        const isInbox = tab.label === "Inbox";
+
         return (
           <TouchableOpacity
             key={tab.label}
-            style={[styles.tab]}
             onPress={() => handleTabPress(tab.route)}
+            style={[
+              styles.tab,
+              isSelected && styles.selectedTab,
+              isBar && isSelected && styles.barSelectedTab,
+            ]}
           >
-            <Image
-              source={tab.icon}
-              style={[styles.icon, isSelected && styles.selectedIcon, iconAdditionalStyle]}
-              resizeMode="contain"
-            />
-            <Text style={[styles.label, isSelected && styles.selectedLabel, labelAdditionalStyle]}>
+            <View style={styles.iconWrapper}>
+              <Image
+                source={tab.icon}
+                resizeMode="contain"
+                style={[
+                  styles.icon,
+                  isSelected && styles.selectedIcon,
+                  isBar && styles.barIcon,
+                  isBar && isSelected && styles.barSelectedIcon,
+                  isStage && styles.stageIcon,
+                ]}
+              />
+              {isInbox && newUserMessageCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {newUserMessageCount > 9 ? "9+" : newUserMessageCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="clip"
+              allowFontScaling={false}
+              style={[
+                styles.label,
+                isSelected && styles.selectedLabel,
+                isBar && isSelected && styles.barSelectedLabel,
+              ]}
+            >
               {tab.label}
             </Text>
           </TouchableOpacity>
@@ -55,58 +97,111 @@ export default function BottomNavbar({ selectedTab }: { selectedTab: string }) {
   );
 }
 
+const ICON_SIZE = 35;
+const BAR_ICON_SIZE = 52;
+const BAR_ICON_SELECTED_SIZE = 70; // <-- bump this if you want your bar icon even bigger
+const BORDER_WIDTH = 2;
+const BAR_LIFT = -10; // <-- how far to lift the Bar tab above the navbar
+const PINK = "#e98dbd";
+const DARK_BG = "#460b2a";
+
 const styles = StyleSheet.create({
   navbar: {
-    width: '100%',
-    height: 90,
-    backgroundColor: '#460b2a',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
+    width: "100%",
+    height: 80,
+    backgroundColor: "#592540",
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    alignItems: "center",
   },
   tab: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 5,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
   },
-  
-  browseLabel: {
-   position: "relative",
-   bottom: 12
-   
+
+  // ALL selected tabs get this:
+  selectedTab: {
+    backgroundColor: DARK_BG,
+    borderWidth: BORDER_WIDTH,
+    borderColor: PINK,
+    borderRadius: 20,
+    height: "100%",
   },
-  browseIcon: {
-    width: 85,
-    height: 85,
-    position: "relative",
-    top: 8,
+
+  // ONLY the Bar tab (when selected) also gets lifted & slightly taller:
+  barSelectedTab: {
+    marginTop: BAR_LIFT,
+    height: "115%",
+    paddingTop: 15,
+    flex: 1.3,
+    borderRadius: 25,
+    zIndex: 1,
   },
-  
-  stageLabel: {
-    position: "relative",
-    bottom: 6
+
+  barSelectedLabel: {
+    fontSize: 15,
+    marginTop: 5,
   },
-  stageIcon: {
-    width: 80,
-    height: 60,
-    position: "relative",
-    top: 2
+
+  iconWrapper: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
   },
+
   icon: {
-    width: 45,
-    height: 45,
-    tintColor: '#fff',
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    tintColor: "#fff",
   },
   selectedIcon: {
-    // Optionally add styling for selected icon here.
+    tintColor: PINK,
   },
+
+  // Bar’s normal selected size:
+  barIcon: {
+    width: BAR_ICON_SIZE,
+    height: BAR_ICON_SIZE,
+  },
+  stageIcon: {
+    width: 55,
+    height: 55,
+  },
+  // Bar’s extra‐large selected size:
+  barSelectedIcon: {
+    width: BAR_ICON_SELECTED_SIZE,
+    height: BAR_ICON_SELECTED_SIZE,
+    marginBottom: 15,
+  },
+
   label: {
     fontSize: 10,
-    marginTop: 8,
-    color: '#fff',
-    textTransform: 'uppercase',
+    marginTop: 4,
+    color: "#fff",
+    textTransform: "uppercase",
   },
   selectedLabel: {
-    // Optionally add styling for selected label here.
+    fontWeight: "bold",
+    color: PINK,
+  },
+  badge: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    backgroundColor: "rgba(196, 42, 42, 1)",
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 5,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
   },
 });
