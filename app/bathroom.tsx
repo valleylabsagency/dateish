@@ -835,7 +835,7 @@ async function validateFace(fileUri: string) {
         <ProfileNavbar
           showBack={hasSavedInSession}
           onBack={async () => {
-            // Before initial save, just behave like before (no auto-save),
+            /*// Before initial save, just behave like before (no auto-save),
             // but still tell the bar we came from the bathroom.
             if (!hasSavedInSession) {
               router.back();
@@ -846,8 +846,9 @@ async function validateFace(fileUri: string) {
             // then go back and re-arm Start Chatting.
             const ok = await saveProfileIfChanged();
             if (ok) {
-              router.replace("/bar-2");
-            }
+              router.back;
+            }*/
+            router.back()
           }}
         />
       </View>
@@ -1005,9 +1006,8 @@ async function validateFace(fileUri: string) {
               </View>
             </Modal>
 
-            {/* NEW: Onboarding Modal (uses same visual motif) */}
-            <Modal transparent visible={onboardingVisible} animationType="fade">
-              <View style={modalStyles.modalOverlay}>
+            {onboardingVisible && (
+              <View style={modalStyles.overlayInScreen} pointerEvents="auto">
                 <TouchableOpacity
                   style={modalStyles.closeButton}
                   onPress={() => {
@@ -1016,12 +1016,13 @@ async function validateFace(fileUri: string) {
                   }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-
                   <Image source={closeIcon} style={styles.closeIcon} />
                 </TouchableOpacity>
+
                 {renderOnboardingContent()}
               </View>
-            </Modal>
+            )}
+
           
           <Modal visible={cameraVisible} animationType="slide" transparent={false}>
               <View style={{ flex: 1, backgroundColor: "black" }}>
@@ -1360,6 +1361,14 @@ const modalStyles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.8)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  overlayInScreen: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 50,           // below navbar
+    elevation: 50,
   },
   closeButton: {
     position: "absolute",

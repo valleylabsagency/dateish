@@ -4,6 +4,7 @@ import { Video, ResizeMode } from 'expo-av';
 import { useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 import animationData from '../assets/videos/mm-dancing.json';
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const withoutBg = {
   ...animationData,
@@ -27,6 +28,7 @@ export default function EntranceAnimation() {
   };
 
   return (
+
     <View style={styles.container}>
       <Video
         ref={video}

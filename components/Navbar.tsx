@@ -1,10 +1,8 @@
-// Navbar.tsx
-
+// components/Navbar.tsx
 import React, { useContext, useEffect, useRef, useState } from "react";
 import {
   View,
   Image,
-  Text,
   StyleSheet,
   TouchableOpacity,
   Animated,
@@ -12,253 +10,151 @@ import {
   Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import LottieView from "lottie-react-native";
+
 import { NavbarContext } from "../contexts/NavbarContext";
 import { MusicContext } from "../contexts/MusicContext";
-import PopUp from "../components/PopUp";
-import LottieView from 'lottie-react-native';
-import animationData from '../assets/videos/mm-dancing.json';
-import { ProfileContext } from '../contexts/ProfileContext';
-//import { MoneysContext } from "../contexts/MoneysContext";
-//import AsyncStorage from "@react-native-async-storage/async-storage";
-//import { doc, updateDoc, increment } from "firebase/firestore";
-//import { auth, firestore } from "@/firebase";
-//import { showRewarded } from "@/services/ads";
-
+import { ProfileContext } from "../contexts/ProfileContext";
+import animationData from "../assets/videos/mm-dancing.json";
 
 const { width, height } = Dimensions.get("window");
+
 const withoutBg = {
   ...animationData,
   layers: animationData.layers.filter(
-    layer => layer.ty !== 1 || layer.nm !== 'Dark Blue Solid 1'
+    (layer: any) => layer.ty !== 1 || layer.nm !== "Dark Blue Solid 1"
   ),
-}
-
-type NavbarProps = {
-  /** If provided, this is called instead of the default WC navigation. */
-  onBathroomPress?: () => void;
-  /** If provided (and onBathroomPress is not), this route is used instead of "/bathroom". */
-  bathroomRoute?: string; // e.g. "/bathroom?onboard=true"
-  lockNonBathroom?: boolean;
 };
 
+type NavbarProps = {
+  /** If provided, overrides default push behavior. */
+  onBathroomPress?: () => void;
 
-export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom }: NavbarProps) {
+  /** If provided, overrides the default /bathroom path. */
+  bathroomRoute?: string;
+
+  /** When true, disables speaker (and any other non-bathroom actions). */
+  lockNonBathroom?: boolean;
+
+  /** When true, disables the WC button (greys it out + no-op). */
+  bathroomDisabled?: boolean;
+
+  /** If provided, overrides context visibility (rarely needed). */
+  showBathroomButton?: boolean;
+};
+
+export default function Navbar({
+  onBathroomPress,
+  bathroomRoute,
+  lockNonBathroom = false,
+  bathroomDisabled = false,
+  showBathroomButton,
+}: NavbarProps) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const insetTop = Math.max(6, insets.top * 0.6);
+
+  const { profileComplete } = useContext(ProfileContext);
   const { showWcButton } = useContext(NavbarContext);
 
-  const { profile, profileComplete } = useContext(ProfileContext);
+  // Visibility: prop override wins, else context controls it.
+  const shouldShowWc = typeof showBathroomButton === "boolean" ? showBathroomButton : showWcButton;
 
   const bathroomPath =
     bathroomRoute ?? (!profileComplete ? "/bathroom?onboard=true" : "/bathroom");
 
-  /*
-  const { activeDrops } = useContext(MoneysContext);
-
-  const isVip = !!profile?.isVip;
-
-   const displayMoneys =
-    typeof profile?.moneys === "number"
-      ? profile!.moneys!
-      : (isVip ? 300 : 100);
-*/
-  type RewardState = { remaining: number; resetAt: number };
-
-  const [rewardRemaining, setRewardRemaining] = useState<number>(5);
-  const [rewardLoading, setRewardLoading] = useState(false);
-
-  function computeNextResetAt(): number {
-    const d = new Date();
-    const reset = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 17, 0, 0, 0); // 17:00 today
-    if (Date.now() >= reset.getTime()) reset.setDate(reset.getDate() + 1);         // else, today 17:00
-    return reset.getTime();
-  }
-
-  async function ensureRewardState(): Promise<RewardState> {
-    const raw = await AsyncStorage.getItem("adRewardsState");
-    let state: RewardState | null = raw ? JSON.parse(raw) : null;
-    if (!state || Date.now() >= state.resetAt) {
-      state = { remaining: 5, resetAt: computeNextResetAt() };
-      await AsyncStorage.setItem("adRewardsState", JSON.stringify(state));
-    }
-    setRewardRemaining(state.remaining);
-    return state;
-  }
-  
-  async function saveRewardState(next: RewardState) {
-    setRewardRemaining(next.remaining);
-    await AsyncStorage.setItem("adRewardsState", JSON.stringify(next));
-  }
-  
-  async function grantTenMoneys() {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    await updateDoc(doc(firestore, "users", uid), { moneys: increment(10) });
-  }
-  
-  async function handleWatchReward() {
-    if (rewardRemaining <= 0 || rewardLoading) return;
-    setRewardLoading(true);
-    try {
-      const ok = await showRewarded();
-      if (ok) {
-        await grantTenMoneys();
-        const state = await ensureRewardState();
-        const next = { ...state, remaining: Math.max(0, state.remaining - 1) };
-        await saveRewardState(next);
-      }
-    } finally {
-      setRewardLoading(false);
-    }
-  }
-  
-      
-
-
-  // Access the music context so we can toggle music or show loading
   const { isPlaying, soundLoading, toggleMusic } = useContext(MusicContext);
 
-  // We'll animate the speaker-lines bigger/smaller for 5s whenever music toggles on
-  // but we do NOT hide them in between loops. Instead we let them remain at the last scale value
-  const linesAnim = useRef(new Animated.Value(1)).current; 
+  // Speaker lines animation
+  const linesAnim = useRef(new Animated.Value(1)).current;
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
-
-  // We track whether lines are actually visible on screen at all
   const [linesVisible, setLinesVisible] = useState(false);
-
-  const [showPopup, setShowPopup] = useState(false);
-  const [popupFlag, setPopupFlag] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (showPopup && popupFlag === "moneys") {
-      ensureRewardState();
-    }
-  }, [showPopup, popupFlag]);
 
   useEffect(() => {
     if (isPlaying) {
-      setLinesVisible(true); // ensure lines are on top of the base speaker
-      // Start repeating scale 1 -> 1.2 -> 1
+      setLinesVisible(true);
+
       loopRef.current = Animated.loop(
         Animated.sequence([
-          Animated.timing(linesAnim, {
-            toValue: 1.2,
-            duration: 700,
-            useNativeDriver: true,
-          }),
-          Animated.timing(linesAnim, {
-            toValue: 1,
-            duration: 700,
-            useNativeDriver: true,
-          }),
+          Animated.timing(linesAnim, { toValue: 1.2, duration: 700, useNativeDriver: true }),
+          Animated.timing(linesAnim, { toValue: 1.0, duration: 700, useNativeDriver: true }),
         ])
       );
+
       loopRef.current.start();
 
-      // Stop the loop after 5s, but keep lines shown at the last scale factor
       const timer = setTimeout(() => {
-        // Stop the animation, freeze it at the current scale
-        if (loopRef.current) loopRef.current.stop();
-        // We can forcibly set linesAnim to e.g. 1.2 or 1 to freeze
-        linesAnim.stopAnimation((currentValue) => {
-          // e.g. freeze it at whichever scale we ended up at
-          // or pick a stable final value
-          // linesAnim.setValue(currentValue);
-          // We'll just pick 1.2 to keep them slightly bigger
-          linesAnim.setValue(1.2);
-        });
+        loopRef.current?.stop();
+        linesAnim.stopAnimation(() => linesAnim.setValue(1.2));
       }, 5000);
 
-      return () => {
-        clearTimeout(timer);
-      };
+      return () => clearTimeout(timer);
     } else {
-      // If not playing, hide lines entirely & reset scale
-      if (loopRef.current) {
-        loopRef.current.stop();
-      }
+      loopRef.current?.stop();
       linesAnim.setValue(1);
       setLinesVisible(false);
     }
-  }, [isPlaying]);
+  }, [isPlaying, linesAnim]);
+
+  const handleWcPress = () => {
+    if (bathroomDisabled) return;
+    if (onBathroomPress) return onBathroomPress();
+    router.push(bathroomPath as any);
+  };
+
+  const handleSpeakerPress = () => {
+    if (lockNonBathroom) return;
+    toggleMusic();
+  };
 
   return (
-    <>
-    <View style={styles.navbar}>
-      {/* Conditionally render the WC button */}
-      
-      <TouchableOpacity
-        onPress={() => {
-          if (onBathroomPress) {
-            onBathroomPress();
-          } else {
-            router.push(bathroomPath);
-          }
-        }}
-        accessibilityRole="button"
-        accessibilityLabel="Open bathroom"
-        testID="wc-button"
-      >
+    <View
+      style={[
+        styles.navbar,
+        {
+          paddingTop: insetTop,
+          height: (Platform.OS === "ios" ? 85 : 65) + insetTop,
+        },
+      ]}
+    >
+      {shouldShowWc ? (
+        <TouchableOpacity
+          onPress={handleWcPress}
+          disabled={bathroomDisabled}
+          accessibilityRole="button"
+          accessibilityLabel="Open bathroom"
+          testID="wc-button"
+          style={bathroomDisabled ? styles.disabled : undefined}
+        >
           <Image
             source={require("../assets/images/icons/WC.png")}
             style={styles.navIcon}
             resizeMode="contain"
           />
         </TouchableOpacity>
-     
+      ) : (
+        <View style={styles.navPlaceholder} />
+      )}
 
-      <View style={styles.navSpacer} /> {/*}
-      <TouchableOpacity 
-        style={styles.moneysBar}
-        disabled={!!lockNonBathroom}
-        pointerEvents={lockNonBathroom ? "none" : "auto"}
-        onPress={() => {
-          if (lockNonBathroom) return;
-          setPopupFlag("moneys");
-          setShowPopup(true);
-        }}
-      >
-     
-         
-        <Text style={styles.moneysAmount}>{displayMoneys}</Text>
-        <Image style={styles.moneysImage} source={require("../assets/images/moneys.png")} />
-        {activeDrops.map(d => (
-            <Animated.Text
-              key={d.id}
-              pointerEvents="none"
-              style={[
-                styles.spendFallText,
-                {
-                  transform: [{ translateY: d.y }],
-                  opacity: d.opacity,
-                },
-              ]}
-            >
-              -{d.amount}
-            </Animated.Text>
-          ))}
-        
-      </TouchableOpacity> */}
+      <View style={styles.navSpacer} />
 
-      {/* Speaker icon area */}
       {soundLoading ? (
-        // If audio is loading, show a spinner
         <LottieView
-                source={withoutBg}
-                autoPlay
-                loop
-                style={{ width: 600, height: 600, backgroundColor: "transparent" }}
-               />
+          source={withoutBg}
+          autoPlay
+          loop
+          style={{ width: 600, height: 600, backgroundColor: "transparent" }}
+        />
       ) : (
         <TouchableOpacity
-        onPress={() => {
-          if (lockNonBathroom) return;
-          toggleMusic();
-        }}
-        style={styles.speakerWrapper}
-        disabled={!!lockNonBathroom}
-        pointerEvents={lockNonBathroom ? "none" : "auto"}
-      >
-          {/* speaker-no-lines is always there */}
+          onPress={handleSpeakerPress}
+          disabled={lockNonBathroom}
+          pointerEvents={lockNonBathroom ? "none" : "auto"}
+          style={[styles.speakerWrapper, lockNonBathroom ? styles.disabled : undefined]}
+          accessibilityRole="button"
+          accessibilityLabel="Toggle music"
+        >
           <Image
             source={require("../assets/images/icons/speaker-no-lines.png")}
             style={styles.speakerBase}
@@ -267,75 +163,23 @@ export default function Navbar({ onBathroomPress, bathroomRoute, lockNonBathroom
           {linesVisible && (
             <Animated.Image
               source={require("../assets/images/icons/speaker-lines.png")}
-              style={[
-                styles.speakerLines,
-                {
-                  transform: [{ scale: linesAnim }],
-                },
-              ]}
+              style={[styles.speakerLines, { transform: [{ scale: linesAnim }] }]}
               resizeMode="contain"
             />
           )}
         </TouchableOpacity>
       )}
     </View>
-{/*}
-    <PopUp
-  visible={showPopup}
-  flag={popupFlag || undefined}
-  onClose={() => setShowPopup(false)}
->
-  {popupFlag === "moneys" && (
-    <View style={moneyStyles.wrap}>
-      <Text style={moneyStyles.note}>
-        Every day when the bar opens, your moneys will fill up to 100
-      </Text>
-
-      <TouchableOpacity
-        style={[moneyStyles.rewardBtn, (rewardRemaining === 0 || rewardLoading) && { opacity: 0.6 }]}
-        onPress={handleWatchReward}
-        disabled={rewardRemaining === 0 || rewardLoading}
-        activeOpacity={0.85}
-      >
-        <Image
-          source={require("../assets/images/icons/ad.png")}
-          style={moneyStyles.adIcon}
-          resizeMode="contain"
-        />
-        <Text style={moneyStyles.rewardText}>
-          {rewardLoading ? "Loading…" : "Get 10 Moneys"}
-        </Text>
-        <Text style={moneyStyles.counter}>{rewardRemaining}/5</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={moneyStyles.shopBtn}
-        onPress={() => {
-          setShowPopup(false);
-          router.push("/mingles?open=shop");
-        }}
-      >
-        <Text style={moneyStyles.shopText}>Go to Shop</Text>
-      </TouchableOpacity>
-    </View>
-  )}
-</PopUp> */}
-
-
-</>
   );
 }
 
 const styles = StyleSheet.create({
   navbar: {
     width: "100%",
-    height: Platform.OS === "ios" ? 85 : 65,
     backgroundColor: "#460b2a",
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 15,
-    paddingBottom: 0,
-    paddingTop: Platform.OS === "ios" ? 0 : 0,
   },
   navIcon: {
     width: 50,
@@ -347,31 +191,6 @@ const styles = StyleSheet.create({
   },
   navSpacer: {
     flex: 1,
-  },
-  moneysBar: {
-    display: "flex",
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 8,
-    height: 35,
-    paddingHorizontal: "2%",
-    paddingVertical: 0,
-    marginRight: "5%",
-    backgroundColor: "#d8bfd8",
-    position: "relative"
-  },
-  moneysAmount: {
-    color: "#460b2a",
-    fontSize: 30,
-    letterSpacing: -2,
-    position: "relative",
-    bottom: height * 0.004,
-    right: width * 0.01
-  },
-  moneysImage: {
-    width: 60,
-
-    height: "90%"
   },
   speakerWrapper: {
     width: 50,
@@ -386,55 +205,11 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   speakerLines: {
-    width: 55, 
+    width: 55,
     height: 40,
     position: "absolute",
   },
-  spendFallText: {
-    position: "absolute",
-    left: "15%",         // tweak until it visually appears under the number
-    top: 0,           // starts near the top of the bar
-    fontSize: 32,
-    fontWeight: "700",
-    color: "red", // nice “spent” red; change if you prefer
-    textShadowColor: "rgba(0,0,0,0.25)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+  disabled: {
+    opacity: 0.45,
   },
 });
-
-const moneyStyles = StyleSheet.create({
-  wrap: { alignItems: "center", paddingTop: 6 },
-  note: {
-    color: "#d8bfd8",
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  rewardBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: "#6e1944",
-    borderWidth: 3,
-    borderColor: "#460b2a",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-  },
-  adIcon: { width: 26, height: 26 },
-  rewardText: { color: "#ffe3d0", fontSize: 18, fontWeight: "600" },
-  counter: { color: "#ffe3d0", fontSize: 16, marginLeft: 8, opacity: 0.9 },
-  shopBtn: {
-    marginTop: 12,
-    borderWidth: 2,
-    borderColor: "#460b2a",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-  shopText: { color: "#ffe3d0", fontSize: 16 },
-});
-
-

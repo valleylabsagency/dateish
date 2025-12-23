@@ -159,9 +159,11 @@ export default function InboxScreen() {
             const online = partnerStatus[partnerUid];
             const partnerRemoved = !(conv.visibleFor || []).includes(partnerUid); // partner deleted on their side
 
+           
             const containerStyle = online
-              ? listStyles.conversationContainer
-              : listStyles.disabledConversation;
+            ? listStyles.conversationContainer
+            : [listStyles.conversationContainer, { opacity: 0.5 }];
+
 
             return (
               <TouchableOpacity

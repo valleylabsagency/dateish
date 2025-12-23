@@ -32,6 +32,7 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import { AntDesign } from "@expo/vector-icons";     // Google
 import { FontAwesome } from "@expo/vector-icons";   // Meta (Facebook)
 import { Ionicons } from "@expo/vector-icons";   
+import { SafeAreaView } from "react-native-safe-area-context";
 
 
 const { width, height } = Dimensions.get("window");
@@ -596,6 +597,9 @@ export default function EntranceScreen() {
 
   //  MAIN + AUTH SHEET
   return (
+   
+
+   
     <View style={styles.container}>
       {/* — Main entrance screen — */}
       <ImageBackground
@@ -1082,6 +1086,7 @@ export default function EntranceScreen() {
     )}
 
     </View>
+
     );
 }
 

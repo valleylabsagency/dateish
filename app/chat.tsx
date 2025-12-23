@@ -101,6 +101,8 @@ export default function ChatScreen() {
   const [hasSentInitial, setHasSentInitial] = useState(false);
   const fullMingText = "Wait for them to answer. Don't be a creep!";
   const [partnerDeletedChat, setPartnerDeletedChat] = useState(false);
+  const [partnerOnline, setPartnerOnline] = useState(true);
+
 
 
   const scrollViewRef = useRef<ScrollView>(null);
@@ -116,14 +118,16 @@ export default function ChatScreen() {
   };
   
   const openTyping = () => {
-    setTypingFlag(true);
-    setTypingModalVisible(true);
-  };
-  const closeTyping = (send?: boolean) => {
-    setTypingFlag(false);
-    setTypingModalVisible(false);
-    if (send) sendMessage();
-  };
+  if (inputDisabled) return;
+  setTypingFlag(true);
+  setTypingModalVisible(true);
+};
+
+const closeTyping = (send?: boolean) => {
+  setTypingFlag(false);
+  setTypingModalVisible(false);
+  if (send && !inputDisabled) sendMessage();
+};
 
   useEffect(() => {
     if (!typingRef.current) return;
@@ -137,6 +141,9 @@ export default function ChatScreen() {
     currentUserId && partnerId
       ? [currentUserId, partnerId].sort().join("_")
       : null;
+
+  const inputDisabled = !partnerOnline || partnerDeletedChat;
+
 
       // ────────────────────────────────────────────────────────────────────
 //  🌟  INITIAL CHIT‑CHAT SEED
@@ -354,21 +361,16 @@ useEffect(() => {
 // subscribe to their online/offline status:
 useEffect(() => {
   if (!partnerId) return;
+
   const statusRef = ref(db, `/status/${partnerId}/online`);
   const cb = (snap: any) => {
-    const online = !!snap.val();
-    if (!online && isFocused) {
-      Alert.alert(
-        `${partnerProfile?.name || "They"} disconnected.`,
-        "",
-        [{ text: "OK", onPress: () => router.replace("/inbox") }]
-      );
-    }
+    setPartnerOnline(!!snap.val());
   };
 
   onValue(statusRef, cb);
   return () => off(statusRef, "value", cb);
-}, [db, partnerId, isFocused, partnerProfile]);
+}, [db, partnerId]);
+
 
 
 
@@ -381,7 +383,7 @@ useEffect(() => {
 
 
   const sendMessage = async () => {
-    if (partnerDeletedChat) return; // don't allow sending to a deleted convo
+    if (inputDisabled) return;
     if (inputMessage.trim() === "" || !chatId) return;
     //setTypingModalVisible(false);
     Keyboard.dismiss();
@@ -512,6 +514,14 @@ useEffect(() => {
       resizeMode="stretch"
     >
       <ProfileNavbar onBack={() => router.back()} />
+      {!partnerOnline && (
+  <View style={styles.offlineBanner}>
+    <Text style={styles.offlineBannerText}>
+      {(partnerProfile?.name || "User")} is offline
+    </Text>
+  </View>
+)}
+
 
       <KeyboardAvoidingView
         style={styles.container}
@@ -559,21 +569,28 @@ useEffect(() => {
         </View>
 
         <View style={styles.inputContainer}>
-          <TouchableOpacity onPress={openTyping} activeOpacity={0.8} style={{ flex: 1 }}>
+          <TouchableOpacity
+            onPress={openTyping}
+            activeOpacity={0.8}
+            style={{ flex: 1, opacity: inputDisabled ? 0.5 : 1 }}
+            disabled={inputDisabled}
+          >
             <View style={styles.textInput}>
-              <Text
-                numberOfLines={1}
-                style={{ color: inputMessage ? "#111" : "#999", fontSize: 16 }}
-              >
-                {inputMessage || "Type your message..."}
+              <Text numberOfLines={1} style={{ color: inputMessage ? "#111" : "#999", fontSize: 16 }}>
+                {inputMessage || (inputDisabled ? "User is offline" : "Type your message...")}
               </Text>
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.sendButton} onPress={() => closeTyping(true)}>
+          <TouchableOpacity
+            style={[styles.sendButton, inputDisabled && { opacity: 0.5 }]}
+            onPress={() => closeTyping(true)}
+            disabled={inputDisabled}
+          >
             <Text style={styles.sendButtonText}>Send</Text>
           </TouchableOpacity>
         </View>
+
 
       </KeyboardAvoidingView>
 
@@ -695,6 +712,14 @@ useEffect(() => {
               style={styles.closeIcon}
               source={require("../assets/images/x.png")}
             />
+            {!partnerOnline && (
+            <View style={styles.offlineBannerInModal}>
+              <Text style={styles.offlineBannerText}>
+                {(partnerProfile?.name || "User")} is offline
+              </Text>
+            </View>
+          )}
+
           </TouchableOpacity>
 
             {partnerProfile && (
@@ -781,14 +806,33 @@ useEffect(() => {
         </View>
       </Modal>
       {partnerDeletedChat && (
-        <View style={styles.deletedOverlay}>
-          <View style={styles.deletedBox}>
-            <Text style={styles.deletedText}>
-              {(partnerProfile?.name || "They")} deleted this convo
-            </Text>
-          </View>
-        </View>
-      )}
+  <View style={styles.deletedOverlay} pointerEvents="auto">
+    <View style={styles.deletedBox}>
+      <TouchableOpacity
+        onPress={() => router.replace("/inbox")}
+        style={styles.deletedCloseButton}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      >
+        <Image
+          source={require("../assets/images/x.png")}
+          style={styles.deletedCloseIcon}
+        />
+      </TouchableOpacity>
+
+      <Text style={styles.deletedText}>
+        {(partnerProfile?.name || "They")} deleted this convo
+      </Text>
+
+      <TouchableOpacity
+        onPress={() => router.replace("/inbox")}
+        style={styles.deletedBackButton}
+      >
+        <Text style={styles.deletedBackButtonText}>Back</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+)}
+
 
       <View style={styles.bottomNavbarContainer}>
         <BottomNavbar selectedTab="Chats" />
@@ -1174,32 +1218,99 @@ const styles = ScaledSheet.create({
     bottom: "-95%",
     right: "-20%",
   },
-    deletedOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 50,
-  },
-  deletedBox: {
-    backgroundColor: "#020621",
-    paddingVertical: "20@ms",
-    paddingHorizontal: "32@ms",
-    borderRadius: "16@ms",
-    borderWidth: "3@ms",
-    borderColor: "#fff",
-    maxWidth: "80%",
-  },
+   
   deletedText: {
     color: "#fff",
     fontSize: "22@ms",
     textAlign: "center",
     fontFamily: FontNames.MontserratRegular,
   },
+  deletedOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+  },
+deletedBox: {
+  width: "85%",
+  borderWidth: "6@ms",
+  borderColor: "#460b2a",
+  backgroundColor: "#592540",
+  borderRadius: "16@ms",
+  paddingVertical: "22@ms",
+  paddingHorizontal: "18@ms",
+  alignItems: "center",
+  position: "relative",
+},
+deletedText: {
+  color: "#ffe3d0",
+  fontSize: "18@ms",
+  textAlign: "center",
+  fontFamily: FontNames.MontserratRegular,
+},
+deletedCloseButton: {
+  position: "absolute",
+  top: "10@ms",
+  right: "10@ms",
+  width: "40@ms",
+  height: "40@ms",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 100,
+},
+deletedCloseIcon: {
+  width: "22@ms",
+  height: "22@ms",
+  tintColor: "#F5E1C4",
+},
+deletedBackButton: {
+  marginTop: "14@ms",
+  backgroundColor: "#6e1944",
+  borderWidth: "3@ms",
+  borderColor: "#460b2a",
+  paddingVertical: "8@ms",
+  paddingHorizontal: "18@ms",
+  borderRadius: "18@ms",
+},
+deletedBackButtonText: {
+  color: "#ffe3d0",
+  fontSize: "16@ms",
+  fontFamily: FontNames.MontserratRegular,
+},
+offlineBanner: {
+  alignSelf: "center",
+  marginTop: "10@vs",
+  marginBottom: "6@vs",
+  backgroundColor: "#b1001a",
+  borderWidth: "3@ms",
+  borderColor: "#460b2a",
+  paddingVertical: "6@ms",
+  paddingHorizontal: "14@ms",
+  borderRadius: "14@ms",
+  zIndex: 2000,
+},
+offlineBannerInModal: {
+  alignSelf: "center",
+  marginBottom: "10@vs",
+  backgroundColor: "#b1001a",
+  borderWidth: "3@ms",
+  borderColor: "#460b2a",
+  paddingVertical: "6@ms",
+  paddingHorizontal: "14@ms",
+  borderRadius: "14@ms",
+},
+offlineBannerText: {
+  color: "#fff",
+  fontSize: "14@ms",
+  fontFamily: FontNames.MontserratRegular,
+},
+
+
 
 });
 

@@ -38,6 +38,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import PushNavBridge from './PushNavBridge';
 import * as SystemUI from 'expo-system-ui';
 
+
 import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 
 const BaseStack = createStackNavigator();
@@ -323,7 +324,7 @@ useEffect(() => {
                               <View style={styles.container}>
                                 <OfflineNotice />
                                 <PushNavBridge />
-                                {!hideNavbar && <Navbar />}
+                               {!hideNavbar && <Navbar />}
                                 <Stack
                                   detachInactiveScreens={false}
                                   screenOptions={{

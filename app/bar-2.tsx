@@ -37,11 +37,12 @@ import {
 import { ProfileContext } from "../contexts/ProfileContext";
 import { useIsFocused } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
-import Navbar from "@/components/Navbar";
+import Navbar from "../components/Navbar";
 import { spendMoneys, getMessageCost } from '../services/moneys';
 import { MoneysContext } from "../contexts/MoneysContext";
 import PopUp from "../components/PopUp";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 // top of file
 import * as NavigationBar from "expo-navigation-bar";
 
@@ -52,6 +53,8 @@ import * as NavigationBar from "expo-navigation-bar";
 import * as MailComposer from "expo-mail-composer";
 import MMAnimated from "@/services/MMAnimated";
 import { Linking, useWindowDimensions, Platform, Keyboard, TouchableWithoutFeedback } from "react-native";
+import { NavbarContext } from "../contexts/NavbarContext";
+
 
 const BG_IMG = require("../assets/images/bar-back.png");
 const FRONT_IMG = require("../assets/images/bar-front.png");
@@ -117,6 +120,7 @@ const WELCOME_MESSAGES = [
 
 const LAST_WELCOME_INDEX = WELCOME_MESSAGES.length - 1;
 
+
 export default function Bar2Screen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ cameFromEntrance?: string; fromBathroomFirst?: string }>();
@@ -133,6 +137,7 @@ export default function Bar2Screen() {
   
 
   const { profileComplete } = useContext(ProfileContext);
+  
 
   const [fontsLoaded] = useFonts({
     [FontNames.MontserratRegular]: require("../assets/fonts/Montserrat-Regular.ttf"),
@@ -165,6 +170,9 @@ const baseStageH = Math.max(0, sh - topNavH);
 const visibleH = baseStageH + (hasBottomBar ? 0 : insets.bottom);
 
 const effectiveH = stageH ?? Math.max(0, sh - topNavH - (profileComplete ? navHeight : 0));
+
+const { setShowWcButton } = useContext(NavbarContext);
+
 
 
 
@@ -399,6 +407,23 @@ const [toastText, setToastText] = useState<string | null>(null);
 
   // Link guard
   const [noLinksVisible, setNoLinksVisible] = useState(false);
+
+  useEffect(() => {
+  // Default off unless we explicitly enable it
+  const shouldShow =
+    // Only relevant during onboarding flow in the bar
+    !profileComplete &&
+    cameFromEntrance &&
+    // Only when we're on the final message AND it's fully displayed (not still typing)
+    welcomeIndex === LAST_WELCOME_INDEX &&
+    !welcomeTyping;
+
+  setShowWcButton(shouldShow);
+
+  // Safety cleanup so it doesn't "stick" when leaving the screen
+  return () => setShowWcButton(false);
+}, [profileComplete, cameFromEntrance, welcomeIndex, welcomeTyping, setShowWcButton]);
+
 
   // Automatically mark user "in the bar" when they come from the Entrance
   useEffect(() => {
@@ -1422,10 +1447,7 @@ const [toastText, setToastText] = useState<string | null>(null);
       marginBottom: hasBottomBar ? 0 : -insets.bottom,
     }}
   >
-    <Navbar
-      bathroomRoute={!profileComplete ? "/bathroom?onboard=true" : "/bathroom"}
-      lockNonBathroom={isLastWelcome}
-    />
+
 
 
       {/* ==== STAGE (locks all layers to the same art space) ==== */}
@@ -1788,14 +1810,14 @@ const [toastText, setToastText] = useState<string | null>(null);
             <View
               style={styles.modalContent}
               pointerEvents="auto"          
-            >
+            >{/*}
               {deletionFlag && (
                 <View style={styles.deletionBanner}>
                   <Text style={styles.deletionBannerText}>
                     {deletionFlag === 'you' ? 'You deleted this chat' : 'They deleted this chat'}
                   </Text>
                 </View>
-              )}
+              )} */}
 
               <TouchableOpacity
                 onPress={closeProfileModal}
@@ -1892,6 +1914,7 @@ const [toastText, setToastText] = useState<string | null>(null);
                             style={[
                               styles.modalChatButtonText,
                               isSelectedOffline && styles.modalChatButtonTextDisabled,
+                              {color: "red", fontWeight: "bold"}
                             ]}
                           >
                             Go To Chat
@@ -1940,6 +1963,7 @@ const [toastText, setToastText] = useState<string | null>(null);
                             styles.modalChatButtonText,
                             (messagingBlocked || isSelectedOffline) &&
                               styles.modalChatButtonTextDisabled,
+                            {color: "red", fontWeight: "bold"}
                           ]}
                         >
                           Go To Chat
@@ -1999,7 +2023,9 @@ const [toastText, setToastText] = useState<string | null>(null);
               {isSelectedOffline && (
               <View style={styles.offlineOverlayInModal} pointerEvents="none">
                 <View style={styles.offlineBadge}>
-                  <Text style={styles.offlineText}>They left the bar</Text>
+                 <Text style={styles.offlineText}>
+                  {(selectedProfile?.name || "They")} left the bar
+                </Text>
                 </View>
               </View>
             )}
@@ -2114,14 +2140,14 @@ const [toastText, setToastText] = useState<string | null>(null);
                   { maxHeight: Math.round(sh * 0.78), paddingBottom: 20 + insets.bottom },
                 ]}
                 pointerEvents="auto"
-              >
+              >{/*}
               {deletionFlag && (
                 <View style={styles.deletionBanner}>
                   <Text style={styles.deletionBannerText}>
                     {deletionFlag === 'you' ? 'You deleted this chat' : 'They deleted this chat'}
                   </Text>
                 </View>
-              )}
+              )} */}
 
               <TouchableOpacity
                 onPress={() => setFirstMessageModalVisible(false)}
@@ -2152,7 +2178,10 @@ const [toastText, setToastText] = useState<string | null>(null);
                       Your first message
                     </Text>
                     <TextInput
-                      style={styles.replyInput}
+                       style={[
+                        styles.replyInput,
+                        { minHeight: 140, maxHeight: 260 }, // ⬅️ bigger box
+                      ]}
                       value={firstMessageText}
                       onChangeText={(t) => stripLinksAndWarn(t, setFirstMessageText)}
                       placeholder="Say something nice…"
@@ -2398,6 +2427,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
+    paddingTop: 60,
   },
   modalContent: {
     width: "85%",
