@@ -847,6 +847,9 @@ const { setShowWcButton } = useContext(NavbarContext);
     })();
   }, []);
 
+  const PROFILE_MODAL_KEY = "bar2ProfileModalOpen";
+  const PROFILE_ID_KEY = "bar2SelectedProfileId";
+
   useEffect(() => {
     let alive = true;
 
@@ -907,6 +910,8 @@ const { setShowWcButton } = useContext(NavbarContext);
 
     return () => unsub.forEach((u) => u());
   }, [profiles]);
+
+
 
   // When the profile modal opens, figure out deletion + whether they already messaged you
   useEffect(() => {
@@ -1001,8 +1006,7 @@ const { setShowWcButton } = useContext(NavbarContext);
     };
   }, [modalVisible, selectedProfile]);
 
-  const PROFILE_MODAL_KEY = "bar2ProfileModalOpen";
-  const PROFILE_ID_KEY = "bar2SelectedProfileId";
+  
 
   const openProfileModal = (profile: any) => {
     setSelectedProfile(profile);
@@ -1607,18 +1611,17 @@ const { setShowWcButton } = useContext(NavbarContext);
         )}
 
         {profileComplete && showStartOverlay && (
-          <>
-            {/* Bubble overlay */}
-            <View
-              style={{
-                position: "absolute",
-                left: btnLeft,
-                top: btnTop - 50,
-                width: btnW,
-                height: btnH,
-                zIndex: 40,
-              },
-            ]}
+        <>
+          {/* Bubble overlay - tap anywhere on this to start */}
+          <Pressable
+            style={{
+              position: "absolute",
+              left: btnLeft,
+              top: btnTop - 50,
+              width: btnW,
+              height: btnH,
+              zIndex: 40,
+            }}
             onPress={async () => {
               setBubbleVisible(false);
               setLeaving(true);
@@ -1634,93 +1637,78 @@ const { setShowWcButton } = useContext(NavbarContext);
                   lastActive: Date.now(),
                 }).catch(() => {});
 
-                // Mark that they've started at least once
                 setHasEverStarted(true);
                 await AsyncStorage.setItem("bar2HasEverStarted", "true");
               } catch {}
             }}
+          >
+            <SpeechBubblePop
+              source={require("../assets/images/speech-bubble.png")}
+              visible={bubbleVisible}
+              width={dispW * 0.9}
+              height={dispW * 0.45}
+              delayTime={800}
+              anchor={{ x: 0.5, y: 0 }}
+              onHidden={() => {
+                setShowStartOverlay(false);
+              }}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  paddingHorizontal: 20,
+                }}
+              >
+                <Text style={styles.bubbleText}>
+                  {BAR_MM_SPEEACH_BUBBLE[mmBubbleIndex]}
+                </Text>
+              </View>
+            </SpeechBubblePop>
+          </Pressable>
 
+          {/* Start Chatting button */}
+          <TouchableOpacity
+            style={[
+              styles.startButton,
+              {
+                position: "absolute",
+                left: btnLeft,
+                top: btnTop - 20,
+                width: btnW,
+                height: btnH,
+                zIndex: 40,
+              },
+            ]}
+            onPress={async () => {
+              setBubbleVisible(false);
+              setLeaving(true);
+              try {
+                const db = getDatabase();
+                const statusRef = rtdbRef(db, `status/${auth.currentUser!.uid}`);
+                rtdbUpdate(statusRef, {
+                  online: true,
+                  bar: true,
+                  lastActive: Date.now(),
+                }).catch(() => {});
+                await AsyncStorage.setItem("bar2ShowPrompt", "false");
+              } catch {}
+            }}
           >
             <Text
               style={styles.startButtonText}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.6}   // shrink instead of truncating
-              ellipsizeMode="clip"     // just in case, don’t show "…"
+              minimumFontScale={0.6}
+              ellipsizeMode="clip"
             >
-              <SpeechBubblePop
-                source={require("../assets/images/speech-bubble.png")}
-                visible={bubbleVisible}
-                width={dispW * 0.9}
-                height={dispW * 0.45}
-                delayTime={800}
-                anchor={{ x: 0.5, y: 0 }}
-                onHidden={() => {
-                  setShowStartOverlay(false);
-                }}
-              >
-                <View
-                  style={{
-                    flex: 1,
-                    justifyContent: "center",
-                    alignItems: "center",
-                    paddingHorizontal: 20,
-                  }}
-                >
-                  <Text style={styles.bubbleText}>
-                    {BAR_MM_SPEEACH_BUBBLE[mmBubbleIndex]}
-                  </Text>
-                </View>
-              </SpeechBubblePop>
-            </View>
+              Start Chatting
+            </Text>
+          </TouchableOpacity>
+        </>
+      )}
 
-            {/* Start Chatting button */}
-            <TouchableOpacity
-              style={[
-                styles.startButton,
-                {
-                  position: "absolute",
-                  left: btnLeft,
-                  top: btnTop - 20,
-                  width: btnW,
-                  height: btnH,
-                  zIndex: 40,
-                },
-              ]}
-              onPress={async () => {
-                // 👇 this is where you trigger the pop-out
-                setBubbleVisible(false);
-
-                setLeaving(true);
-                // setShowStartOverlay(false); // ⬅ if you want to SEE the exit animation,
-                // move this into onHidden instead.
-                try {
-                  const db = getDatabase();
-                  const statusRef = rtdbRef(
-                    db,
-                    `status/${auth.currentUser!.uid}`
-                  );
-                  rtdbUpdate(statusRef, {
-                    online: true,
-                    bar: true,
-                    lastActive: Date.now(),
-                  }).catch(() => {});
-                  await AsyncStorage.setItem("bar2ShowPrompt", "false");
-                } catch {}
-              }}
-            >
-              <Text
-                style={styles.startButtonText}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.6}
-                ellipsizeMode="clip"
-              >
-                Start Chatting
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
 
         {/* (WELCOME) Mr. Mingles image (static) + typed bubble only during onboarding */}
         {!profileComplete && cameFromEntrance && (
@@ -2029,8 +2017,9 @@ const { setShowWcButton } = useContext(NavbarContext);
           >
             <View
               style={styles.modalContent}
-              pointerEvents="auto"          
-            >{/*}
+              pointerEvents="auto"
+            >
+              {/*
               {deletionFlag && (
                 <View style={styles.deletionBanner}>
                   <Text style={styles.deletionBannerText}>
@@ -2039,7 +2028,9 @@ const { setShowWcButton } = useContext(NavbarContext);
                       : "They deleted this chat"}
                   </Text>
                 </View>
-              )} */}
+              )}
+              */}
+
 
               <TouchableOpacity
                 onPress={closeProfileModal}
@@ -2251,13 +2242,15 @@ const { setShowWcButton } = useContext(NavbarContext);
                 </>
               )}
               {isSelectedOffline && (
-              <View style={styles.offlineOverlayInModal} pointerEvents="none">
-                <View style={styles.offlineBadge}>
-                 <Text style={styles.offlineText}>
-                  {(selectedProfile?.name || "They")} left the bar
-                </Text>
+                <View style={styles.offlineOverlayInModal} pointerEvents="none">
+                  <View style={styles.offlineBadge}>
+                    <Text style={styles.offlineText}>
+                      {(selectedProfile?.name || "They")} left the bar
+                    </Text>
+                  </View>
                 </View>
               )}
+
             </View>
           </View>
         </View>
@@ -2379,57 +2372,18 @@ const { setShowWcButton } = useContext(NavbarContext);
                   },
                 ]}
                 pointerEvents="auto"
-              >{/*}
-              {deletionFlag && (
-                <View style={styles.deletionBanner}>
-                  <Text style={styles.deletionBannerText}>
-                    {deletionFlag === 'you' ? 'You deleted this chat' : 'They deleted this chat'}
-                  </Text>
-                </View>
-              )} */}
-
-              <TouchableOpacity
-                onPress={() => setFirstMessageModalVisible(false)}
-                style={styles.closeButton}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Image
-                  style={{ width: 20, height: 20 }}
-                  source={require("../assets/images/x.png")}
-                />
-              </TouchableOpacity>
-
-              {selectedProfile && (
-                <>
-                  <ScrollView
-                    contentContainerStyle={[
-                      styles.modalBody,
-                      { paddingBottom: 28 + insets.bottom },
-                    ]}
-                    showsVerticalScrollIndicator={false}
-                  >
-                    <Text
-                      style={[
-                        styles.modalLocation,
-                        { marginTop: 12, marginBottom: 4, fontSize: 18, textAlign: "center", margin: "auto" },
-                      ]}
-                    >
-                      Your first message
+                {/*
+                {deletionFlag && (
+                  <View style={styles.deletionBanner}>
+                    <Text style={styles.deletionBannerText}>
+                      {deletionFlag === "you"
+                        ? "You deleted this chat"
+                        : "They deleted this chat"}
                     </Text>
-                    <TextInput
-                       style={[
-                        styles.replyInput,
-                        { minHeight: 140, maxHeight: 260 }, // ⬅️ bigger box
-                      ]}
-                      value={firstMessageText}
-                      onChangeText={(t) => stripLinksAndWarn(t, setFirstMessageText)}
-                      placeholder="Say something nice…"
-                      placeholderTextColor="#7A4C6E"
-                      multiline
-                      blurOnSubmit
-                      returnKeyType="done"
-                      onSubmitEditing={Keyboard.dismiss}
-                    />
+                  </View>
+                )}
+                */}
 
                 <TouchableOpacity
                   onPress={() => setFirstMessageModalVisible(false)}
@@ -2466,7 +2420,10 @@ const { setShowWcButton } = useContext(NavbarContext);
                         Your first message
                       </Text>
                       <TextInput
-                        style={styles.replyInput}
+                        style={[
+                          styles.replyInput,
+                          { minHeight: 140, maxHeight: 260 },
+                        ]}
                         value={firstMessageText}
                         onChangeText={(t) =>
                           stripLinksAndWarn(t, setFirstMessageText)
@@ -2500,6 +2457,7 @@ const { setShowWcButton } = useContext(NavbarContext);
           </TouchableWithoutFeedback>
         </View>
       )}
+
 
       {noLinksVisible && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
