@@ -73,9 +73,6 @@ import {
   BarClosedOverlay,
 } from "@/services/mmPopups/barClosed";
 
-const BaseStack = createStackNavigator();
-const Stack = withLayoutContext(BaseStack.Navigator);
-
 const withoutBg = {
   ...animationData,
   layers: animationData.layers.filter(
