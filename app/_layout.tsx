@@ -51,6 +51,7 @@ import LottieView from "lottie-react-native";
 import animationData from "../assets/videos/mm-dancing.json";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as SystemUI from "expo-system-ui";
+import PushNavBridge from "./PushNavBridge"
 
 
 import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
