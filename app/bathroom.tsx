@@ -5,7 +5,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  ImageBackground,
   Image,
   StyleSheet,
   Modal,
@@ -14,7 +13,6 @@ import {
   Platform,
   Alert,
   Linking,
-  Dimensions,
   ActivityIndicator,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -32,16 +30,11 @@ import closeIcon from "../assets/images/x.png";
 import LottieView from "lottie-react-native";
 import animationData from "../assets/videos/mm-dancing.json";
 import * as ImagePicker from "expo-image-picker";
-
-// import { Camera, useCameraDevice } from "react-native-vision-camera";
-// import FaceDetector from "@react-native-ml-kit/face-detection";
-
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // resolve the asset to get its intrinsic size
 const bathroomImg = require("../assets/images/bathroom.png");
 const { width: imgW, height: imgH } = Image.resolveAssetSource(bathroomImg);
-const BG_ASPECT_RATIO = imgW / imgH;
 
 const withoutBg = {
   ...animationData,
@@ -49,10 +42,6 @@ const withoutBg = {
     (layer) => layer.ty !== 1 || layer.nm !== "Dark Blue Solid 1"
   ),
 };
-
-// ===== Stage sizing helpers (fit whole image on screen) =====
-
-// Place children by normalized art coords (0..1)
 
 export default function BathroomScreen() {
   const router = useRouter();
@@ -70,17 +59,10 @@ export default function BathroomScreen() {
   const [descriptionError, setDescriptionError] = useState("");
   const [locationLoading, setLocationLoading] = useState(false);
   const [showChitChats, setShowChitChats] = useState(false);
-  const [popupFlag, setPopupFlag] = useState<string | null>(null);
   const [mustAnswer, setMustAnswer] = useState(false);
 
-  // const [cameraVisible, setCameraVisible] = useState(false);
-  // const cameraRef = useRef<Camera>(null);
-  // const device = useCameraDevice("front");
-  // const [noFaceVisible, setNoFaceVisible] = useState(false);
-  // const [validating, setValidating] = useState(false);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
 
-  const scaleCover = Math.max(stageSize.w / imgW || 0, stageSize.h / imgH || 0);
   const dispW = stageSize.w;
   const dispH = stageSize.h;
   const imgLeft = 0;
@@ -95,14 +77,6 @@ export default function BathroomScreen() {
   const mirrorScale =
     dispW > 0 ? Math.min(1.25, Math.max(0.8, (dispW * mirrorW) / 360)) : 1;
 
-  // Reusable scaled sizes (clamped)
-  const fs = (base: number) =>
-    Math.round(Math.min(24, Math.max(10, base * mirrorScale)));
-  // Mirror box actual width in pixels
-  const mirrorBoxW = dispW * mirrorW;
-
-  // Photo size: ~42% of mirror width, clamped between 80–160 px
-  // helpers (put near other small utils)
   const clamp = (v: number, lo: number, hi: number) =>
     Math.max(lo, Math.min(hi, v));
   const remap = (
@@ -116,21 +90,14 @@ export default function BathroomScreen() {
     ((clamp(v, inMin, inMax) - inMin) * (outMax - outMin)) / (inMax - inMin);
 
   // ---- Avatar size (responsive) ----
+  const mirrorBoxW = dispW * mirrorW;
   const shortSidePx = Math.min(dispW || 0, dispH || 0);
-
-  // Base size relative to mirror width (tweak 0.38..0.44 if needed)
   const baseAvatar = mirrorBoxW * 0.4;
 
-  // Smaller screens (shortSide~340) get ~-10%, tall phones (shortSide~430) get ~+18%
   let mult = remap(shortSidePx, 340, 430, 0.9, 1.18);
-
-  // Extra haircut for *very* small screens
   if (shortSidePx < 360) {
-    // 300→0.78x … 330→0.86x (keeps really tiny devices in check)
     mult = remap(shortSidePx, 250, 230, 0.68, 0.8);
   }
-
-  // Final size with sane clamps
   const photoSize = Math.round(clamp(baseAvatar * mult, 82, 168));
 
   // editing-about modal
@@ -144,10 +111,9 @@ export default function BathroomScreen() {
   const rollAnim = useRef(new Animated.Value(500)).current;
   const [chats, setChats] = useState<SavedChat[]>([]);
 
-  // NEW: Onboarding flow (uses the SAME “Mr. Mingles” modal container)
+  // NEW: Onboarding flow
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0);
-
   const [hasSavedInSession, setHasSavedInSession] = useState(!!profileComplete);
 
   // DOB step fields + refs for auto-advance
@@ -158,16 +124,14 @@ export default function BathroomScreen() {
   const mmRef = useRef<TextInput>(null);
   const yyyyRef = useRef<TextInput>(null);
 
+  // ===== NEW: name + dob validation states =====
+  const NAME_MAX = 20;
+  const [nameTooLong, setNameTooLong] = useState(false);
+  const [dobInvalid, setDobInvalid] = useState(false);
+
   const insets = useSafeAreaInsets();
-
   const [navH, setNavH] = useState(0);
-
-  // If the navbar already includes its own safe-area padding (most do),
-  // use its measured height only. Before we’ve measured, fall back to insets.top.
   const TOP_PADDING = navH > 0 ? navH : insets.top;
-
-  // how much to bias vertical placement: 0 = top, .5 = center, 1 = bottom
-  const Y_ANCHOR = 0; // <- pin toward the top
 
   const isMounted = useRef(true);
   useEffect(() => {
@@ -176,68 +140,39 @@ export default function BathroomScreen() {
     };
   }, []);
 
-  // determine if Next should be enabled on each step
-  // replace your nextEnabled with this:
-  const nextEnabled =
-    onboardingStep === 0
-      ? name.trim().length > 0
-      : onboardingStep === 1
-      ? dobDD.length === 2 &&
-        dobMM.length === 2 &&
-        dobYYYY.length === 4 &&
-        isValidAdult(dobDD, dobMM, dobYYYY) &&
-        isMinYearOk(dobYYYY) // <- block pre-1945
-      : onboardingStep === 2
-      ? location.trim().length > 0
-      : true;
-
-  // show animation only on first and last step
-  const showAnimatedMM =
-    onboardingVisible &&
-    (onboardingStep === 0 ||
-      onboardingStep === 1 ||
-      onboardingStep === 2 ||
-      onboardingStep === 3);
-
   // Firestore user ref for chit-chats
   const userDocRef = auth.currentUser
     ? doc(firestore, "users", auth.currentUser.uid)
     : null;
 
+  // ===== Helpers for DOB validity =====
+  const parseIntSafe = (s: string) => {
+    const n = parseInt(s, 10);
+    return Number.isFinite(n) ? n : NaN;
+  };
+
+  const isValidDD = (dd: string) => {
+    if (!dd) return true; // don't show error while empty
+    const n = parseIntSafe(dd);
+    return Number.isFinite(n) && n >= 1 && n <= 31;
+  };
+
+  const isValidMM = (mm: string) => {
+    if (!mm) return true;
+    const n = parseIntSafe(mm);
+    return Number.isFinite(n) && n >= 1 && n <= 12;
+  };
+
+  const recomputeDobInvalid = (dd: string, mm: string) => {
+    const shouldCheck = dd.length > 0 || mm.length > 0;
+    if (!shouldCheck) return false;
+    return !isValidDD(dd) || !isValidMM(mm);
+  };
+
   function isMinYearOk(yyyy: string) {
     const y = parseInt(yyyy, 10);
     return !isNaN(y) && y >= 1945;
   }
-
-  // Always pass a proper URI with scheme (file://) to ML Kit on BOTH platforms
-  // async function validateFace(fileUri: string) {
-  //   const uri = fileUri.startsWith('file://') ? fileUri : `file://${fileUri}`;
-
-  //   try {
-  //     const options: any = {
-  //       performanceMode: 'fast',
-  //       classificationMode: 'none',
-  //       contourMode: 'none',
-  //       minFaceSize: 0.05,
-  //       isTrackingEnabled: false,
-  //     };
-
-  //     const mod: any = FaceDetector as any;
-
-  //     // Prefer detectFromFile; fall back to other method names some versions expose
-  //     const faces =
-  //       (typeof mod.detectFromFile === 'function' && await mod.detectFromFile(uri, options)) ||
-  //       (typeof mod.detectFromUri  === 'function' && await mod.detectFromUri(uri, options)) ||
-  //       (typeof mod.detect         === 'function' && await mod.detect(uri, options)) ||
-  //       [];
-
-  //     console.log('MLKit faces count =', Array.isArray(faces) ? faces.length : faces);
-  //     return Array.isArray(faces) && faces.length > 0;
-  //   } catch (e) {
-  //     console.warn('Face detection failed:', e, { fileUri: uri });
-  //     return false;
-  //   }
-  // }
 
   useEffect(() => {
     if (!userDocRef) return;
@@ -254,13 +189,8 @@ export default function BathroomScreen() {
 
   async function handleSave(type: ChatType, content: string, index?: number) {
     const next = [...chats];
-    if (index != null) {
-      // edit existing
-      next[index] = { type, content };
-    } else {
-      // add new
-      next.push({ type, content });
-    }
+    if (index != null) next[index] = { type, content };
+    else next.push({ type, content });
 
     setChats(next);
 
@@ -303,6 +233,9 @@ export default function BathroomScreen() {
       setLocation(profile.location || "");
       setAbout(profile.about || "");
       setPhotoUri(profile.photoUri || null);
+
+      // keep validation flags consistent on load
+      setNameTooLong((profile.name || "").length > NAME_MAX);
     }
   }, [profile]);
 
@@ -315,7 +248,7 @@ export default function BathroomScreen() {
     [FontNames.MontSerratSemiBold]: require("../assets/fonts/Montserrat-SemiBold.ttf"),
   });
 
-  // animate Mr. Mingles warning (existing)
+  // animate Mr. Mingles warning
   useEffect(() => {
     Animated.timing(rollAnim, {
       toValue: modalVisible || showAnimatedMM ? 0 : 500,
@@ -324,7 +257,7 @@ export default function BathroomScreen() {
     }).start();
   }, [modalVisible, showAnimatedMM]);
 
-  // typewriter for warning (existing)
+  // typewriter for warning
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
     if (modalVisible) {
@@ -341,18 +274,15 @@ export default function BathroomScreen() {
   }, [modalVisible]);
 
   function isProfileCompleteLocal(p?: any) {
-    // Adjust the fields to match your "complete" definition
     return Boolean(p?.name && p?.age && p?.location && p?.about && p?.photoUri);
   }
 
-  // OPEN ONBOARDING when routed from bar welcome (onboard=true) AND we *know* profile is incomplete
+  // OPEN ONBOARDING when routed from bar welcome (onboard=true) AND profile is incomplete
   useEffect(() => {
-    // Prefer the context flag if it’s reliable; otherwise fall back to local computed completeness
     const effectiveComplete =
       (typeof profileComplete === "boolean" ? profileComplete : undefined) ??
       isProfileCompleteLocal(profile);
 
-    // Do nothing until we can actually tell (avoid false “incomplete” before load)
     if (effectiveComplete === undefined) return;
 
     const shouldOnboard =
@@ -369,7 +299,6 @@ export default function BathroomScreen() {
 
   // TEMPORARY camera for expo
   const handleTakePhoto = async () => {
-    // ask for camera permission
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       Alert.alert(
@@ -379,13 +308,12 @@ export default function BathroomScreen() {
       return;
     }
 
-    // open native camera
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [1, 1], // square crop for your circle avatar
+      aspect: [1, 1],
       quality: 0.8,
-      cameraType: ImagePicker.CameraType.front, // selfie cam
+      cameraType: ImagePicker.CameraType.front,
     });
 
     if (result.canceled) return;
@@ -393,57 +321,14 @@ export default function BathroomScreen() {
     const asset = result.assets[0];
     if (!asset?.uri) return;
 
-    // just save the uri, same as before
     setPhotoUri(asset.uri);
   };
-
-  // take photo
-
-  // const handleTakePhoto = async () => {
-  //   const status = await Camera.requestCameraPermission();
-  //   if (status !== "granted") {
-  //     Alert.alert("Camera permission needed", "Please allow camera access to take a profile photo.");
-  //     return;
-  //   }
-  //   setCameraVisible(true);
-  // };
-
-  // const captureAndValidate = async () => {
-  //   if (!cameraRef.current) return;
-  //   try {
-  //     setValidating(true);
-  //     const photo = await cameraRef.current.takePhoto({
-  //       flash: 'off',
-  //       enableShutterSound: true,
-  //       ...(Platform.OS === 'ios' ? { photoCodec: 'jpeg' } : {}),
-  //     });
-
-  //     // Normalize to file://... for both platforms
-  //     const uri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
-
-  //     const ok = await validateFace(uri);
-
-  //     if (ok) {
-  //       // IMPORTANT: Save the *same* uri you validated
-  //       setPhotoUri(uri);
-  //     } else {
-  //       setNoFaceVisible(true);
-  //     }
-  //   } catch (e) {
-  //     console.error(e);
-  //     Alert.alert("Couldn’t capture", "Please try again.");
-  //   } finally {
-  //     setValidating(false);
-  //     setCameraVisible(false);
-  //   }
-  // };
 
   // request location
   const handleRequestLocation = async () => {
     if (!isMounted.current) return;
     setLocationLoading(true);
     try {
-      // 1) Services ON?
       const services = await Location.hasServicesEnabledAsync();
       if (!services) {
         Alert.alert(
@@ -457,7 +342,6 @@ export default function BathroomScreen() {
         return;
       }
 
-      // 2) Permission?
       const { status, canAskAgain } =
         await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
@@ -474,7 +358,6 @@ export default function BathroomScreen() {
         return;
       }
 
-      // 3) Get position (with timeout)
       const pos = await Promise.race([
         Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
@@ -484,7 +367,6 @@ export default function BathroomScreen() {
         ),
       ]);
 
-      // 4) Reverse geocode
       const geo = await Location.reverseGeocodeAsync(pos.coords);
       if (geo && geo.length > 0) {
         const { city, region, country } = geo[0];
@@ -501,9 +383,6 @@ export default function BathroomScreen() {
       }
     } catch (e: any) {
       if (e?.message === "timeout") {
-        // just for testing in emulators
-        setLocation("Test City, Testland");
-
         Alert.alert("Slow GPS", "Couldn’t get a fix. Try again near a window.");
       } else {
         console.error("Location error:", e);
@@ -533,7 +412,6 @@ export default function BathroomScreen() {
       return;
     }
 
-    //  snapshot BEFORE saving
     const wasProfileComplete = !!profileComplete;
 
     setIsSaving(true);
@@ -542,17 +420,14 @@ export default function BathroomScreen() {
       setProfileComplete(true);
       setHasSavedInSession(true);
 
-      // Post-save nudge about Chit Chats
       Alert.alert(
         "Pro tip",
         "Tired of ‘Hey’ and ‘Sup’? Check out the Chit Chats for prompts worth replying to!"
       );
 
-      // First-ever save → send the special flag to bar-2
       if (!wasProfileComplete) {
         router.replace("/bar-2?fromBathroomFirst=1");
       } else {
-        // Later edits → normal return to bar
         router.replace("/bar-2");
       }
     } catch (e) {
@@ -562,9 +437,7 @@ export default function BathroomScreen() {
     }
   };
 
-  // Auto-save after first profile creation: only save if something changed
   const saveProfileIfChanged = async () => {
-    // If we don't even have a loaded profile yet, just bail
     if (!profile) return true;
 
     const orig = profile || {};
@@ -577,15 +450,11 @@ export default function BathroomScreen() {
       current.about !== orig.about ||
       current.photoUri !== orig.photoUri;
 
-    if (!changed) {
-      // Nothing to do, allow navigation
-      return true;
-    }
+    if (!changed) return true;
 
     try {
       setIsSaving(true);
       await saveProfile(current);
-      // Profile is already considered "created", just keep the flag true
       setProfileComplete(true);
       return true;
     } catch (e) {
@@ -618,12 +487,141 @@ export default function BathroomScreen() {
     return ageNum >= 21;
   }
 
+  // ===== NEW: Name change handler (sets too-long flag) =====
+  const onChangeName = (t: string) => {
+    setName(t);
+    setNameTooLong(t.length > NAME_MAX);
+  };
+
+  // auto-advance between DOB fields + recompute invalid dd/mm
+  const pad2 = (s: string) => {
+    const v = s.replace(/\D/g, "");
+    if (v.length === 1) return `0${v}`;
+    return v.slice(0, 2);
+  };
+
+  const inRange = (n: number, lo: number, hi: number) => n >= lo && n <= hi;
+
+  const isValidDDStrict = (dd: string) => {
+    const v = dd.replace(/\D/g, "");
+    if (v.length === 0) return false;
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && inRange(n, 1, 31);
+  };
+
+  const isValidMMStrict = (mm: string) => {
+    const v = mm.replace(/\D/g, "");
+    if (v.length === 0) return false;
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && inRange(n, 1, 12);
+  };
+
+  const finalizeDD = (raw = dobDD) => {
+    const v = raw.replace(/\D/g, "").slice(0, 2);
+    if (!v) return { ok: false, val: "" };
+    const n = parseInt(v, 10);
+    const ok = Number.isFinite(n) && inRange(n, 1, 31);
+    const val = ok ? (v.length === 1 ? `0${v}` : v) : v; // only pad if ok
+    return { ok, val };
+  };
+
+  const finalizeMM = (raw = dobMM) => {
+    const v = raw.replace(/\D/g, "").slice(0, 2);
+    if (!v) return { ok: false, val: "" };
+    const n = parseInt(v, 10);
+    const ok = Number.isFinite(n) && inRange(n, 1, 12);
+    const val = ok ? (v.length === 1 ? `0${v}` : v) : v;
+    return { ok, val };
+  };
+
+  const onChangeDD = (t: string) => {
+    const v = t.replace(/\D/g, "").slice(0, 2);
+    setDobDD(v);
+
+    // show invalid DOB only when they started typing
+    setDobInvalid(recomputeDobInvalid(v, dobMM));
+
+    // if they typed 2 digits, only advance if VALID
+    if (v.length === 2) {
+      if (isValidDDStrict(v)) {
+        mmRef.current?.focus();
+      } else {
+        // keep focus, don't advance
+        ddRef.current?.focus();
+      }
+    }
+  };
+
+  const onChangeMM = (t: string) => {
+    const v = t.replace(/\D/g, "").slice(0, 2);
+    setDobMM(v);
+    setDobInvalid(recomputeDobInvalid(dobDD, v));
+
+    if (v.length === 2) {
+      if (isValidMMStrict(v)) {
+        yyyyRef.current?.focus();
+      } else {
+        mmRef.current?.focus();
+      }
+    }
+  };
+
+  const onChangeYYYY = (t: string) => {
+    const v = t.replace(/\D/g, "").slice(0, 4);
+    setDobYYYY(v);
+  };
+
+  // Call these onBlur so "2" becomes "02" AFTER you leave the field.
+  // Also: if invalid, we keep focus here and do not pad.
+  const onBlurDD = () => {
+    const { ok, val } = finalizeDD();
+    if (!dobDD) return; // nothing typed
+    setDobDD(val);
+    setDobInvalid(recomputeDobInvalid(val, dobMM));
+    if (!ok) {
+      // bounce focus back if invalid
+      ddRef.current?.focus();
+    }
+  };
+
+  const onBlurMM = () => {
+    const { ok, val } = finalizeMM();
+    if (!dobMM) return;
+    setDobMM(val);
+    setDobInvalid(recomputeDobInvalid(dobDD, val));
+    if (!ok) {
+      mmRef.current?.focus();
+    }
+  };
+
+  // determine if Next should be enabled on each step
+  // ===== UPDATED: includes nameTooLong + dobInvalid blocking =====
+  const nextEnabled =
+    onboardingStep === 0
+      ? name.trim().length > 0 && !nameTooLong
+      : onboardingStep === 1
+      ? dobDD.length === 2 &&
+        dobMM.length === 2 &&
+        dobYYYY.length === 4 &&
+        !dobInvalid &&
+        isValidAdult(dobDD, dobMM, dobYYYY) &&
+        isMinYearOk(dobYYYY)
+      : onboardingStep === 2
+      ? location.trim().length > 0
+      : true;
+
+  const showAnimatedMM =
+    onboardingVisible &&
+    (onboardingStep === 0 ||
+      onboardingStep === 1 ||
+      onboardingStep === 2 ||
+      onboardingStep === 3);
+
   // Onboarding step handlers
   const handleNext = async () => {
     if (!nextEnabled) return;
 
     if (onboardingStep === 0) {
-      // lock-in name (note: "can’t change later" – you could persist immediately if desired)
       setOnboardingStep(1);
     } else if (onboardingStep === 1) {
       const ageNum = computeAgeFromDob(dobDD, dobMM, dobYYYY);
@@ -642,28 +640,11 @@ export default function BathroomScreen() {
       setOnboardingStep(3);
     } else if (onboardingStep === 3) {
       setOnboardingVisible(false);
-      // user can complete remaining fields now
     }
   };
 
   const handleLocationPrompt = async () => {
     await handleRequestLocation();
-  };
-
-  // auto-advance between DOB fields
-  const onChangeDD = (t: string) => {
-    const v = t.replace(/\D/g, "").slice(0, 2);
-    setDobDD(v);
-    if (v.length === 2) mmRef.current?.focus();
-  };
-  const onChangeMM = (t: string) => {
-    const v = t.replace(/\D/g, "").slice(0, 2);
-    setDobMM(v);
-    if (v.length === 2) yyyyRef.current?.focus();
-  };
-  const onChangeYYYY = (t: string) => {
-    const v = t.replace(/\D/g, "").slice(0, 4);
-    setDobYYYY(v);
   };
 
   const renderOnboardingContent = () => {
@@ -688,12 +669,18 @@ export default function BathroomScreen() {
                 placeholder="Your name"
                 placeholderTextColor="#999"
                 value={name}
-                onChangeText={setName}
+                onChangeText={onChangeName}
                 autoCapitalize="words"
               />
               <Text style={onboardStyles.comment}>
                 You won’t be able to change it after.
               </Text>
+
+              {nameTooLong && (
+                <Text style={onboardStyles.errorText}>
+                  Your name is too long, choose a nickname or something...
+                </Text>
+              )}
             </>
           )}
 
@@ -708,6 +695,7 @@ export default function BathroomScreen() {
                   keyboardType="number-pad"
                   value={dobDD}
                   onChangeText={onChangeDD}
+                  onBlur={onBlurDD}
                   maxLength={2}
                 />
                 <Text style={onboardStyles.slash}>/</Text>
@@ -719,6 +707,7 @@ export default function BathroomScreen() {
                   keyboardType="number-pad"
                   value={dobMM}
                   onChangeText={onChangeMM}
+                  onBlur={onBlurMM}
                   maxLength={2}
                 />
                 <Text style={onboardStyles.slash}>/</Text>
@@ -733,10 +722,19 @@ export default function BathroomScreen() {
                   maxLength={4}
                 />
               </View>
+
               <Text style={onboardStyles.comment}>
                 You won’t be able to change it after.
               </Text>
 
+              {/* NEW: DD/MM invalid message */}
+              {dobInvalid && (
+                <Text style={onboardStyles.errorText}>
+                  Invalid date of birth
+                </Text>
+              )}
+
+              {/* existing age too young */}
               {dobDD &&
                 dobMM &&
                 dobYYYY &&
@@ -747,6 +745,7 @@ export default function BathroomScreen() {
                   </Text>
                 )}
 
+              {/* existing too old */}
               {dobYYYY.length === 4 && parseInt(dobYYYY, 10) < 1945 && (
                 <Text style={onboardStyles.errorText}>
                   Are you lost? Do you need me to call your nurse?
@@ -806,7 +805,7 @@ export default function BathroomScreen() {
           )}
         </View>
 
-        {/* Mr. Mingles image (animated only first/last) */}
+        {/* Mr. Mingles image */}
         {showAnimatedMM && (
           <Animated.View
             pointerEvents="none"
@@ -814,7 +813,6 @@ export default function BathroomScreen() {
               modalStyles.mrMingles,
               { transform: [{ translateX: rollAnim }] },
             ]}
-            // optional: accessibility clean-up so screen readers ignore the overlay:
             accessible={false}
             importantForAccessibility="no-hide-descendants"
           >
@@ -900,7 +898,6 @@ export default function BathroomScreen() {
               router.replace("/bar-2");
               return;
             }
-
             const ok = await saveProfileIfChanged();
             if (ok) router.replace("/bar-2");
           }}
@@ -979,18 +976,10 @@ export default function BathroomScreen() {
                   onChangeText={setLocation}
                   editable={false}
                 />
-                {/* {locationLoading && (
-                  <LottieView
-                    source={withoutBg}
-                    autoPlay
-                    loop
-                    style={styles.locationInlineLoader}
-                  />
-                )} */}
                 {locationLoading && (
                   <ActivityIndicator
-                    size="small" // or "large"
-                    color="#999" // match your UI
+                    size="small"
+                    color="#999"
                     style={styles.locationInlineLoader}
                   />
                 )}
@@ -1106,8 +1095,6 @@ export default function BathroomScreen() {
         )}
       </View>
 
-      {/* ✅ MODALS OUTSIDE STAGE so overlay covers navbar/status bar too */}
-
       {/* Incomplete profile warning modal */}
       <Modal
         transparent
@@ -1162,22 +1149,14 @@ export default function BathroomScreen() {
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-    width: "100%",
-    alignItems: "center",
-  },
+  background: { flex: 1, width: "100%", alignItems: "center" },
   formContainer: {
     position: "absolute",
     width: "90%",
     overflow: "hidden",
     paddingHorizontal: scale(6),
   },
-  closeIcon: {
-    width: 24,
-    height: 24,
-    tintColor: "#F5E1C4",
-  },
+  closeIcon: { width: 24, height: 24, tintColor: "#F5E1C4" },
   input: {
     width: "100%",
     fontSize: scale(16),
@@ -1189,19 +1168,14 @@ const styles = StyleSheet.create({
     paddingVertical: verticalScale(3),
     includeFontPadding: false,
   },
-  locationContainer: {
-    alignItems: "center",
-    paddingBottom: verticalScale(1),
-  },
+  locationContainer: { alignItems: "center", paddingBottom: verticalScale(1) },
   locationInputWrap: {
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
   },
-  inputLoadingText: {
-    color: "transparent", // hide text while loader shows "in its place"
-  },
+  inputLoadingText: { color: "transparent" },
   locationInlineLoader: {
     position: "absolute",
     height: scale(100),
@@ -1217,26 +1191,11 @@ const styles = StyleSheet.create({
     marginTop: verticalScale(1),
     alignSelf: "center",
   },
-  editButtonText: {
-    fontSize: scale(9),
-    fontFamily: FontNames.MontserratBold,
-  },
-  photoContainer: {
-    alignItems: "center",
-    marginVertical: verticalScale(2),
-  },
-  photo: {
-    width: scale(130),
-    height: scale(130),
-    borderRadius: scale(100),
-  },
-  editButtonPhoto: {
-    marginTop: verticalScale(10),
-  },
-  aboutContainer: {
-    alignItems: "center",
-    marginVertical: verticalScale(5),
-  },
+  editButtonText: { fontSize: scale(9), fontFamily: FontNames.MontserratBold },
+  photoContainer: { alignItems: "center", marginVertical: verticalScale(2) },
+  photo: { width: scale(130), height: scale(130), borderRadius: scale(100) },
+  editButtonPhoto: { marginTop: verticalScale(10) },
+  aboutContainer: { alignItems: "center", marginVertical: verticalScale(5) },
   aboutText: {
     fontSize: scale(11),
     color: "gray",
@@ -1246,9 +1205,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     paddingHorizontal: 8,
   },
-  bottomEdit: {
-    marginTop: verticalScale(5),
-  },
+  bottomEdit: { marginTop: verticalScale(5) },
   hitbox: {
     position: "absolute",
     top: "70%",
@@ -1262,23 +1219,15 @@ const styles = StyleSheet.create({
     right: "10%",
     width: 120,
     height: 80,
-    //backgroundColor: "rgba(0,255,0,0.2)"   --DEBUG COLOR
   },
-  bottomNavbarContainer: {
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
-  },
+  bottomNavbarContainer: { position: "absolute", bottom: 0, width: "100%" },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
-  inputLocked: {
-    color: "#6f6d8a", // dimmed look
-    opacity: 0.8,
-  },
+  inputLocked: { color: "#6f6d8a", opacity: 0.8 },
   saveBtn: {
     position: "absolute",
     bottom: verticalScale(30),
@@ -1308,7 +1257,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 300, // make sure it's above everything else
+    zIndex: 300,
   },
 });
 
@@ -1381,7 +1330,6 @@ const modalStyles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   closeButtonText: {
     color: "#fff",
     fontSize: moderateScale(35),
@@ -1397,7 +1345,7 @@ const modalStyles = StyleSheet.create({
     padding: verticalScale(20),
     alignItems: "center",
     position: "relative",
-    overflow: "visible", // <- allow MM to hang out of the box
+    overflow: "visible",
     marginBottom: "55%",
   },
   modalText: {
@@ -1451,7 +1399,7 @@ const modalStyles = StyleSheet.create({
   },
 });
 
-// Onboarding-specific styles (inside the “lazy shit” modal container)
+// Onboarding-specific styles
 const onboardStyles = StyleSheet.create({
   speechWrap: {
     width: "100%",
@@ -1505,9 +1453,7 @@ const onboardStyles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 8,
   },
-  nextButtonDisabled: {
-    opacity: 0.4,
-  },
+  nextButtonDisabled: { opacity: 0.4 },
   nextText: {
     fontSize: scale(18),
     color: "#ffe3d0",
@@ -1521,17 +1467,9 @@ const onboardStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  dobCell: {
-    width: scale(60),
-  },
-  dobYear: {
-    width: scale(90),
-  },
-  slash: {
-    color: "#fff",
-    marginHorizontal: scale(6),
-    fontSize: scale(22),
-  },
+  dobCell: { width: scale(60) },
+  dobYear: { width: scale(90) },
+  slash: { color: "#fff", marginHorizontal: scale(6), fontSize: scale(22) },
   primaryButton: {
     backgroundColor: "#6e1944",
     borderWidth: 4,
