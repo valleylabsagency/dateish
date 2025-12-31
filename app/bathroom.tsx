@@ -425,11 +425,11 @@ export default function BathroomScreen() {
         "Tired of ‘Hey’ and ‘Sup’? Check out the Chit Chats for prompts worth replying to!"
       );
 
-      if (!wasProfileComplete) {
-        router.replace("/bar-2?fromBathroomFirst=1");
-      } else {
-        router.replace("/bar-2");
-      }
+      // if (!wasProfileComplete) {
+      //   router.replace("/bar-2?fromBathroomFirst=1");
+      // } else {
+      //   router.replace("/bar-2");
+      // }
     } catch (e) {
       console.error(e);
     } finally {
@@ -791,15 +791,6 @@ export default function BathroomScreen() {
                 style={[onboardStyles.comment, { marginTop: verticalScale(8) }]}
               >
                 I’m going out for a smoke. Come back to the bar when you finish.
-              </Text>
-              <Text
-                style={[
-                  onboardStyles.comment,
-                  { marginTop: verticalScale(8), fontStyle: "italic" },
-                ]}
-              >
-                Tip: Tired of “Hey” and “Sup”? Check out the Chit Chats to get
-                something worth replying to!
               </Text>
             </>
           )}
@@ -1426,7 +1417,7 @@ const onboardStyles = StyleSheet.create({
   },
   comment: {
     color: "#cfd2ff",
-    fontSize: scale(12),
+    fontSize: scale(16),
     marginTop: verticalScale(8),
     textAlign: "center",
     fontFamily: FontNames.MontserratExtraLightItalic,
