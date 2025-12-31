@@ -13,6 +13,7 @@ type Props = {
   bottom?: React.ReactNode;
 
   style?: StyleProp<ViewStyle>;
+  contentOverflowHidden?: boolean; // default true
 };
 
 export function ScreenShell({
@@ -23,6 +24,7 @@ export function ScreenShell({
   children,
   bottom,
   style,
+  contentOverflowHidden,
 }: Props) {
   return (
     <View style={[styles.screen, style]}>
@@ -44,7 +46,14 @@ export function ScreenShell({
         {hud ? <View style={styles.hud}>{hud}</View> : null}
 
         {/* Content gets the remaining space */}
-        <View style={styles.content}>{children}</View>
+        <View
+          style={[
+            styles.content,
+            contentOverflowHidden === false ? { overflow: "visible" } : null,
+          ]}
+        >
+          {children}
+        </View>
 
         {bottom ? <View style={styles.bottom}>{bottom}</View> : null}
       </View>

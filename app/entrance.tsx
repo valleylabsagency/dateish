@@ -1477,13 +1477,13 @@ const styles = StyleSheet.create({
   background: { width, height: "100%", alignItems: "center" },
   entranceSign: {
     position: "absolute",
-    top: "-16%",
+    top: "-19%",
     width: width * 0.7,
     height: height * 0.7,
   },
   bannerContainer: {
     position: "absolute",
-    top: height * 0.32,
+    top: height * 0.29,
     width: width * 0.9,
     height: height * 0.07,
   },

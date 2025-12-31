@@ -1083,9 +1083,12 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
   const rot = dir.dy === 1 ? Math.PI / 2 : dir.dy === -1 ? -Math.PI / 2 : 0;
   const scaleX = dir.dx === -1 ? -1 : 1;
 
+  const mazeTranslateY = Math.max(0, PADY + UI_CONFIG.MAZE_Y_OFFSET);
+
   /* ===================== RENDER ===================== */
   return (
     <ScreenShell
+      contentOverflowHidden={false}
       backgroundSource={require("./lyd/BACKGROUND_NO_TITLE.png")}
       bgTransform={[
         { scale: BG_SCALE },
@@ -1174,10 +1177,7 @@ export default function LittleYellowDude({ onFinish }: LittleYellowDudeProps) {
         {!layout.ready ? null : (
           <Canvas style={{ width: layout.width, height: layout.height }}>
             <Group
-              transform={[
-                { translateX: PADX },
-                { translateY: PADY + UI_CONFIG.MAZE_Y_OFFSET },
-              ]}
+              transform={[{ translateX: PADX }, { translateY: mazeTranslateY }]}
             >
               <Rect x={0} y={0} width={STAGE_W} height={STAGE_H} color="#000" />
 
@@ -1461,8 +1461,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     height: 44, // lock it
+    bottom: 10,
   },
   invRow: { flexDirection: "row", alignItems: "center" },
   invSlot: {
@@ -1551,7 +1552,7 @@ const styles = StyleSheet.create({
   restartTxt: { color: "#e5e7eb", fontSize: 18, fontWeight: "800" },
 
   // Controller (inside ScreenShell bottom slot)
-  pad: { alignSelf: "center", alignItems: "center" },
+  pad: { alignSelf: "center", alignItems: "center", bottom: 10 },
   padRow: {
     flexDirection: "row",
     gap: 10,
