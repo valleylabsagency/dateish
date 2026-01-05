@@ -602,6 +602,18 @@ export default function ChatScreen() {
       >
         <View style={typingModalStyles.container}>
           <View style={typingModalStyles.inputBox}>
+            {/* SMALL CLOSE X */}
+            <TouchableOpacity
+              style={typingModalStyles.closeButton}
+              onPress={() => closeTyping(false)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Image
+                source={require("../assets/images/x.png")}
+                style={typingModalStyles.closeIcon}
+              />
+            </TouchableOpacity>
+
             <TextInput
               style={typingModalStyles.textInput}
               value={inputMessage}
@@ -611,6 +623,7 @@ export default function ChatScreen() {
               multiline
               autoFocus
             />
+
             <TouchableOpacity
               style={typingModalStyles.doneButton}
               onPress={() => closeTyping(true)}
@@ -829,6 +842,7 @@ const typingModalStyles = ScaledSheet.create({
     borderRadius: "10@ms",
     padding: "20@ms",
     alignItems: "center",
+    paddingTop: "44@ms", // 👈 ADD THIS (space for X)
   },
   textInput: {
     width: "100%",
@@ -850,6 +864,22 @@ const typingModalStyles = ScaledSheet.create({
   doneButtonText: {
     color: "#fff",
     fontSize: "18@ms",
+  },
+  closeButton: {
+    position: "absolute",
+    top: "10@ms",
+    right: "10@ms",
+    width: "28@ms", // smaller than other modals
+    height: "28@ms",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+
+  closeIcon: {
+    width: "16@ms", // smaller icon
+    height: "16@ms",
+    tintColor: "#333",
   },
 });
 
