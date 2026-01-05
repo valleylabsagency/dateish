@@ -63,6 +63,10 @@ export default function EventsScreen() {
       >
         {/* Centered overlay content */}
         <View style={styles.contentContainer}>
+          {/* <Text style={styles.events}>
+            All the fun events are gonna be here
+          </Text> */}
+          <Text style={styles.comingSoon}>Live Events Coming Soon!</Text>
           <Text style={styles.description}>
             <Text style={styles.bold}>
               Dateish is new so there aren’t many people here yet……
@@ -100,33 +104,57 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 90,
+    paddingHorizontal: 20,
+  },
+
+  events: {
+    marginTop: 30,
+    marginBottom: 30,
+    fontFamily: FontNames.MontserratBold,
+    fontSize: 26,
+    width: "80%",
+    lineHeight: 36,
+    color: "#fc5b32ff",
+    textAlign: "center",
+  },
+
+  comingSoon: {
+    marginTop: 10,
+    marginBottom: 35,
+    fontFamily: FontNames.MontserratBold,
+    fontSize: 32,
+    width: "80%",
+    lineHeight: 36,
+    color: "#fde3b6",
+    textAlign: "center",
   },
 
   description: {
     fontFamily: FontNames.MontserratRegular,
-    fontSize: 24,
+    fontSize: 22,
     lineHeight: 30,
     color: "white",
     textAlign: "center",
+    paddingHorizontal: 20,
+    marginTop: 40,
   },
   bold: {
-    fontFamily: FontNames.MontserratBold,
-    fontWeight: "700",
+    fontFamily: FontNames.MontserratRegular,
   },
 
   callToAction: {
     marginTop: 30,
-    marginBottom: 30,
+    marginBottom: 60,
     fontFamily: FontNames.MontserratBold,
-    fontSize: 28,
+    fontSize: 30,
     lineHeight: 36,
     color: "#fde3b6",
     textAlign: "center",
   },
 
   shareButton: {
-    marginTop: 32,
+    marginTop: 10,
+    marginBottom: 10,
     backgroundColor: "#592540",
     borderColor: "#460b2a",
     borderWidth: 2,
