@@ -40,6 +40,7 @@ import * as StoreReview from "expo-store-review";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsFocused } from "@react-navigation/native";
 import * as NavigationBar from "expo-navigation-bar";
+import { AppText } from "@/components/AppText";
 
 const BG_IMG = require("../assets/images/mm-back.png");
 const FRONT_IMG = require("../assets/images/mm-front.png");
@@ -503,11 +504,11 @@ export default function MinglesScreen() {
                     paddingRight: 40,
                   }}
                 >
-                  <Text
+                  <AppText
                     style={[styles.bubbleText, { includeFontPadding: false }]}
                   >
                     {messages[idx]}
-                  </Text>
+                  </AppText>
 
                   {idx === 0 && (
                     <TouchableOpacity
@@ -838,7 +839,11 @@ export default function MinglesScreen() {
         title="Bar Rules"
         onClose={() => setShowPopupRules(false)}
       >
-        <ScrollView style={shopStyles.vipScroll}>
+        <ScrollView
+          style={shopStyles.vipScroll}
+          showsVerticalScrollIndicator={true}
+          persistentScrollbar={true}
+        >
           <View style={styles.hoursContainer}>
             <Text style={styles.hoursText}>Opening Hours:{"\n"}</Text>
             <Text style={styles.hours}>17:00–05:00</Text>

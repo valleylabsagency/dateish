@@ -81,6 +81,7 @@ import {
   TouchableWithoutFeedback,
 } from "react-native";
 import SpeechBubblePop from "@/services/SpeechBubblePop";
+import { AppText } from "@/components/AppText";
 
 const BG_IMG = require("../assets/images/bar-back.png");
 const FRONT_IMG = require("../assets/images/bar-front.png");
@@ -1632,7 +1633,9 @@ export default function Bar2Screen() {
                     paddingHorizontal: 20,
                   }}
                 >
-                  <Text style={styles.bubbleText}>{welcomeDisplayed}</Text>
+                  <AppText style={styles.bubbleText}>
+                    {welcomeDisplayed}
+                  </AppText>
                 </View>
               </SpeechBubblePop>
               {/* </ImageBackground> */}
@@ -1856,10 +1859,20 @@ export default function Bar2Screen() {
               paddingHorizontal: 12,
               paddingVertical: 8,
               borderRadius: 12,
-              width: 70,
+              minWidth: 70,
+              alignSelf: "flex-start",
             }}
           >
-            <Text style={styles.skipText}>Skip</Text>
+            <Text
+              style={styles.skipText}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+              ellipsizeMode="clip"
+              allowFontScaling={false} // optional: makes it immune to OS font scaling
+            >
+              SKIP
+            </Text>
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -2397,6 +2410,9 @@ const styles = StyleSheet.create({
     color: "#ffe3d0",
     fontSize: 16,
     fontFamily: FontNames.MontSerratSemiBold,
+    textAlign: "center",
+    includeFontPadding: false, // Android: reduces weird extra vertical padding
+    lineHeight: 18, // keeps it from looking “double-line-ish”
   },
 
   pointerBase: {

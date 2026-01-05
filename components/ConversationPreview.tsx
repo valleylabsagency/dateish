@@ -1,4 +1,3 @@
-// ConversationPreview.tsx
 import React, { useState, useEffect } from "react";
 import { TouchableOpacity, View, Text, Image, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
@@ -6,7 +5,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { firestore } from "../firebase";
 import { FontNames } from "../constants/fonts";
 import { MaterialIcons } from "@expo/vector-icons";
-
+import { AppText } from "@/components/AppText";
 
 interface ConversationPreviewProps {
   conversation: any;
@@ -14,74 +13,92 @@ interface ConversationPreviewProps {
   online: boolean;
 }
 
-const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation, currentUserId, online }) => {
+/**
+ * Space reserved so text doesn't collide with the trash icon
+ * Keep this tight — adjust between 36–48 if needed
+ */
+const RIGHT_GUTTER_FOR_TRASH = 44;
+
+const ConversationPreview: React.FC<ConversationPreviewProps> = ({
+  conversation,
+  currentUserId,
+  online,
+}) => {
   const router = useRouter();
-  const partnerUid = conversation.users.filter((uid: string) => uid !== currentUserId)[0];
-  
-  // Instead of using conversation.partnerName directly, fetch the partner's name from Firestore.
+  const partnerUid = conversation.users.filter(
+    (uid: string) => uid !== currentUserId
+  )[0];
+
   const [partnerName, setPartnerName] = useState("");
   const lastMsg = conversation.lastMessage || "";
-  const timestamp =
-    conversation.updatedAt && conversation.updatedAt.seconds
-      ? new Date(conversation.updatedAt.seconds * 1000).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : "";
-  
+
+  const timestamp = conversation.updatedAt?.seconds
+    ? new Date(conversation.updatedAt.seconds * 1000).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+
   const [photoUri, setPhotoUri] = useState<string>("");
 
   useEffect(() => {
     const fetchPartnerProfile = async () => {
       const userDocRef = doc(firestore, "users", partnerUid);
       const userDocSnap = await getDoc(userDocRef);
-      if (userDocSnap.exists()) {
-        const data = userDocSnap.data();
-        if (data.photoUri && typeof data.photoUri === "string" && data.photoUri.trim().length > 0) {
-          setPhotoUri(data.photoUri);
-        }
-        if (data.name && typeof data.name === "string") {
-          setPartnerName(data.name);
-        }
+      if (!userDocSnap.exists()) return;
+
+      const data = userDocSnap.data();
+      if (typeof data.photoUri === "string" && data.photoUri.trim()) {
+        setPhotoUri(data.photoUri);
+      }
+      if (typeof data.name === "string") {
+        setPartnerName(data.name);
       }
     };
+
     fetchPartnerProfile();
   }, [partnerUid]);
 
   return (
     <TouchableOpacity
-      style={conversationStyles.chatPreview}
+      style={styles.chatPreview}
       onPress={() => {
         if (online) {
-          router.push(`/chat?partner=${partnerUid}`)
+          router.push(`/chat?partner=${partnerUid}`);
         }
       }}
+      activeOpacity={0.85}
     >
       {photoUri ? (
-        <Image
-        source={{ uri: photoUri }}
-        style={conversationStyles.previewImage}
-      />
+        <Image source={{ uri: photoUri }} style={styles.previewImage} />
       ) : (
-        <MaterialIcons
-          name="person"
-          size={120}
-          color="white"
-        />
+        <MaterialIcons name="person" size={120} color="white" />
       )}
-      
-      <View style={conversationStyles.previewTextContainer}>
-        <Text style={conversationStyles.previewName}>{partnerName}</Text>
-        <Text style={conversationStyles.previewLastMessage}>
-          {lastMsg.length > 30 ? lastMsg.slice(0, 30) + "..." : lastMsg}
-        </Text>
+
+      <View style={styles.previewTextContainer}>
+        <AppText
+          style={styles.previewName}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {partnerName}
+        </AppText>
+
+        <AppText
+          style={styles.previewLastMessage}
+          numberOfLines={3}
+          ellipsizeMode="tail"
+        >
+          {lastMsg}
+        </AppText>
       </View>
-      <Text style={conversationStyles.previewTimestamp}>{timestamp}</Text>
+
+      {!!timestamp && <Text style={styles.previewTimestamp}>{timestamp}</Text>}
     </TouchableOpacity>
   );
 };
 
-const conversationStyles = StyleSheet.create({
+const styles = StyleSheet.create({
   chatPreview: {
     backgroundColor: "rgb(89,37,66)",
     opacity: 0.85,
@@ -92,11 +109,22 @@ const conversationStyles = StyleSheet.create({
     borderRadius: 25,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: 4,
+    paddingRight: RIGHT_GUTTER_FOR_TRASH,
     marginVertical: 10,
+    position: "relative",
   },
-  previewImage: { width: 130, height: 130, borderRadius: 65 },
-  previewTextContainer: { flex: 1, marginHorizontal: 10 },
+  previewImage: {
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+  },
+  previewTextContainer: {
+    flex: 1,
+    marginLeft: 6,
+    marginRight: 6,
+    justifyContent: "center",
+  },
   previewName: {
     color: "#e2a350",
     fontSize: 24,
@@ -105,17 +133,17 @@ const conversationStyles = StyleSheet.create({
   previewLastMessage: {
     color: "#fff",
     fontSize: 16,
-    marginTop: 5,
+    marginTop: 6,
     fontFamily: FontNames.MontserratRegular,
+    lineHeight: 20,
   },
   previewTimestamp: {
+    position: "absolute",
+    top: 10,
+    right: 14,
     color: "#fff",
     fontSize: 14,
-    alignSelf: "flex-end",
-    marginBottom: 8,
-    marginRight: 8
   },
-
 });
 
 export default ConversationPreview;
